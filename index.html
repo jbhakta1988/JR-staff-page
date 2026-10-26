@@ -74,13 +74,470 @@ const EXAMPLE_USERS=[
 {id:"mspms-la",name:"Mei Tran",pin:"4160",role:"Laundry Attendant",hotel:"MSPMS",shift:"AM",days:DAYS},
 {id:"mspms-ba",name:"Joy Bennett",pin:"4170",role:"Breakfast Attendant",hotel:"MSPMS",shift:"AM",days:DAYS}
 ];
-// Later, loadUsers() should read active staff from Supabase, for example:
-// const { data, error } = await supabase.from("staff").select("*").eq("active", true);
-// if (error) throw error;
-// return data;
+// Supabase is off until a public directory can load real users. The example demo never calls it.
+const USE_SUPABASE=false;
+const SB_URL="https://clxvmtbmveusrbxacnxe.supabase.co";
+const SB_KEY="sb_publishable_ehDhAPcG-9jVDXx1FU_5PQ_QYb9YP77";
+const STAFF_EMAIL_DOMAIN="staff.jrhospitality.local";
+const SB_JS="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+const DB_CACHE="jrportal_db_cache";
+// TODO(directory): anon cannot read profiles, and public has no staff view.
+// Public functions are only set_my_language and acknowledge_alert. The name list
+// has to load before sign-in, so until a security-definer RPC or view returns
+// id, name, hotel_id, role, active, loadUsers() keeps EXAMPLE_USERS.
+const DIRECTORY_SOURCES=[{kind:"rpc",name:"staff_directory"},{kind:"view",name:"staff_directory"},{kind:"view",name:"public_profiles"}];
+const ROLE_FROM_DB={above_property:"Above Property",gm:"GM",agm:"AGM",front_desk:"Front Desk",hk_lead:"Housekeeping",housekeeper:"Housekeeper",maintenance:"Maintenance",shuttle_driver:"Shuttle Driver",house_person:"House Person",laundry:"Laundry Attendant",breakfast:"Breakfast Attendant"};
+const ROLE_TO_DB={"Above Property":"above_property",GM:"gm",AGM:"agm","Front Desk":"front_desk",Housekeeping:"hk_lead",Housekeeper:"housekeeper",Maintenance:"maintenance","Shuttle Driver":"shuttle_driver","House Person":"house_person","Laundry Attendant":"laundry","Breakfast Attendant":"breakfast"};
+const DEPT_FOR_ROLE={"Front Desk":"front_desk",Housekeeping:"housekeeping",Housekeeper:"housekeeping",Maintenance:"maintenance","Shuttle Driver":"shuttle","House Person":"house_person","Laundry Attendant":"laundry","Breakfast Attendant":"breakfast",GM:"management",AGM:"management","Above Property":"management"};
+let sb=null,sbSession=null,sbPush=false,sbBase=null,pushChain=Promise.resolve(),directorySource="example",remoteLabor=false,Ssync="";
 let USERS=[];
+function exampleUsers(){return EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>({...u,active:u.active!==false}))}
+function staffEmail(u){if(u.email)return u.email;return String(u.login_id||u.id)+"@"+STAFF_EMAIL_DOMAIN}
+function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||""))}
+function useRemote(){return !!(USE_SUPABASE&&sb&&sbSession)}
+function ensureSb(){
+  if(!USE_SUPABASE)return Promise.resolve(null);
+  if(sb)return Promise.resolve(sb);
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src=SB_JS;s.async=true;
+    s.onload=()=>{
+      const lib=window.supabase;
+      if(!lib||!lib.createClient){reject(new Error("supabase-js did not load"));return}
+      sb=lib.createClient(SB_URL,SB_KEY);resolve(sb);
+    };
+    s.onerror=()=>reject(new Error("Could not load supabase-js"));
+    document.head.appendChild(s);
+  });
+}
+function dbBag(){try{return JSON.parse(sget(DB_CACHE)||"{}")}catch(e){return {}}}
+function dbBagSave(b){sset(DB_CACHE,JSON.stringify(b))}
+function dbCachePut(table,row){
+  if(!row)return;
+  const bag=dbBag();const rows=bag[table]||[];
+  const i=rows.findIndex(r=>r.id===row.id);
+  if(i>=0)rows[i]=row;else rows.unshift(row);
+  bag[table]=rows;dbBagSave(bag);
+}
+function mapDirectoryRow(r){
+  const id=r.id||r.user_id;if(!id||!r.name)return null;
+  const hotel=r.hotel_id===undefined?r.hotel:r.hotel_id;
+  return {id:String(id),user_id:r.user_id||null,email:r.email||null,name:r.name,pin:r.pin||"",role:ROLE_FROM_DB[r.role]||r.role||"",hotel:hotel||null,shift:r.shift||"AM",days:Array.isArray(r.days)?r.days:DAYS,active:r.active!==false,he_employee_id:r.he_employee_id||null};
+}
+async function loadPublicDirectory(){
+  // TODO(directory): none of these exist yet. Checked public schema on 2026-10-26.
+  for(const src of DIRECTORY_SOURCES){
+    try{
+      const res=src.kind==="rpc"?await sb.rpc(src.name):await sb.from(src.name).select("*");
+      if(res.error||!Array.isArray(res.data)||!res.data.length)continue;
+      const rows=res.data.map(mapDirectoryRow).filter(Boolean);
+      if(rows.length){directorySource="supabase";return rows}
+    }catch(e){}
+  }
+  directorySource="example";
+  return null;
+}
 function loadUsers(){
-  return Promise.resolve(EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>({...u,active:u.active!==false})));
+  const example=exampleUsers();
+  if(!USE_SUPABASE)return Promise.resolve(example);
+  return ensureSb().then(()=>loadPublicDirectory()).then(rows=>rows||example).catch(()=>example);
+}
+async function dbSelect(table,opts){
+  opts=opts||{};
+  const bag=dbBag();
+  const cached=(bag[table]||[]).filter(r=>!opts.eq||Object.entries(opts.eq).every(([k,v])=>r[k]===v));
+  if(!useRemote())return cached;
+  try{
+    let q=sb.from(table).select("*").limit(opts.limit||1000);
+    if(opts.eq)for(const [k,v] of Object.entries(opts.eq))if(v!=null)q=q.eq(k,v);
+    const {data,error}=await q;
+    if(error)throw error;
+    if(opts.eq){
+      const rest=(bag[table]||[]).filter(r=>!Object.entries(opts.eq).every(([k,v])=>r[k]===v));
+      bag[table]=rest.concat(data||[]);
+    }else bag[table]=data||[];
+    dbBagSave(bag);
+    return data||[];
+  }catch(e){
+    Ssync="Supabase read failed for "+table+". Showing the saved copy.";
+    return cached;
+  }
+}
+async function dbInsert(table,row){
+  const body={...row};delete body.id;
+  if(!useRemote()){const local={...body,_local:true};dbCachePut(table,local);return {data:local,source:"local"}}
+  try{
+    const {data,error}=await sb.from(table).insert(body).select().single();
+    if(error)throw error;
+    dbCachePut(table,data);
+    return {data,source:"supabase"};
+  }catch(e){
+    const local={...body,_local:true};dbCachePut(table,local);
+    Ssync="Saved on this device. Supabase rejected a "+table+" write.";
+    return {data:local,source:"local",error:e};
+  }
+}
+async function dbUpdate(table,id,patch){
+  if(!id||String(id).startsWith("local"))return {data:null,source:"local"};
+  if(!useRemote())return {data:null,source:"local"};
+  try{
+    const {data,error}=await sb.from(table).update(patch).eq("id",id).select().single();
+    if(error)throw error;
+    dbCachePut(table,data);
+    return {data,source:"supabase"};
+  }catch(e){
+    Ssync="Saved on this device. Supabase rejected a "+table+" update.";
+    return {data:null,source:"local",error:e};
+  }
+}
+async function dbRemove(table,id){
+  if(!id||!useRemote())return {source:"local"};
+  try{
+    const {error}=await sb.from(table).delete().eq("id",id);
+    if(error)throw error;
+    const bag=dbBag();bag[table]=(bag[table]||[]).filter(r=>r.id!==id);dbBagSave(bag);
+    return {source:"supabase"};
+  }catch(e){
+    Ssync="Saved on this device. Supabase rejected a "+table+" delete.";
+    return {source:"local",error:e};
+  }
+}
+function writeDept(fallback){const d=DEPT_FOR_ROLE[authRole()]||fallback;return d==="management"?fallback:d}
+function priToDb(p){return p==="Med"?"Medium":(p||"Medium")}
+function priFromDb(p){return p==="Medium"?"Med":(p||"Med")}
+function dueIso(v){
+  if(!v||v==="Today")return ld();
+  const m=String(v).match(/^(\d{1,2})\/(\d{1,2})$/);
+  if(!m)return null;
+  return new Date().getFullYear()+"-"+String(m[1]).padStart(2,"0")+"-"+String(m[2]).padStart(2,"0");
+}
+function runAtIso(day,label){
+  const m=String(label||"").trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if(!day||!m)return null;
+  let h=+m[1];const min=+(m[2]||0);const ap=(m[3]||"").toUpperCase();
+  if(ap==="PM"&&h<12)h+=12;if(ap==="AM"&&h===12)h=0;
+  if(h>23||min>59)return null;
+  const d=new Date(day+"T"+String(h).padStart(2,"0")+":"+String(min).padStart(2,"0")+":00");
+  return Number.isNaN(d.getTime())?null:d.toISOString();
+}
+function hhmm(ts){
+  if(!ts)return "";
+  const d=new Date(ts);if(Number.isNaN(d.getTime()))return String(ts).slice(11,16);
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+function userByName(name){return USERS.find(u=>u.name===name)||null}
+function mondayOfDate(date){const d=new Date(date+"T12:00:00");d.setDate(d.getDate()-((d.getDay()+6)%7));return ymd(d)}
+function posDept(pos){return { "Front Desk":"front_desk","HK Lead":"housekeeping",Housekeeper:"housekeeping",Maintenance:"maintenance","Shuttle Driver":"shuttle","House Person":"house_person","Laundry Attendant":"laundry","Breakfast Attendant":"breakfast" }[pos]||"management"}
+function shiftPublished(s){return !!((S.pub||{})[s.scope+"|"+mondayOfDate(s.date)])}
+function queuePush(){pushChain=pushChain.then(()=>pushDiff()).catch(e=>{Ssync=String(e&&e.message||e)})}
+function takeBaseline(){try{sbBase=snap()}catch(e){sbBase=null}}
+function snap(){
+  const hotels={};
+  Object.keys(S.h||{}).forEach(h=>{
+    const d=S.h[h]||{};
+    hotels[h]={
+      rooms:(d.rooms||[]).map(r=>({key:String(r.n),sig:[r.s,r.hk].join("|"),sb_id:r.sb_id||null})),
+      wo:(d.wo||[]).map(w=>({key:String(w.id),sig:[w.room,w.t,w.p,w.s,(w.photo_paths||[]).join(",")].join("|"),sb_id:w.sb_id||null})),
+      insp:(d.insp||[]).map(x=>({key:lid(x),sig:[x.room,x.score,x.notes,(x.failed||[]).join(",")].join("|"),sb_id:x.sb_id||null})),
+      pm:(d.pm||[]).map(p=>({key:lid(p),sig:[p.a,p.f,p.due,p.done].join("|"),sb_id:p.sb_id||null})),
+      notes:(d.notes||[]).map(n=>({key:lid(n),sig:[n.sh,n.t].join("|"),sb_id:n.sb_id||null})),
+      inv:(d.inv||[]).map(x=>({key:x.it,sig:[x.par,x.oh,x.u].join("|"),sb_id:x.sb_id||null})),
+      orders:(d.orders||[]).map(o=>({key:lid(o),sig:[o.st,o.items].join("|"),sb_id:o.sb_id||null})),
+      walk:{sig:JSON.stringify(d.walk||[]),sb_id:(d.sbWalkId||null)},
+      lists:(d.sbLists||[]).map(l=>({key:String(l.id),sig:JSON.stringify(l.results||{}),sb_id:l.run_id||null}))
+    };
+  });
+  const shifts=(S.shifts||[]).map(s=>({key:s.id,sig:[s.scope,s.pos,s.who,s.date,s.start,s.end,shiftPublished(s)?1:0].join("|"),sb_id:s.sb_id||null}));
+  const shuttle=[];
+  Object.entries(S.shuttle||{}).forEach(([day,block])=>{
+    (block.runs||[]).forEach(run=>{
+      (run.pax||[]).forEach(p=>{
+        shuttle.push({key:lid(p),sig:[p.g,p.r,p.n,p.h,run.t,run.to].join("|"),sb_id:p.sb_id||null,day});
+      });
+    });
+  });
+  return {hotels,shifts,shuttle};
+}
+async function pushDiff(){
+  if(!useRemote()||!sbBase)return;
+  const now=snap();let failed=false;
+  for(const h of Object.keys(now.hotels)){
+    if(!S.h[h])continue;
+    failed=await syncRooms(h,sbBase.hotels[h],now.hotels[h])||failed;
+    failed=await syncSimple(h,"wo",sbBase.hotels[h],now.hotels[h],woBody, "work_orders")||failed;
+    failed=await syncSimple(h,"insp",sbBase.hotels[h],now.hotels[h],inspBody,"inspections")||failed;
+    failed=await syncSimple(h,"pm",sbBase.hotels[h],now.hotels[h],pmBody,"pm_tasks")||failed;
+    failed=await syncSimple(h,"notes",sbBase.hotels[h],now.hotels[h],noteBody,"shift_notes")||failed;
+    failed=await syncSimple(h,"inv",sbBase.hotels[h],now.hotels[h],invBody,"inventory_items")||failed;
+    failed=await syncSimple(h,"orders",sbBase.hotels[h],now.hotels[h],orderBody,"purchase_orders")||failed;
+    failed=await syncWalk(h,sbBase.hotels[h],now.hotels[h])||failed;
+    failed=await syncLists(h,sbBase.hotels[h],now.hotels[h])||failed;
+  }
+  failed=await syncShifts(sbBase.shifts,now.shifts)||failed;
+  failed=await syncShuttle(sbBase.shuttle,now.shuttle)||failed;
+  if(!failed){Ssync="";sbBase=snap()}
+  sset(KEY,JSON.stringify(S));
+}
+function lid(obj){if(!obj.lid)obj.lid="l"+Math.random().toString(36).slice(2,10);return obj.lid}
+function liveOf(hotel,kind,item){
+  const d=S.h[hotel];
+  if(kind==="wo")return (d.wo||[]).find(w=>String(w.id)===item.key);
+  if(kind==="inv")return (d.inv||[]).find(x=>x.it===item.key);
+  const list={insp:d.insp,pm:d.pm,notes:d.notes,orders:d.orders}[kind]||[];
+  return list.find(x=>x.lid===item.key);
+}
+function woBody(h,w){return {hotel_id:h,department:"maintenance",location:String(w.room||""),title:String(w.t||"Work order").slice(0,180),description:String(w.t||""),priority:priToDb(w.p),status:w.s||"Open",photo_paths:w.photo_paths||[]}}
+function inspBody(h,x){return {hotel_id:h,department:"housekeeping",room_number:String(x.room||""),score:x.score===""||x.score==null?null:Number(x.score),failed_items:x.failed||[],notes:x.notes||""}}
+function pmBody(h,p){const due=dueIso(p.due);const row={hotel_id:h,department:"maintenance",asset:p.a||"PM",frequency:p.f||null,done:!!p.done};if(due)row.due_date=due;return row}
+function noteBody(h,n){return {hotel_id:h,department:writeDept("front_desk"),shift:n.sh||"",body:n.t||""}}
+function invBody(h,x){return {hotel_id:h,department:writeDept("housekeeping"),item:x.it,unit:x.u||null,par:x.par==null?null:Number(x.par),on_hand:x.oh==null?null:Number(x.oh)}}
+function orderBody(h,o){return {hotel_id:h,department:writeDept("housekeeping"),lines:[{text:o.items||""}],status:o.st||"Draft"}}
+async function syncRooms(hotel,before,after){
+  const prev=new Map(((before&&before.rooms)||[]).map(x=>[x.key,x]));
+  let failed=false;
+  for(const item of after.rooms){
+    const was=prev.get(item.key);
+    if(was&&was.sig===item.sig)continue;
+    const row=(S.h[hotel].rooms||[]).find(r=>String(r.n)===item.key);if(!row)continue;
+    const body={hotel_id:hotel,department:"housekeeping",room_number:String(row.n),floor:Math.floor(Number(row.n)/100)||null,hk_status:row.s||null,fo_status:row.s||null};
+    if(row.sb_id){const res=await dbUpdate("rooms",row.sb_id,{hk_status:body.hk_status,fo_status:body.fo_status});if(res.source!=="supabase")failed=true}
+    else{const res=await dbInsert("rooms",body);if(res.source==="supabase"&&res.data&&res.data.id)row.sb_id=res.data.id;else failed=true}
+    const oldHk=was?was.sig.split("|").slice(1).join("|"):null;
+    if(String(row.hk||"")!==String(oldHk||"")&&row.hk){
+      const asg={hotel_id:hotel,department:"housekeeping",work_date:ld(),room_number:String(row.n),status:"assigned",clean_type:row.s||null};
+      const who=userByName(String(row.hk).replace(" (EX)",""));
+      if(who&&isUuid(who.user_id))asg.assignee=who.user_id;
+      if(row.asg_id){const res=await dbUpdate("hk_assignments",row.asg_id,asg);if(res.source!=="supabase")failed=true}
+      else{const res=await dbInsert("hk_assignments",asg);if(res.source==="supabase"&&res.data&&res.data.id)row.asg_id=res.data.id;else failed=true}
+    }
+  }
+  return failed;
+}
+async function syncSimple(hotel,kind,before,after,toRow,table){
+  const prev=new Map(((before&&before[kind])||[]).map(x=>[x.key,x]));
+  let failed=false;
+  for(const item of after[kind]){
+    const was=prev.get(item.key);
+    if(was&&was.sig===item.sig)continue;
+    const live=liveOf(hotel,kind,item);if(!live)continue;
+    const body=toRow(hotel,live);
+    const id=live.sb_id;
+    if(id){const res=await dbUpdate(table,id,body);if(res.source!=="supabase")failed=true}
+    else{
+      const res=await dbInsert(table,body);
+      if(res.source==="supabase"&&res.data&&res.data.id){
+        live.sb_id=res.data.id;
+        if(kind==="wo"&&live.photoFile){const ok=await attachWoPhoto(hotel,live,res.data.id);if(!ok)failed=true}
+      }else failed=true;
+    }
+  }
+  return failed;
+}
+async function attachWoPhoto(hotel,w,remoteId){
+  try{
+    const file=w.photoFile;if(!file)return true;
+    const safe=String(file.name||"photo.jpg").replace(/[^A-Za-z0-9._-]/g,"_");
+    const path=hotel+"/"+remoteId+"/"+Date.now()+"-"+safe;
+    const up=await sb.storage.from("work-order-photos").upload(path,file,{contentType:file.type||"image/jpeg",upsert:false});
+    if(up.error)throw up.error;
+    const paths=[...(w.photo_paths||[]),path];
+    const res=await dbUpdate("work_orders",remoteId,{photo_paths:paths});
+    if(res.source!=="supabase")return false;
+    w.photo_paths=paths;delete w.photoFile;
+    const signed=await sb.storage.from("work-order-photos").createSignedUrl(path,3600);
+    if(signed.data&&signed.data.signedUrl)w.photo=signed.data.signedUrl;
+    return true;
+  }catch(e){Ssync="Work order saved. The photo stayed on this device.";return false}
+}
+async function syncWalk(hotel,before,after){
+  const was=before&&before.walk;const now=after.walk;
+  if(was&&was.sig===now.sig)return false;
+  const d=S.h[hotel];if(!d)return false;
+  const body={hotel_id:hotel,department:"management",walk_date:ld(),results:{items:d.walk||[]},notes:""};
+  if(d.sbWalkId){const res=await dbUpdate("property_walks",d.sbWalkId,body);return res.source!=="supabase"}
+  const res=await dbInsert("property_walks",body);
+  if(res.source==="supabase"&&res.data&&res.data.id){d.sbWalkId=res.data.id;return false}
+  return true;
+}
+async function syncLists(hotel,before,after){
+  const prev=new Map(((before&&before.lists)||[]).map(x=>[x.key,x]));
+  let failed=false;
+  for(const item of after.lists){
+    const was=prev.get(item.key);
+    if(was&&was.sig===item.sig)continue;
+    const live=(S.h[hotel].sbLists||[]).find(l=>String(l.id)===item.key);if(!live)continue;
+    const body={hotel_id:hotel,department:live.department||writeDept("management"),template_id:live.id,run_date:ld(),results:live.results||{},completed:Object.values(live.results||{}).some(Boolean)};
+    if(live.run_id){const res=await dbUpdate("checklist_runs",live.run_id,{results:body.results,completed:body.completed});if(res.source!=="supabase")failed=true}
+    else{const res=await dbInsert("checklist_runs",body);if(res.source==="supabase"&&res.data&&res.data.id)live.run_id=res.data.id;else failed=true}
+  }
+  return failed;
+}
+async function syncShifts(before,after){
+  const prev=new Map((before||[]).map(x=>[x.key,x]));
+  let failed=false;
+  for(const item of after){
+    const was=prev.get(item.key);
+    const live=(S.shifts||[]).find(s=>s.id===item.key);
+    if(was&&!live&&was.sb_id){const res=await dbRemove("schedule_shifts",was.sb_id);if(res.source!=="supabase")failed=true;continue}
+    if(!live||(was&&was.sig===item.sig))continue;
+    const who=userByName(live.who);
+    const hotel=live.scope==="SHUTTLE"?((who&&who.hotel)||S.hotel):live.scope;
+    const body={hotel_id:hotel,department:posDept(live.pos),position:live.pos,shift_date:live.date,start_time:live.start.length===5?live.start+":00":live.start,end_time:live.end.length===5?live.end+":00":live.end,hours:shHrs(live.start,live.end),published:shiftPublished(live)};
+    if(who&&isUuid(who.user_id))body.employee=who.user_id;
+    if(live.sb_id){const res=await dbUpdate("schedule_shifts",live.sb_id,body);if(res.source!=="supabase")failed=true}
+    else{const res=await dbInsert("schedule_shifts",body);if(res.source==="supabase"&&res.data&&res.data.id)live.sb_id=res.data.id;else failed=true}
+  }
+  return failed;
+}
+async function syncShuttle(before,after){
+  const prev=new Map((before||[]).map(x=>[x.key,x]));
+  let failed=false;
+  for(const item of after){
+    const was=prev.get(item.key);
+    if(was&&was.sig===item.sig)continue;
+    const block=(S.shuttle||{})[item.day];let run=null,pax=null;
+    (block&&block.runs||[]).forEach(r=>{(r.pax||[]).forEach(p=>{if(p.lid===item.key){run=r;pax=p}})});
+    if(!pax||!run)continue;
+    const at=runAtIso(item.day,run.t);if(!at)continue;
+    const body={hotel_id:pax.h||S.hotel,department:"shuttle",run_at:at,destination:run.to||null,guest_name:pax.g||"",room_number:String(pax.r||""),party_size:Number(pax.n)||1,status:"Booked",notes:""};
+    if(pax.sb_id){const res=await dbUpdate("shuttle_signups",pax.sb_id,body);if(res.source!=="supabase")failed=true}
+    else{const res=await dbInsert("shuttle_signups",body);if(res.source==="supabase"&&res.data&&res.data.id)pax.sb_id=res.data.id;else failed=true}
+  }
+  return failed;
+}
+async function applySessionProfile(){
+  if(!useRemote()||!sbSession.user)return;
+  const uid=sbSession.user.id;
+  const {data,error}=await sb.from("profiles").select("*").eq("user_id",uid).maybeSingle();
+  if(error||!data)return;
+  const row=mapDirectoryRow(data);
+  if(!row)return;
+  row.user_id=uid;row.id=row.id||uid;
+  let local=USERS.find(u=>u.user_id===uid||u.id===uid||u.id===row.id);
+  if(!local){USERS.push(row);local=row}
+  else Object.assign(local,{name:row.name,role:row.role,hotel:row.hotel,user_id:uid,he_employee_id:row.he_employee_id,active:row.active});
+  S.uid=local.id;
+  if(local.hotel)S.hotel=local.hotel;
+  S.role=(local.role==="Above Property"||local.role==="GM"||local.role==="AGM")?"GM":local.role;
+}
+async function signPaths(list){
+  if(!useRemote())return;
+  for(const w of list||[]){
+    const path=(w.photo_paths||[])[0];if(!path)continue;
+    try{
+      const signed=await sb.storage.from("work-order-photos").createSignedUrl(path,3600);
+      if(signed.data&&signed.data.signedUrl)w.photo=signed.data.signedUrl;
+    }catch(e){}
+  }
+}
+async function hydrate(){
+  if(!useRemote())return;
+  const hotels=await dbSelect("hotels");
+  hotels.forEach(h=>{if(h&&h.id&&HOTELS[h.id]&&h.name)HOTELS[h.id]=h.id+" · "+h.name});
+  await dbSelect("departments");
+  const profiles=await dbSelect("profiles");
+  profiles.forEach(p=>{
+    const row=mapDirectoryRow(p);if(!row)return;
+    row.user_id=p.user_id;row.id=p.user_id;
+    if(!USERS.some(u=>u.user_id===p.user_id||u.id===p.user_id))USERS.push(row);
+  });
+  const names={};profiles.forEach(p=>{names[p.user_id]=p.name});
+  for(const h of Object.keys(HOTELS)){
+    if(!S.h[h])continue;
+    const d=S.h[h];
+    const rooms=await dbSelect("rooms",{eq:{hotel_id:h}});
+    if(rooms.length){
+      const asg=await dbSelect("hk_assignments",{eq:{hotel_id:h}});
+      const today=ld();
+      d.rooms=rooms.map(r=>{
+        const hit=asg.filter(a=>a.room_number===r.room_number&&String(a.work_date).slice(0,10)===today).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))[0];
+        const who=hit&&names[hit.assignee];
+        return {n:Number(r.room_number)||r.room_number,s:r.hk_status||r.fo_status||"VC",hk:who||"",sb_id:r.id,asg_id:hit?hit.id:null,t0:"",t1:"",x:"",mins:0,ts:0};
+      });
+    }
+    const wos=await dbSelect("work_orders",{eq:{hotel_id:h}});
+    if(wos.length){
+      d.wo=wos.map(w=>({id:w.id,sb_id:w.id,room:w.location||"",t:w.title||w.description||"",p:priFromDb(w.priority),s:w.status||"Open",photo:"",photo_paths:w.photo_paths||[]}));
+      await signPaths(d.wo);
+    }
+    const ins=await dbSelect("inspections",{eq:{hotel_id:h}});
+    if(ins.length)d.insp=ins.map(x=>({room:x.room_number,by:names[x.inspected_by]||"Staff",score:x.score,notes:x.notes||"",date:String(x.inspected_at||"").slice(0,10),failed:x.failed_items||[],sb_id:x.id}));
+    const pms=await dbSelect("pm_tasks",{eq:{hotel_id:h}});
+    if(pms.length)d.pm=pms.map(p=>({a:p.asset,f:p.frequency||"",due:p.due_date||"",done:!!p.done,sb_id:p.id}));
+    const notes=await dbSelect("shift_notes",{eq:{hotel_id:h}});
+    if(notes.length)d.notes=notes.map(n=>({sh:n.shift||"",by:names[n.created_by]||"Staff",t:n.body||"",at:hhmm(n.created_at),sb_id:n.id}));
+    const inv=await dbSelect("inventory_items",{eq:{hotel_id:h}});
+    if(inv.length)d.inv=inv.map(x=>({it:x.item,par:Number(x.par)||0,oh:Number(x.on_hand)||0,u:x.unit||"",sb_id:x.id}));
+    const pos=await dbSelect("purchase_orders",{eq:{hotel_id:h}});
+    if(pos.length)d.orders=pos.map(o=>({at:String(o.created_at||"").slice(0,10),st:o.status||"Draft",items:(Array.isArray(o.lines)?o.lines.map(l=>l.text||l.item||"").filter(Boolean).join(", "):""),sb_id:o.id}));
+    const tpls=await dbSelect("checklist_templates",{eq:{hotel_id:h}});
+    const runs=await dbSelect("checklist_runs",{eq:{hotel_id:h}});
+    const today=ld();
+    if(tpls.length){
+      d.sbLists=tpls.filter(t=>t.active!==false).map(t=>{
+        const run=runs.find(r=>r.template_id===t.id&&String(r.run_date).slice(0,10)===today);
+        const items=(Array.isArray(t.items)?t.items:[]).map(item=>typeof item==="string"?item:(item.label||item.name||""));
+        return {id:t.id,run_id:run?run.id:null,name:t.name,department:t.department,items,results:(run&&run.results)||{}};
+      });
+    }
+    const walks=await dbSelect("property_walks",{eq:{hotel_id:h}});
+    const walk=walks.find(w=>String(w.walk_date).slice(0,10)===today)||walks[0];
+    if(walk&&walk.results&&Array.isArray(walk.results.items)){d.walk=walk.results.items;d.sbWalkId=walk.id}
+    const fcs=await dbSelect("forecasts",{eq:{hotel_id:h}});
+    if(fcs.length&&typeof weekDates==="function"){
+      const by=new Map(fcs.map(r=>[String(r.forecast_date).slice(0,10),r]));
+      const days=weekDates(0);
+      if(days.some(day=>by.has(ymd(day))))d.fc=days.map((day,i)=>{const row=by.get(ymd(day));const cur=(d.fc||[])[i]||{d:i,occ:0,arr:0};return row?{d:i,occ:Number(row.occupied_rooms)||0,arr:Number(row.arrivals)||0}:cur});
+    }
+  }
+  S.sbSignups=await dbSelect("shuttle_signups");
+  const plans=await dbSelect("labor_plans");
+  const punches=await dbSelect("time_punches");
+  if((plans.length||punches.length)&&typeof weekDates==="function"){
+    const days=weekDates(0).map(ymd);
+    plans.forEach(r=>{
+      const i=days.indexOf(String(r.plan_date).slice(0,10));if(i<0)return;
+      const bucket=r.hotel_id;if(!laborPlan.hours[bucket])laborPlan.hours[bucket]={};
+      const pos=r.position||r.department;if(!pos)return;
+      if(!laborPlan.hours[bucket][pos])laborPlan.hours[bucket][pos]=[0,0,0,0,0,0,0];
+      laborPlan.hours[bucket][pos][i]=Number(r.plan_hours)||0;
+      remoteLabor=true;
+    });
+    punches.forEach(r=>{
+      const i=days.indexOf(String(r.work_date).slice(0,10));if(i<0)return;
+      const bucket=r.hotel_id;const name=names[r.employee]||r.he_employee_id||"Staff";
+      if(!timePunches[bucket])timePunches[bucket]={};
+      if(!timePunches[bucket][name])timePunches[bucket][name]=[null,null,null,null,null,null,null];
+      timePunches[bucket][name][i]=r.punch_in?[hhmm(r.punch_in),hhmm(r.punch_out)]:null;
+      remoteLabor=true;
+    });
+  }
+  const shifts=await dbSelect("schedule_shifts");
+  if(shifts.length){
+    S.shifts=shifts.map(s=>({id:"sb"+s.id,sb_id:s.id,scope:s.department==="shuttle"?"SHUTTLE":s.hotel_id,pos:s.position||"",who:names[s.employee]||"",date:String(s.shift_date).slice(0,10),start:String(s.start_time||"").slice(0,5),end:String(s.end_time||"").slice(0,5)}));
+    S.pub=S.pub||{};
+    shifts.filter(s=>s.published).forEach(s=>{const scope=s.department==="shuttle"?"SHUTTLE":s.hotel_id;S.pub[scope+"|"+mondayOfDate(String(s.shift_date).slice(0,10))]=1});
+    S.schedSeed=1;
+  }
+}
+function mergeSbSignups(k){
+  const block=S.shuttle&&S.shuttle[k];
+  if(!block||block.sbMerged||!(S.sbSignups||[]).length)return;
+  block.sbMerged=1;
+  (S.sbSignups||[]).forEach(s=>{
+    if(String(s.run_at||"").slice(0,10)!==k)return;
+    let run=(block.runs||[]).find(r=>(r.to||"")===(s.destination||"")&&hhmm(s.run_at)===r.t);
+    if(!run){run={t:hhmm(s.run_at)||"Saved",to:s.destination||"Shuttle",type:"Saved",st:s.status||"Booked",cap:14,pax:[]};block.runs.push(run)}
+    if(!(run.pax||[]).some(p=>p.sb_id===s.id))run.pax.push({g:s.guest_name||"",r:s.room_number||"",n:s.party_size||1,h:s.hotel_id,sb_id:s.id});
+  });
+}
+function sbCheckCard(){
+  const lists=(D().sbLists)||[];if(!lists.length)return "";
+  return lists.map(l=>`<div class="card"><h3>${escH(l.name)} <span class="pill VC">Supabase</span></h3>${(l.items||[]).map(item=>{const on=!!(l.results||{})[item];return `<label class="li"><input type="checkbox" ${on?"checked":""} onchange="sbToggle(${Number(l.id)},'${E(item)}',this.checked)">${escH(item)}</label>`}).join("")||"<small>No items on this template.</small>"}</div>`).join("");
+}
+function sbToggle(id,label,on){
+  const l=(D().sbLists||[]).find(x=>x.id===id);if(!l)return;
+  l.results=l.results||{};l.results[decodeURIComponent(label)]=!!on;save();render();
 }
 function meUser(){return USERS.find(u=>u.id===S.uid)||null}
 function authRole(){const u=meUser();return u?u.role:""}
@@ -107,7 +564,7 @@ pmq:{total:[110,120,124][i],done:[38,52,29][i],days:66},roomsCleaned:[228,204,21
 fc:[0,1,2,3,4,5,6].map(d=>({d,occ:[68,74,88,92,81,63,58][(d+i)%7],arr:[42,55,71,78,60,38,30][(d+i)%7]}))}}
 if(!S){S={hotel:"MSPWE",role:"GM",tab:"home",uid:"",h:{}};Object.keys(HOTELS).forEach((k,i)=>S.h[k]=seed(k,i))}
 if(!S.uid)S.uid="";
-const save=()=>sset(KEY,JSON.stringify(S));const D=()=>S.h[S.hotel];const $=id=>document.getElementById(id);
+const save=()=>{sset(KEY,JSON.stringify(S));if(sbPush)queuePush()};const D=()=>S.h[S.hotel];const $=id=>document.getElementById(id);
 function go(t){if(meUser()&&t!="home"&&!navFor(S.role).includes(t)&&!tilesFor(S.role).includes(t))return;S.tab=t;save();render();scrollTo(0,0)}
 const V={
 home(){const d=D(),r=S.role,ow=d.wo.filter(w=>w.s!="Done").length,dirty=d.rooms.filter(x=>x.s.endsWith("D")).length,low=d.inv.filter(x=>x.oh<x.par*.5).length;
@@ -136,7 +593,7 @@ ${grps.map(g=>`<div class="card"><h3>${g}</h3>${its.filter(x=>x.grp==g).map(it=>
 <div class="card"><h3>Roster (EXAMPLE)</h3><table><tr><th>Name</th><th>Role</th><th>Shift</th><th>Days</th><th>Today</th></tr>${ST().map(s=>`<tr><td>${s.n}</td><td>${s.role}</td><td>${s.shift}</td><td>${s.days.map(x=>["Su","M","Tu","W","Th","F","Sa"][x]).join(" ")}</td><td>${s.days.includes(DOW)?'<span class=good>On</span>':'Off'}</td></tr>`).join("")}</table></div>`},
 notes(){const d=D();return `<h2>Shift Notes & Handoff</h2><div class="card"><select id="ns" style="width:100%"><option>AM</option><option>PM</option><option>Night Audit</option></select><textarea id="nt" style="width:100%;min-height:90px" placeholder="Handoff notes for next shift"></textarea><button class="btn" style="width:100%" onclick="addN()">Post handoff</button></div>
 <div class="card"><h3>Log</h3>${d.notes.map(n=>`<div class="li"><div><b>${n.sh}</b> · ${n.by} · ${n.at}<br>${n.t}</div></div>`).join("")}</div>`},
-check(){const its=ITEMS().filter(x=>!x.key.startsWith("GM-")&&(S.role=="GM"||x.def==S.role)),g=[...new Set(its.map(x=>x.grp))];return `<h2>Checklists</h2><small>Auto-assigned to on-shift staff by role${S.role=="Front Desk"?" and shift":""}; resets each period.</small>${keyLogCard()}${g.map(gr=>{const a=its.filter(x=>x.grp==gr),q=a[0].src;return `<div class="card"><h3>${gr} <span class="pill ${q?'VC':'OD'}">${q?'Imported from Quore':'EXAMPLE'}</span></h3><small>${a[0].per} · ${pk(a[0].per)}${a[0].shift?" · "+a[0].shift+" shift":""} · ${a.filter(x=>isD(x.key,x.per)).length}/${a.length} done</small>${a.map(itRow).join("")}</div>`}).join("")}`},
+check(){const its=ITEMS().filter(x=>!x.key.startsWith("GM-")&&(S.role=="GM"||x.def==S.role)),g=[...new Set(its.map(x=>x.grp))];return `<h2>Checklists</h2>${sbCheckCard()}<small>Auto-assigned to on-shift staff by role${S.role=="Front Desk"?" and shift":""}; resets each period.</small>${keyLogCard()}${g.map(gr=>{const a=its.filter(x=>x.grp==gr),q=a[0].src;return `<div class="card"><h3>${gr} <span class="pill ${q?'VC':'OD'}">${q?'Imported from Quore':'EXAMPLE'}</span></h3><small>${a[0].per} · ${pk(a[0].per)}${a[0].shift?" · "+a[0].shift+" shift":""} · ${a.filter(x=>isD(x.key,x.per)).length}/${a.length} done</small>${a.map(itRow).join("")}</div>`}).join("")}`},
 walk(){const d=D(),k=pk("Weekly"),w=(d.wk||{})[k]||{},all=Object.values(QUORE.walk).flat(),dn=all.filter(x=>(w[x]||{}).d).length;return `<h2>Property Walk</h2><div class="card"><b>Guide for Weekly Walk</b> <span class="pill VC">Imported from Quore</span><br><small>${k} · everybody · ${dn}/${all.length} areas</small><div style="background:#eee;border-radius:5px;margin-top:4px"><div class="bar" style="width:${100*dn/all.length}%"></div></div></div>${Object.entries(QUORE.walk).map(([h,its])=>`<div class="card"><h3>${h}</h3>${its.map(x=>{const v=w[x]||{};return `<div class="li" style="flex-wrap:wrap"><label style="flex:1;display:flex;gap:10px;align-items:center"><input type="checkbox" ${v.d?'checked':''} onchange="wkT('${E(x)}',this.checked)">${x}</label>${v.iss?`<small class="bad" style="flex:1 1 100%">WO created: ${v.iss}</small>`:`<input style="flex:1 1 100%;font-size:14px;min-height:38px" placeholder="Issue? (creates work order)" onchange="wkI('${E(x)}',this.value)">`}</div>`}).join("")}</div>`).join("")}`},
 inv(){const d=D();return `<h2>Inventory vs Par</h2><div class="card"><table><tr><th>Item</th><th>Par</th><th>On hand</th><th></th></tr>${d.inv.map((x,i)=>`<tr><td>${x.it}</td><td>${x.par}</td><td><input style="width:70px" type="number" value="${x.oh}" onchange="D().inv[${i}].oh=+this.value;save();render()"></td><td class="${x.oh<x.par*.5?'bad':'good'}">${x.oh<x.par*.5?'LOW':'OK'}</td></tr>`).join("")}</table><button class="btn" style="width:100%;margin-top:8px" onclick="go('order')">Create order from low stock</button></div>`},
 order(){const d=D(),low=d.inv.filter(x=>x.oh<x.par*.5);return `<h2>Ordering</h2><div class="card"><h3>Suggested (below 50% of par)</h3>${low.map(x=>`<div class="li">${x.it}: order <b>${x.par-x.oh}</b> to reach par</div>`).join("")||"Nothing low"}<button class="btn" style="width:100%" onclick="mkO()">Submit order request</button></div>
@@ -147,7 +604,7 @@ return `<h2>Labor Management</h2><div class="card"><div class="kpi"><div><b>${t(
 <div class="card"><h3>Daily targets (today, ${d.fc[0].occ}% occ ≈ ${Math.round(d.fc[0].occ*.9)} occ rooms)</h3><table><tr><th>Dept</th><th>Min/occ rm</th><th>Fixed hrs</th><th>Target hrs</th></tr>${[["HK",30,8],["FD",6,24],["MT",3,8]].map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td><td><b>${(Math.round(d.fc[0].occ*.9)*x[1]/60+x[2]).toFixed(1)}</b></td></tr>`).join("")}</table></div>
 <div class="card"><h3>5-minute daily labor check-in</h3>${["Compared yesterday Actual vs Plan","Cut/added shifts for today's forecast","Approached OT associates (>40h)","Noted reason for variance"].map((x,j)=>`<label class="li"><input type="checkbox" ${(d.lci||[])[j]?'checked':''} onchange="(D().lci=D().lci||[])[${j}]=this.checked;save()">${x}</label>`).join("")}</div>
 <div class="card"><h3>Housekeeping MPR</h3><p>${hk} HK hrs · ${d.roomsCleaned} rooms cleaned → <b>${mpr} min/room</b> (target 30.0) <span class="${mpr>30?'bad':'good'}">${mpr>30?'Over':'On target'}</span></p></div>`},
-gmc(){const t=S.gt||"Weekly",its=ITEMS().filter(x=>x.grp=="GM "+t);return `<h2>GM Checklists</h2><div class="row">${["Daily","Weekly","Monthly"].map(x=>`<button class="${x==t?'btn':'btn2'}" onclick="S.gt='${x}';save();render()">${x} ${gpct(x)}%</button>`).join("")}</div>
+gmc(){const t=S.gt||"Weekly",its=ITEMS().filter(x=>x.grp=="GM "+t);return `<h2>GM Checklists</h2>${sbCheckCard()}<div class="row">${["Daily","Weekly","Monthly"].map(x=>`<button class="${x==t?'btn':'btn2'}" onclick="S.gt='${x}';save();render()">${x} ${gpct(x)}%</button>`).join("")}</div>
 <div class="card"><h3>${pk(t)} · ${gpct(t)}% complete</h3><div style="background:#eee;border-radius:5px"><div class="bar" style="width:${gpct(t)}%"></div></div>${its.map((it,i)=>`<div style="display:flex;align-items:center;gap:6px"><div style="flex:1">${itRow(it)}</div><button class="btn2" style="min-width:44px" onclick="gdel('${t}',${i})">✕</button></div>`).join("")}
 <div class="row"><input id="gnew" placeholder="Add ${t.toLowerCase()} item"><button class="btn" style="flex:0 0 70px" onclick="gadd('${t}')">Add</button></div><small>Checks reset each new ${t=="Daily"?"day":t=="Weekly"?"week (Mon)":"month"}; unfinished items carry over flagged overdue.</small></div>`},line(){const r=S.role,d=D(),L=LD(),LS=d.LS,its=ITEMS().filter(x=>x.grp==r+" daily"),ck=t=>`<div class="card"><h3>${t||"Daily checklist"} · ${lpct(r)}%</h3>${its.map(itRow).join("")}</div>`,rq=myReqs(),rqc=`<div class="card"><h3>My requests (from leads/front desk)</h3>${rq.map(reqRow).join("")||"None right now."}</div>`;
 if(r=="Shuttle Driver"){if(!SHH.includes(S.hotel))return '<h2>Shuttle</h2><div class="card">No shuttle at this property.</div>';const X=SH();return `<h2>Shuttle · Vehicle</h2><div class="card"><h3>Pre-trip vehicle inspection</h3>${X.pre.map((c,i)=>`<label class="li"><input type="checkbox" ${c[1]?'checked':''} onchange="SH().pre[${i}][1]=this.checked?now():'';save();render()"><span>${c[0]} ${c[1]?`<small class=good>✓ ${c[1]}</small>`:''}</span></label>`).join("")}</div>
@@ -216,7 +673,7 @@ function tilesFor(role){const t=TILES[role]||[];return SHH.includes(S.hotel)?t.s
 function navFor(role){const n=NAV[role]||["home"];return SHH.includes(S.hotel)?n.slice():n.filter(x=>x!="shut")}
 const LCK={"Housekeeper":["Cart stocked & clean","Master key signed out","Chemicals labeled","Linen bags emptied","Cart returned & key signed in"],"House Person":["Lobby & entrance swept","Public trash emptied","Public restrooms checked","Elevators wiped","Stairwells checked","Pool area tidy","Linen closets stocked"],"Laundry Attendant":["Lint traps cleaned","Chemical levels checked","Machines wiped down","Folding tables clean","Soiled linen sorted","End-of-day counts logged"],"Breakfast Attendant":["Setup: coffee brewed","Setup: hot items out","Setup: cold bar stocked","Setup: signage & utensils","Teardown: food discarded/stored","Teardown: surfaces sanitized","Teardown: restock for tomorrow"]};
 const now=()=>new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
-function SH(){const k=ld();S.shuttle=S.shuttle||{};if(!S.shuttle[k])S.shuttle[k]={runs:[["5:30 AM","MSP Airport"],["7:00 AM","MSP Airport"],["9:00 AM","Mall of America"],["12:00 PM","MSP Airport"],["3:00 PM","MSP Airport"],["6:00 PM","Mall of America"]].map((a,i)=>({t:a[0],to:a[1],type:"Scheduled",st:"Pending",cap:14,pax:i==1?[{g:"Smith (EX)",r:"214",n:2,h:"MSPAM"},{g:"Garcia (EX)",r:"118",n:1,h:"MSPMS"},{g:"Nguyen (EX)",r:"305",n:3,h:"MSPAM"}]:i==2?[{g:"Brown (EX)",r:"221",n:4,h:"MSPMS"}]:[]})),miles:[],pre:["Tires & pressure","Lights & signals","Brakes","Fluids / fuel level","Wipers & mirrors","Interior clean","Wheelchair lift / step","First aid & fire extinguisher"].map(x=>[x,""])};return S.shuttle[k]}
+function SH(){const k=ld();S.shuttle=S.shuttle||{};if(!S.shuttle[k])S.shuttle[k]={runs:[["5:30 AM","MSP Airport"],["7:00 AM","MSP Airport"],["9:00 AM","Mall of America"],["12:00 PM","MSP Airport"],["3:00 PM","MSP Airport"],["6:00 PM","Mall of America"]].map((a,i)=>({t:a[0],to:a[1],type:"Scheduled",st:"Pending",cap:14,pax:i==1?[{g:"Smith (EX)",r:"214",n:2,h:"MSPAM"},{g:"Garcia (EX)",r:"118",n:1,h:"MSPMS"},{g:"Nguyen (EX)",r:"305",n:3,h:"MSPAM"}]:i==2?[{g:"Brown (EX)",r:"221",n:4,h:"MSPMS"}]:[]})),miles:[],pre:["Tires & pressure","Lights & signals","Brakes","Fluids / fuel level","Wipers & mirrors","Interior clean","Wheelchair lift / step","First aid & fire extinguisher"].map(x=>[x,""])};mergeSbSignups(k);return S.shuttle[k]}
 function signUp(){const X=SH(),r=X.runs[+$("sr").value],n=+$("sn").value||1,g=$("sg").value.trim();if(!g){$("smsg").textContent="Enter guest name";return}if(r.pax.reduce((a,p)=>a+p.n,0)+n>r.cap){$("smsg").textContent="Not enough seats on that run";return}r.pax.push({g,r:$("sm").value||"-",n,h:S.hotel,by:cw()});save();render()}
 function addRun(){const t=$("ot").value.trim();if(!t)return;SH().runs.push({t,to:$("od").value||"On-demand",type:"On-demand ("+S.hotel+")",st:"Pending",cap:14,pax:[]});save();render()}
 function runSt(i){const r=SH().runs[i];if(r.st=="Pending"){r.st="En route";r.t0=now()}else{r.st="Complete";r.t1=now()}save();render()}
@@ -256,8 +713,8 @@ function lv(){return D().labor.reduce((a,x)=>a+x.a-x.p,0)}
 function cyc(i){const o=["VD","RFI","VC","OC","OD","OOO"],r=D().rooms[i];r.s=o[(o.indexOf(r.s)+1)%6];save();render()}
 function asg(n,a){D().rooms.find(r=>r.n==n).hk=a;save()}
 function addI(){const cs=[...document.querySelectorAll(".ic")];D().insp.unshift({tpl:S.tpl||"Guestroom",failed:cs.filter(c=>!c.checked).map(c=>c.dataset.i),room:$("ir").value||"?",score:$("is").value||Math.round(100*cs.filter(c=>c.checked).length/cs.length),by:cw(),notes:$("in").value,date:new Date().toLocaleDateString()});save();render()}
-let ph="";function pv(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{ph=e.target.result;$("wpv").src=ph};r.readAsDataURL(f)}
-function addW(){const d=D();if(!$("wt").value){$("wt").placeholder="⚠ Describe the issue first";$("wt").focus();return};d.wo.unshift({id:d.wo.length+1,room:$("wr").value||"-",t:$("wt").value,p:$("wp").value,s:"Open",photo:ph});ph="";save();render()}
+let ph="",phFile=null;function pv(el){const f=el.files[0];if(!f)return;phFile=f;const r=new FileReader();r.onload=e=>{ph=e.target.result;const img=$("wpv");if(img)img.src=ph};r.readAsDataURL(f)}
+function addW(){const d=D();if(!$("wt").value){$("wt").placeholder="⚠ Describe the issue first";$("wt").focus();return};const row={id:d.wo.length+1,room:$("wr").value||"-",t:$("wt").value,p:$("wp").value,s:"Open",photo:ph,photo_paths:[]};if(phFile)row.photoFile=phFile;d.wo.unshift(row);ph="";phFile=null;save();render()}
 function addN(){D().notes.unshift({sh:$("ns").value,by:cw(),t:$("nt").value,at:new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})});save();render()}
 function walkIss(i,v){const d=D();d.walk[i][2]=v;if(v)d.wo.unshift({id:d.wo.length+1,room:d.walk[i][0],t:v+" (from property walk)",p:"Med",s:"Open",photo:""});save()}
 function mkO(){const d=D(),low=d.inv.filter(x=>x.oh<x.par*.5);if(!low.length)return;d.orders.unshift({at:new Date().toLocaleDateString(),st:"Pending GM approval",items:low.map(x=>`${x.it} ×${x.par-x.oh}`).join(", ")});save();render()}
@@ -287,7 +744,7 @@ function renderLogin(){
   document.body.style.paddingBottom="16px";
   const sites=LOGIN_SITES.map(([id,label])=>`<button type="button" class="${id===loginSite?"on":""}" aria-pressed="${id===loginSite}" onclick="pickHotel('${id}')">${escH(label)}</button>`).join("");
   const who=loginSite?`<p class="step">2. Your name</p><input id="loginFind" autocomplete="off" placeholder="Type to filter" aria-label="Filter names" value="${escH(loginQ)}" oninput="filterLogin(this.value)"><select id="loginWho" aria-label="Employee" onchange="pickUser(this.value)">${staffOptions()}</select><p class="step">3. PIN</p><div class="dots" id="pinDots" aria-label="PIN">${loginPin?"•".repeat(loginPin.length):"••••"}</div><div class="kp" aria-label="PIN keypad">${["1","2","3","4","5","6","7","8","9"].map(n=>`<button type="button" onclick="pinKey('${n}')">${n}</button>`).join("")}<button type="button" class="wide" onclick="pinKey('b')" aria-label="Delete">⌫</button><button type="button" onclick="pinKey('0')">0</button><button type="button" class="wide" onclick="pinKey('c')" aria-label="Clear">Clear</button><button type="button" class="btn" style="grid-column:1 / -1;min-height:64px;font-size:18px" onclick="signIn()">Sign in</button></div><p id="loginErr" class="bad">${escH(loginErr)}</p>`:`<p style="font-size:14px">Choose a hotel to see its staff.</p>`;
-  $("app").innerHTML=`<div class="card login"><span class="ex">EXAMPLE</span><h2>Staff sign in</h2><p style="font-size:13px;margin:6px 0 10px">Example names only. Sign-in on this page is not real security.</p><p class="step">1. Hotel</p><div class="sites">${sites}</div>${who}</div>`;
+  $("app").innerHTML=`<div class="card login"><span class="ex">EXAMPLE</span><h2>Staff sign in</h2><p style="font-size:13px;margin:6px 0 10px">Example names only. Sign-in on this page is not real security.</p>${USE_SUPABASE&&directorySource!=="supabase"?'<p class="warn">TODO: no public staff directory yet, so these names are still the example list. With Supabase on, the PIN is the password for id@staff.jrhospitality.local.</p>':""}<p class="step">1. Hotel</p><div class="sites">${sites}</div>${who}</div>`;
 }
 function pickHotel(id){
   if(!LOGIN_SITES.some(s=>s[0]===id))return;
@@ -308,15 +765,33 @@ function pinKey(k){
   const d=$("pinDots");if(d)d.textContent=loginPin?"•".repeat(loginPin.length):"••••";
   const e=$("loginErr");if(e)e.textContent="";
 }
-function signIn(){
+async function signIn(){
   const u=USERS.find(x=>x.id===loginUid&&x.active!==false);
   const siteOk=!!u&&(loginSite==="CORP"?!u.hotel:u.hotel===loginSite);
-  if(!u||!siteOk||u.pin!==loginPin){loginErr=!u||!siteOk?"Select your name, then enter the PIN.":"PIN doesn't match.";loginPin="";renderLogin();return}
+  if(!u||!siteOk){loginErr="Select your name, then enter the PIN.";loginPin="";renderLogin();return}
+  if(USE_SUPABASE){
+    if(!/^\d{4}$/.test(loginPin)){loginErr="Enter the 4-digit PIN.";loginPin="";renderLogin();return}
+    try{
+      await ensureSb();
+      const {data,error}=await sb.auth.signInWithPassword({email:staffEmail(u),password:loginPin});
+      if(error||!data.session){loginErr="PIN doesn't match.";loginPin="";renderLogin();return}
+      sbSession=data.session;sbPush=false;
+      sset(LAST_SITE,loginSite);
+      S.uid=u.id;S.hotel=u.hotel||(HOTELS[S.hotel]?S.hotel:"MSPWE");S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";
+      loginPin="";loginErr="";loginUid="";
+      await applySessionProfile();await hydrate();
+      sset(KEY,JSON.stringify(S));
+      try{render()}catch(e){throw e}
+      takeBaseline();sbPush=true;
+    }catch(e){loginErr="Could not reach Supabase.";loginPin="";renderLogin()}
+    return;
+  }
+  if(u.pin!==loginPin){loginErr="PIN doesn't match.";loginPin="";renderLogin();return}
   sset(LAST_SITE,loginSite);
   S.uid=u.id;S.hotel=u.hotel||(HOTELS[S.hotel]?S.hotel:"MSPWE");S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";
   loginPin="";loginErr="";loginUid="";save();render();
 }
-function signOut(){S.uid="";S.tab="home";loginPin="";loginUid="";loginErr="";save();render()}
+async function signOut(){sbPush=false;sbSession=null;if(sb){try{await sb.auth.signOut()}catch(e){}}S.uid="";S.tab="home";loginPin="";loginUid="";loginErr="";save();render()}
 function render(){
   const u=meUser();
   if(!u){renderLogin();return}
@@ -341,7 +816,7 @@ function render(){
   $("role").innerHTML=leader()?ROLES.map(r=>`<button type="button" class="${r==S.role?"on":""}" onclick="setRole('${r}')">${r=="GM"?"GM Home":(SHORT[r]||r)}</button>`).join(""):"";
   $("hname").textContent=HOTELS[S.hotel]+" · "+u.name+" · "+u.role+(leader()&&S.role!="GM"?" · viewing "+(SHORT[S.role]||S.role):"");
   $("hbt").textContent=S.hotel+" · "+(SHORT[u.role]||u.role)+" · "+u.name;
-  $("warn").innerHTML=STORE_OK?"":"<div class=warn>Storage blocked in this viewer: changes last until you close the page. Open in Safari/Chrome to save.</div>";
+  $("warn").innerHTML=(STORE_OK?"":"<div class=warn>Storage blocked in this viewer: changes last until you close the page. Open in Safari/Chrome to save.</div>")+(Ssync?`<div class=warn>${escH(Ssync)}</div>`:"");
   if(!M[S.tab])S.tab="home";
   $("app").innerHTML=V[S.tab]();
   $("nav").innerHTML=nav.map(t=>`<button class="${S.tab==t?'on':''}" onclick="go('${t}')"><span>${M[t][0]}</span>${M[t][1]}</button>`).join("");
@@ -546,10 +1021,16 @@ function schedPage(){
 }
 V.sched=schedPage;
 document.getElementById("app").innerHTML='<div class="card">Loading staff directory…</div>';
-loadUsers().then(list=>{
-  USERS=Array.isArray(list)?list:[];
-  const he=expandHE(USERS);laborPlan=he.laborPlan;timePunches=he.timePunches;
-  try{render()}catch(e){document.getElementById("app").innerHTML="<div class=card>Error: "+e.message+"</div>";throw e}
-  fetch("data/labor.json").then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.laborPlan||!j.timePunches)return;laborPlan=j.laborPlan;timePunches=j.timePunches;try{render()}catch(e){}}).catch(()=>{});
-}).catch(e=>{document.getElementById("app").innerHTML="<div class=card>Could not load the staff directory. "+escH(e&&e.message?e.message:"")+"</div>"});
+(async()=>{
+  try{
+    if(USE_SUPABASE){try{await ensureSb();const {data}=await sb.auth.getSession();sbSession=data.session||null}catch(e){Ssync="Supabase did not load. Example data is still on this device."}}
+    const list=await loadUsers();
+    USERS=Array.isArray(list)?list:[];
+    const he=expandHE(USERS);laborPlan=he.laborPlan;timePunches=he.timePunches;
+    if(sbSession){await applySessionProfile();await hydrate()}
+    try{render()}catch(e){document.getElementById("app").innerHTML="<div class=card>Error: "+e.message+"</div>";throw e}
+    takeBaseline();sbPush=!!(USE_SUPABASE&&sbSession);
+    if(!remoteLabor)fetch("data/labor.json").then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.laborPlan||!j.timePunches)return;laborPlan=j.laborPlan;timePunches=j.timePunches;try{render()}catch(e){}}).catch(()=>{});
+  }catch(e){document.getElementById("app").innerHTML="<div class=card>Could not load the staff directory. "+escH(e&&e.message?e.message:"")+"</div>"}
+})();
 </script></body></html>
