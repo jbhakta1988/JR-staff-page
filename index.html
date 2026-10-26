@@ -6,7 +6,7 @@ header{background:#14365d;color:#fff;padding:10px 12px;position:sticky;top:0;z-i
 header h1{font-size:16px;margin:0 0 6px}.ex{background:#f5a623;color:#000;font-size:11px;padding:2px 6px;border-radius:4px;font-weight:700}
 .sw{display:flex;gap:6px}select,input,textarea,button{font-size:16px;min-height:44px;border-radius:8px;border:1px solid #c5cbd6;padding:8px}
 header{z-index:50;padding:6px 10px!important}#hbar{width:100%;display:flex;align-items:center;gap:8px;background:#ffffff1a;color:#fff;border:1px solid #fff5;min-height:48px;font-size:15px;font-weight:700;text-align:left}#hbt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#hpanel{padding-bottom:6px;max-height:75vh;overflow:auto}nav{z-index:40}main{position:relative;z-index:1}
-.seg{display:flex;gap:6px;margin-top:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}.seg button{flex:1 0 auto;min-height:48px;border:1px solid #fff6;background:#ffffff1f;color:#fff;font-weight:700;font-size:15px;padding:6px 10px;touch-action:manipulation;cursor:pointer}.seg button.on{background:#fff;color:#14365d}#role{flex-wrap:wrap}#role button{flex:1 0 30%}.seg.sm button{font-size:13px;font-weight:600;min-height:44px}
+.seg{display:flex;gap:6px;margin-top:6px;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}.seg button{flex:1 0 auto;min-height:48px;border:1px solid #fff6;background:#ffffff1f;color:#fff;font-weight:700;font-size:15px;padding:6px 10px;touch-action:manipulation;cursor:pointer}.seg button.on{background:#fff;color:#14365d}#role{flex-wrap:wrap}#role button{flex:1 0 30%}.seg.sm button{font-size:13px;font-weight:600;min-height:44px}
 .hname{font-size:12px;opacity:.85;margin-top:4px}.warn{background:#fff3cd;color:#000;font-size:12px;padding:4px 8px;border-radius:6px;margin-top:6px}main{padding:12px;max-width:640px;margin:auto}
 .card{background:#fff;border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 3px #0001}
 h2{font-size:18px;margin:4px 0 10px}h3{font-size:15px;margin:0 0 8px}
@@ -23,6 +23,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 .bad{color:#c0262d;font-weight:700}.good{color:#1a7f37;font-weight:700}.li{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #eee;min-height:48px}
 .li input[type=checkbox]{width:26px;height:26px;min-height:0}img.prev{max-width:100%;border-radius:8px;margin-top:6px}.bar{height:10px;background:#14365d;border-radius:5px}
 .login h2{margin-top:8px}.acct{font-size:13px;padding:8px 0;border-bottom:1px solid #eee;line-height:1.35}details summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+table.fit{width:100%;table-layout:fixed;font-size:12px}table.fit th,table.fit td{text-align:center;padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}table.fit .nm{text-align:left}table.fit button{min-height:36px;font-size:12px;padding:2px 0;width:100%}td.over,th.over{background:#fde2e1}.wk{display:flex;gap:6px;align-items:center;margin:6px 0}.wk b{flex:1;text-align:center;font-size:14px}
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span id="hbt"></span><span class="ex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
@@ -69,9 +70,9 @@ const USERS=[
 function meUser(){return USERS.find(u=>u.id===S.uid)||null}
 function authRole(){const u=meUser();return u?u.role:""}
 function leader(){return authRole()=="Above Property"||authRole()=="GM"||authRole()=="AGM"}
-const M={home:["🏠","Home"],rooms:["🛏️","Rooms"],insp:["🔍","Inspect"],wo:["🔧","Work Orders"],pm:["🗓️","PMs"],notes:["📝","Shift Notes"],check:["✅","Checklists"],walk:["🚶","Prop Walk"],inv:["📦","Inventory"],order:["🛒","Ordering"],labor:["⏱️","Labor"],fc:["📈","Forecast"],gmc:["📋","GM Checklists"],my:["👤","My Tasks"],myrooms:["🛏️","My Rooms"],lf:["🧳","Lost & Found"],esc:["🚩","Escalations"],rules:["⚙️","Assign Rules"],line:["📋","Station"],lreq:["📨","Line Staff"],shut:["🚐","Shuttle"]};
-const NAV={GM:["home","my","wo","labor"],"Front Desk":["home","my","rooms","notes"],Housekeeping:["home","rooms","insp","esc"],"Housekeeper":["home","myrooms","check"],Maintenance:["home","my","wo","pm"],"Shuttle Driver":["home","shut","line"],"House Person":["home","my","line","check"],"Laundry Attendant":["home","my","line","check"],"Breakfast Attendant":["home","my","line","check"]};
-const TILES={"Shuttle Driver":["shut","line"],"House Person":["my","line","check"],"Laundry Attendant":["my","line","check"],"Breakfast Attendant":["my","line","check"],GM:["my","rules","lreq","shut","gmc","rooms","insp","wo","pm","notes","check","walk","inv","order","labor","fc"],"Front Desk":["my","shut","lreq","rooms","notes","check","wo","fc"],Housekeeping:["my","rooms","insp","esc","lf","labor","inv","order","check","lreq"],"Housekeeper":["myrooms","check"],Maintenance:["my","wo","pm","walk","check","inv","order"]};
+const M={home:["🏠","Home"],rooms:["🛏️","Rooms"],insp:["🔍","Inspect"],wo:["🔧","Work Orders"],pm:["🗓️","PMs"],notes:["📝","Shift Notes"],check:["✅","Checklists"],walk:["🚶","Prop Walk"],inv:["📦","Inventory"],order:["🛒","Ordering"],labor:["⏱️","Labor"],fc:["📈","Forecast"],gmc:["📋","GM Checklists"],my:["👤","My Tasks"],myrooms:["🛏️","My Rooms"],lf:["🧳","Lost & Found"],esc:["🚩","Escalations"],rules:["⚙️","Assign Rules"],line:["📋","Station"],lreq:["📨","Line Staff"],shut:["🚐","Shuttle"],sched:["📅","Schedule"]};
+const NAV={GM:["home","sched","my","wo","labor"],"Front Desk":["home","sched","my","rooms","notes"],Housekeeping:["home","sched","rooms","insp","esc"],"Housekeeper":["home","sched","myrooms","check"],Maintenance:["home","sched","my","wo","pm"],"Shuttle Driver":["home","sched","shut","line"],"House Person":["home","sched","my","line","check"],"Laundry Attendant":["home","sched","my","line","check"],"Breakfast Attendant":["home","sched","my","line","check"]};
+const TILES={"Shuttle Driver":["sched","shut","line"],"House Person":["sched","my","line","check"],"Laundry Attendant":["sched","my","line","check"],"Breakfast Attendant":["sched","my","line","check"],GM:["sched","my","rules","lreq","shut","gmc","rooms","insp","wo","pm","notes","check","walk","inv","order","labor","fc"],"Front Desk":["sched","my","shut","lreq","rooms","notes","check","wo","fc"],Housekeeping:["sched","my","rooms","insp","esc","lf","labor","inv","order","check","lreq"],"Housekeeper":["sched","myrooms","check"],Maintenance:["sched","my","wo","pm","walk","check","inv","order"]};
 const KEY="jrportal_v7";let MEM={},STORE_OK=true;
 function sget(k){try{return window.localStorage.getItem(k)}catch(e){STORE_OK=false;return MEM[k]||null}}
 function sset(k,v){MEM[k]=v;try{window.localStorage.setItem(k,v)}catch(e){STORE_OK=false}}
@@ -272,6 +273,7 @@ function render(){
   const u=meUser();
   if(!u){renderLogin();return}
   enforceAccess();
+  ensureSched();
   $("hdr").hidden=false;
   document.body.style.paddingBottom="84px";
   const nav=navFor(S.role),dd=D();
@@ -298,5 +300,203 @@ function render(){
 }
 function setHotel(k){if(authRole()!="Above Property"||!HOTELS[k])return;S.hotel=k;S.tab="home";save();render();scrollTo(0,0)}
 function setRole(r){if(!leader()||!ROLES.includes(r))return;S.role=r;S.tab="home";save();render();scrollTo(0,0)}
+/*HE_START*/
+// HOTEL EFFECTIVENESS DATA LAYER
+// Plan hours and actual punches will later come from Hotel Effectiveness.
+// laborPlan.hours[hotel|SHUTTLE][position] = Mon..Sun plan hours.
+// laborPlan.associate[hotel|SHUTTLE][name] = Mon..Sun plan hours.
+// laborPlan.rooms[hotel] = Mon..Sun room count used for housekeeping MPR.
+// timePunches[hotel|SHUTTLE][name] = Mon..Sun [in,out] or null.
+// Example data is below. If data/labor.json is present, it replaces laborPlan and timePunches.
+const HE_ROOMS={MSPWE:[32,32,28,32,34,30,0],MSPAM:[30,30,26,32,34,28,0],MSPMS:[28,30,26,30,32,26,0]};
+const HE_PAT={
+"Front Desk":{days:[0,1,2,3,4,5],a:"07:00",b:"15:00",over:{2:["06:00","16:00"]}},
+"Housekeeping":{days:[0,1,2,3,4],a:"07:00",b:"15:00"},
+"Housekeeper":{days:[0,1,2,3,4,5],a:"08:00",b:"16:00",over:{2:["07:00","17:30"]}},
+"Maintenance":{days:[0,1,2,3,4],a:"08:00",b:"16:00"},
+"House Person":{days:[0,1,2,3,4,5],a:"08:00",b:"16:00"},
+"Laundry Attendant":{days:[0,1,2,3,4,5],a:"07:00",b:"15:00"},
+"Breakfast Attendant":{days:[0,1,2,3,4,5],a:"05:30",b:"13:30",over:{4:["05:00","14:00"]}},
+"Shuttle Driver":{days:[0,1,2,3,4,5],a:"07:00",b:"15:00",over:{2:["06:00","15:00"]},late:["15:00","23:00"]}
+};
+function expandHE(users){
+  const hours={SHUTTLE:{"Shuttle Driver":[0,0,0,0,0,0,0]}},associate={SHUTTLE:{}},punches={SHUTTLE:{}};
+  Object.keys(HE_ROOMS).forEach(h=>{hours[h]={};associate[h]={};punches[h]={}});
+  const drivers=users.filter(u=>u.role==="Shuttle Driver").slice().sort((a,b)=>a.hotel.localeCompare(b.hotel));
+  users.forEach(u=>{
+    if(!u.hotel||!HE_PAT[u.role])return;
+    const pos=u.role==="Housekeeping"?"HK Lead":u.role, pat=HE_PAT[u.role], bucket=u.role==="Shuttle Driver"?"SHUTTLE":u.hotel;
+    const late=u.role==="Shuttle Driver"&&drivers[1]&&drivers[1].id===u.id;
+    const plan=[0,0,0,0,0,0,0]; pat.days.forEach(i=>plan[i]=8);
+    associate[bucket][u.name]=plan;
+    punches[bucket][u.name]=[0,1,2,3,4,5,6].map(i=>{
+      if(!pat.days.includes(i))return null;
+      if(late)return pat.late.slice();
+      if(pat.over&&pat.over[i])return pat.over[i].slice();
+      return [pat.a,pat.b];
+    });
+    if(!hours[bucket][pos])hours[bucket][pos]=[0,0,0,0,0,0,0];
+    plan.forEach((n,i)=>hours[bucket][pos][i]+=n);
+  });
+  return {laborPlan:{hours:hours,associate:associate,rooms:HE_ROOMS},timePunches:punches};
+}
+/*HE_END*/
+let HE=expandHE(USERS);let laborPlan=HE.laborPlan,timePunches=HE.timePunches;
+const POS=["Front Desk","HK Lead","Housekeeper","Maintenance","Shuttle Driver","House Person","Laundry Attendant","Breakfast Attendant"];
+const POSLAB={"Front Desk":"Front Desk","HK Lead":"HK Lead","Housekeeper":"Housekeeper","Maintenance":"Maint","Shuttle Driver":"Shuttle","House Person":"House","Laundry Attendant":"Laundry","Breakfast Attendant":"Bkfst"};
+const POSS={"Front Desk":"FD","HK Lead":"Lead","Housekeeper":"HK","Maintenance":"MT","Shuttle Driver":"SH","House Person":"HP","Laundry Attendant":"LA","Breakfast Attendant":"BK"};
+const DOWLAB=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+let SCHED_NOTE="";
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function mondayOf(off){const n=new Date();n.setHours(12,0,0,0);n.setDate(n.getDate()-((n.getDay()+6)%7)+7*(off||0));return n}
+function weekDates(off){const s=mondayOf(off);return [0,1,2,3,4,5,6].map(i=>{const d=new Date(s);d.setDate(s.getDate()+i);return d})}
+function shHrs(a,b){if(!a||!b||!a.includes(":")||!b.includes(":"))return 0;const [ah,am]=a.split(":").map(Number),[bh,bm]=b.split(":").map(Number);return (bh*60+bm-(ah*60+am))/60}
+function fmtH(n){if(n==null||Number.isNaN(n))return "—";const r=Math.round(n*10)/10;return Math.abs(r-Math.round(r))<1e-6?String(Math.round(r)):r.toFixed(1)}
+function fmtVar(n){if(n==null||Number.isNaN(n))return "—";if(Math.abs(n)<0.05)return "0";return (n>0?"+":"-")+fmtH(Math.abs(n))}
+function sid(){S.sid=(S.sid||0)+1;return "s"+S.sid}
+function schedPos(){const r=authRole();if(r==="Housekeeping")return ["HK Lead","Housekeeper"];if(r==="Above Property"||r==="GM"||r==="AGM")return POS.filter(p=>p!=="Shuttle Driver"||SHH.includes(S.hotel));return []}
+function canEditSched(){return schedPos().length>0}
+function canPublish(){const r=authRole();return r==="Above Property"||r==="GM"||r==="AGM"}
+function schedScope(pos){return pos==="Shuttle Driver"?"SHUTTLE":S.hotel}
+function schedPeople(pos){if(pos==="Shuttle Driver")return USERS.filter(u=>u.role==="Shuttle Driver").sort((a,b)=>a.hotel.localeCompare(b.hotel));const role=pos==="HK Lead"?"Housekeeping":pos;return USERS.filter(u=>u.hotel===S.hotel&&u.role===role)}
+function heBucket(pos){return pos==="Shuttle Driver"?"SHUTTLE":S.hotel}
+function escH(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+function ensureSched(){
+  if(!S.shifts)S.shifts=[];
+  if(!S.pub)S.pub={};
+  if(S.schedSeed)return;
+  const drivers=USERS.filter(u=>u.role==="Shuttle Driver").slice().sort((a,b)=>a.hotel.localeCompare(b.hotel));
+  [0,-1].forEach(off=>{
+    const days=weekDates(off);
+    USERS.forEach(u=>{
+      const pat=HE_PAT[u.role]; if(!pat||!u.hotel)return;
+      const pos=u.role==="Housekeeping"?"HK Lead":u.role, scope=u.role==="Shuttle Driver"?"SHUTTLE":u.hotel;
+      const late=u.role==="Shuttle Driver"&&drivers[1]&&drivers[1].id===u.id;
+      days.forEach((d,i)=>{
+        if(!pat.days.includes(i))return;
+        let a=pat.a,b=pat.b;
+        if(late){a=pat.late[0];b=pat.late[1]}
+        else if(pat.over&&pat.over[i]){a=pat.over[i][0];b=pat.over[i][1]}
+        S.shifts.push({id:sid(),scope:scope,pos:pos,who:u.name,date:ymd(d),start:a,end:b});
+      });
+    });
+  });
+  S.schedSeed=1;save();
+}
+function shiftTimes(pos,date){return (S.shifts||[]).filter(s=>s.scope===schedScope(pos)&&s.pos===pos&&s.date===date)}
+function sumHrs(list){return list.reduce((a,s)=>a+shHrs(s.start,s.end),0)}
+function setWeek(d){S.wk=(S.wk||0)+d;S.editId="";SCHED_NOTE="";save();render()}
+function setPos(p){if(!schedPos().includes(p))return;S.spos=p;S.editId="";SCHED_NOTE="";save();render()}
+function setSV(v){if(v!=="clock"&&v!=="build")return;S.sv=v;save();render()}
+function setSd(i){S.sd=i;render()}
+function edShift(id){const s=(S.shifts||[]).find(x=>x.id===id);if(!s||!schedPos().includes(s.pos)||s.scope!==schedScope(s.pos))return;S.spos=s.pos;S.editId=id;S.sv="build";save();render()}
+function delShift(id){const s=(S.shifts||[]).find(x=>x.id===id);if(!s||!schedPos().includes(s.pos)||s.scope!==schedScope(s.pos))return;S.shifts=S.shifts.filter(x=>x.id!==id);if(S.editId===id)S.editId="";save();render()}
+function cpShift(id){
+  const s=(S.shifts||[]).find(x=>x.id===id);if(!s||!schedPos().includes(s.pos))return;
+  const d=new Date(s.date+"T12:00:00");d.setDate(d.getDate()+1);
+  const date=ymd(d);
+  S.shifts.push({id:sid(),scope:s.scope,pos:s.pos,who:s.who,date:date,start:s.start,end:s.end});
+  SCHED_NOTE="Copied to "+date;save();render();
+}
+function copyLast(){
+  if(!canEditSched())return;
+  const pos=S.spos; if(!schedPos().includes(pos))return;
+  const scope=schedScope(pos);
+  const positions=scope==="SHUTTLE"?["Shuttle Driver"]:schedPos().filter(p=>p!=="Shuttle Driver");
+  const cur=weekDates(S.wk||0),prev=weekDates((S.wk||0)-1),map={};
+  prev.forEach((d,i)=>map[ymd(d)]=ymd(cur[i]));
+  let n=0;
+  S.shifts.filter(s=>s.scope===scope&&positions.includes(s.pos)&&map[s.date]).forEach(s=>{
+    const date=map[s.date];
+    if(S.shifts.some(x=>x.scope===scope&&x.pos===s.pos&&x.who===s.who&&x.date===date&&x.start===s.start&&x.end===s.end))return;
+    S.shifts.push({id:sid(),scope:scope,pos:s.pos,who:s.who,date:date,start:s.start,end:s.end});n++;
+  });
+  SCHED_NOTE=n?("Copied "+n+" shifts"):"Last week is already on this week";save();render();
+}
+function publishWeek(){
+  if(!canPublish())return;
+  const pos=S.spos; if(!schedPos().includes(pos))return;
+  S.pub[schedScope(pos)+"|"+ymd(weekDates(S.wk||0)[0])]=1;SCHED_NOTE="Week published";save();render();
+}
+function cancelEdit(){S.editId="";save();render()}
+function saveShift(){
+  if(!canEditSched()||!schedPos().includes(S.spos))return;
+  const who=$("sw").value,date=$("sd").value,start=$("ss").value,end=$("se").value,msg=$("smsg");
+  const people=schedPeople(S.spos).map(u=>u.name),days=weekDates(S.wk||0).map(ymd);
+  if(!people.includes(who)||!days.includes(date)||shHrs(start,end)<=0){if(msg)msg.textContent="Choose a name, a day this week, and an end time after the start.";return}
+  const scope=schedScope(S.spos);
+  if(S.editId){
+    const s=S.shifts.find(x=>x.id===S.editId);
+    if(!s||!schedPos().includes(s.pos))return;
+    Object.assign(s,{who:who,date:date,start:start,end:end,pos:S.spos,scope:scope});
+  }else S.shifts.push({id:sid(),scope:scope,pos:S.spos,who:who,date:date,start:start,end:end});
+  S.editId="";SCHED_NOTE="Shift saved";save();render();
+}
+function schedPage(){
+  const u=meUser(),off=S.wk||0,days=weekDates(off),wk=ymd(days[0]);
+  const title=days[0].toLocaleDateString("en-US",{month:"short",day:"numeric"})+"–"+days[6].toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  const pager=`<div class="wk"><button type="button" class="btn2" onclick="setWeek(-1)">Prev</button><b>${title}</b><button type="button" class="btn2" onclick="setWeek(1)">Next</button></div>`;
+  if(!canEditSched()){
+    const mine=(S.shifts||[]).filter(s=>s.who===u.name&&days.some(d=>ymd(d)===s.date)&&S.pub[s.scope+"|"+wk]);
+    const rows=days.map(d=>{
+      const date=ymd(d),list=mine.filter(s=>s.date===date);
+      if(!list.length)return "";
+      return `<h3>${DOWLAB[(d.getDay()+6)%7]} ${d.getMonth()+1}/${d.getDate()}</h3><table class="fit"><tr><th>Pos</th><th>In</th><th>Out</th><th>Hrs</th></tr>${list.map(s=>`<tr><td>${escH(POSS[s.pos]||s.pos)}</td><td>${escH(s.start)}</td><td>${escH(s.end)}</td><td>${fmtH(shHrs(s.start,s.end))}</td></tr>`).join("")}</table>`;
+    }).join("");
+    return `<div id="schedRoot"><h2>My Schedule</h2>${pager}<div class="card">${rows||"No published shifts this week."}</div></div>`;
+  }
+  if(!schedPos().includes(S.spos))S.spos=schedPos()[0];
+  const pos=S.spos,scope=schedScope(pos),pub=!!S.pub[scope+"|"+wk];
+  const tabs=`<div class="seg" role="tablist">${schedPos().map(p=>`<button type="button" class="${p===pos?"on":""}" onclick="setPos('${p}')">${POSLAB[p]}</button>`).join("")}</div>`;
+  const mode=`<div class="seg"><button type="button" class="${S.sv==="clock"?"":"on"}" onclick="setSV('build')">Builder</button><button type="button" class="${S.sv==="clock"?"on":""}" onclick="setSV('clock')">Time clock</button></div>`;
+  if(S.sv==="clock"){
+    if(S.sd==null||S.sd<0||S.sd>6){const t=ymd(new Date());const i=days.findIndex(d=>ymd(d)===t);S.sd=i>=0?i:0}
+    const di=S.sd,date=ymd(days[di]);
+    const dayBtns=`<div class="seg">${days.map((d,i)=>`<button type="button" class="${i===di?"on":""}" onclick="setSd(${i})">${DOWLAB[i]}</button>`).join("")}</div>`;
+    const blocks=schedPos().map(p=>{
+      const bucket=heBucket(p),people=schedPeople(p);
+      const body=people.map(person=>{
+        const plan=((laborPlan.associate[bucket]||{})[person.name]||[0,0,0,0,0,0,0])[di];
+        const sched=sumHrs((S.shifts||[]).filter(s=>s.scope===schedScope(p)&&s.pos===p&&s.who===person.name&&s.date===date));
+        const punch=((timePunches[bucket]||{})[person.name]||[])[di];
+        const actual=punch?shHrs(punch[0],punch[1]):null;
+        const v=actual==null?null:actual-plan;
+        return `<tr><td class="nm">${escH(person.name)}</td><td>${fmtH(plan)}</td><td>${fmtH(sched)}</td><td>${actual==null?"—":fmtH(actual)}</td><td class="${v>0.05?"over":""}">${fmtVar(v)}</td></tr>`;
+      }).join("");
+      return `<h3>${escH(p)}</h3><table class="fit"><tr><th class="nm">Name</th><th>Plan</th><th>Sched</th><th>Act</th><th>Var</th></tr>${body}</table>`;
+    }).join("");
+    return `<div id="schedRoot"><h2>Time clock</h2><p style="font-size:13px;margin:0 0 8px">from Hotel Effectiveness</p>${pager}${mode}${dayBtns}<div class="card">${blocks}<small>Read only. Plan and actual punches are example Hotel Effectiveness data. Var = actual − plan.</small></div></div>`;
+  }
+  const hk=pos==="HK Lead"||pos==="Housekeeper";
+  let tp=0,ts=0;
+  const sumRows=days.map((d,i)=>{
+    const date=ymd(d);
+    const plan=(laborPlan.hours[scope]&&laborPlan.hours[scope][pos]?laborPlan.hours[scope][pos]:[0,0,0,0,0,0,0])[i];
+    const sched=sumHrs(shiftTimes(pos,date));
+    const v=sched-plan; tp+=plan; ts+=sched;
+    let mprCell="";
+    if(hk){
+      const hkHrs=sumHrs(shiftTimes("HK Lead",date))+sumHrs(shiftTimes("Housekeeper",date));
+      const rooms=(laborPlan.rooms[S.hotel]||[])[i]||0;
+      const mpr=rooms?hkHrs*60/rooms:null;
+      mprCell=`<td class="${mpr>30?"over":""}">${mpr==null?"—":fmtH(mpr)}</td>`;
+    }
+    return `<tr><td>${DOWLAB[i]}</td><td>${fmtH(plan)}</td><td>${fmtH(sched)}</td><td class="${v>0.05?"over":""}">${fmtVar(v)}</td>${mprCell}</tr>`;
+  }).join("");
+  const totVar=ts-tp;
+  const sumTable=`<table class="fit"><tr><th>Day</th><th>Plan</th><th>Sched</th><th>Var</th>${hk?"<th>MPR</th>":""}</tr>${sumRows}<tr><td>All</td><td>${fmtH(tp)}</td><td>${fmtH(ts)}</td><td class="${totVar>0.05?"over":""}">${fmtVar(totVar)}</td>${hk?"<td></td>":""}</tr></table>`;
+  const editing=S.editId?(S.shifts||[]).find(s=>s.id===S.editId):null;
+  const people=schedPeople(pos);
+  const form=`<h3>${editing?"Edit shift":"Add shift"}</h3><select id="sw" style="width:100%">${people.map(p=>`<option value="${escH(p.name)}" ${editing&&editing.who===p.name?"selected":""}>${escH(p.name)}</option>`).join("")}</select><select id="sd" style="width:100%;margin-top:6px">${days.map(d=>`<option value="${ymd(d)}" ${editing&&editing.date===ymd(d)?"selected":""}>${DOWLAB[(d.getDay()+6)%7]} ${d.getMonth()+1}/${d.getDate()}</option>`).join("")}</select><div class="row"><input id="ss" type="time" value="${editing?editing.start:"07:00"}" aria-label="Start"><input id="se" type="time" value="${editing?editing.end:"15:00"}" aria-label="End"></div><p id="smsg" class="bad"></p><div class="row"><button type="button" class="btn" onclick="saveShift()">Save</button>${editing?`<button type="button" class="btn2" onclick="cancelEdit()">Cancel</button>`:""}</div>`;
+  const byDay=days.map(d=>{
+    const date=ymd(d),list=shiftTimes(pos,date);
+    if(!list.length)return "";
+    return `<h3>${DOWLAB[(d.getDay()+6)%7]} ${d.getMonth()+1}/${d.getDate()}</h3><table class="fit"><tr><th class="nm">Name</th><th>In</th><th>Out</th></tr>${list.map(s=>`<tr><td class="nm">${escH(s.who)}</td><td>${escH(s.start)}</td><td>${escH(s.end)}</td></tr><tr><td colspan="3"><div class="row"><button type="button" class="btn2" onclick="edShift('${s.id}')">Edit</button><button type="button" class="btn2" onclick="cpShift('${s.id}')">Copy</button><button type="button" class="btn2" onclick="delShift('${s.id}')">Delete</button></div></td></tr>`).join("")}</table>`;
+  }).join("");
+  const where=pos==="Shuttle Driver"?"Shared shuttle · MSPAM + MSPMS":escH(S.hotel+" · "+pos);
+  return `<div id="schedRoot"><h2>Schedule</h2><p style="font-size:13px;margin:0">${where} · ${pub?"Published":"Draft"}</p>${pager}${mode}${tabs}<div class="card"><div class="row"><button type="button" class="btn2" onclick="copyLast()">Copy last week</button>${canPublish()&&!pub?`<button type="button" class="btn" onclick="publishWeek()">Publish week</button>`:""}</div>${SCHED_NOTE?`<p>${escH(SCHED_NOTE)}</p>`:""}<small>Plan hours are example data from Hotel Effectiveness. Var = scheduled − plan. Over plan is highlighted.${hk?" MPR = housekeeping minutes per room (target 30).":""}</small>${sumTable}</div><div class="card">${form}</div><div class="card">${byDay||"No shifts this position."}</div></div>`;
+}
+V.sched=schedPage;
 try{render()}catch(e){document.getElementById("app").innerHTML="<div class=card>Error: "+e.message+"</div>";throw e}
+fetch("data/labor.json").then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.laborPlan||!j.timePunches)return;laborPlan=j.laborPlan;timePunches=j.timePunches;try{render()}catch(e){}}).catch(()=>{});
 </script></body></html>
