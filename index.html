@@ -151,6 +151,7 @@ body.he-print .wk button{display:none}
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
 <div id="toast" class="toast" hidden></div>
+<script src="vendor/dicebear.min.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
 // Example directory only. Do not put a live employee roster in this public file.
@@ -3238,9 +3239,10 @@ function lvl(xp){let i=0;LV.forEach((l,j)=>{if(xp>=l[0])i=j});return i}
 function nm(l){return LANG==="es"?l[2]:l[1]}
 window.ptsAward=function(n,en,es,big){const p=P(),before=lvl(p.xp);p.xp+=n;p.wk+=n;p.mo+=n;p.log.unshift([new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),en,es,n]);p.log=p.log.slice(0,15);const after=lvl(p.xp);SV(p);
   ptsToast("+"+n+" "+t("pts")+" · "+(LANG==="es"?es:en));if(big)confetti();
-  if(after>before){p.xp+=LV.length*0+25*after;SV(p);setTimeout(()=>{confetti();ptsToast("🎉 "+t("Level up!")+" "+t("Level")+" "+(after+1)+" · "+nm(LV[after]),3500)},900)}};
+  if(after>before){p.xp+=LV.length*0+25*after;SV(p);setTimeout(()=>{confetti();window.avLevelUp&&avLevelUp();ptsToast("🎉 "+t("Level up!")+" "+t("Level")+" "+(after+1)+" · "+nm(LV[after]),3500)},900)}};
 function ptsToast(msg,ms){let el=document.getElementById("ptsToast");if(!el){el=document.createElement("div");el.id="ptsToast";el.style.cssText="position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#1f2a44;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;z-index:9999;box-shadow:0 4px 14px #0004;transition:opacity .3s;max-width:92vw;text-align:center";document.body.appendChild(el)}el.textContent=msg;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,ms||2200)}
 function confetti(){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;if(window.funBurst){window.funBurst();return}const c=document.createElement("canvas");c.style.cssText="position:fixed;inset:0;pointer-events:none;z-index:9998";c.width=innerWidth;c.height=innerHeight;document.body.appendChild(c);const x=c.getContext("2d"),cols=["#f94144","#f8961e","#f9c74f","#90be6d","#43aa8b","#577590"],ps=Array.from({length:140},()=>({x:c.width/2,y:c.height/3,vx:(Math.random()-.5)*12,vy:Math.random()*-12-3,s:4+Math.random()*5,c:cols[Math.floor(Math.random()*6)],r:Math.random()*6}));let f=0;(function a(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.35;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});if(++f<110)requestAnimationFrame(a);else c.remove()})()}
+window.ptsToast=ptsToast;window.ptsLevel=()=>lvl(P().xp);window.ptsStats=()=>P().st;
 window.ptsCard=function(){const p=P(),i=lvl(p.xp),nx=LV[i+1],pct=nx?Math.round((p.xp-LV[i][0])/(nx[0]-LV[i][0])*100):100;
   return `<div class=card onclick="go('pts')" style="cursor:pointer;background:linear-gradient(135deg,#fff7e0,#e8f0ff)"><div style="display:flex;justify-content:space-between;align-items:center"><b>⭐ ${t("My Points")}</b><span style="background:#1f2a44;color:#fff;border-radius:999px;padding:2px 10px;font-size:13px">${t("Level")} ${i+1} · ${escH(nm(LV[i]))}</span></div>
   <div style="font-size:28px;font-weight:700;margin:6px 0">${p.xp.toLocaleString()} <small style="font-size:14px;font-weight:400">XP</small></div>
@@ -3248,7 +3250,7 @@ window.ptsCard=function(){const p=P(),i=lvl(p.xp),nx=LV[i+1],pct=nx?Math.round((
   <small>${nx?(nx[0]-p.xp)+" "+t("to next level"):"MAX"} · ${t("This week")}: ${p.wk} · 🔥 ${p.st.ck}</small></div>`};
 function board(per){const me=(meUser()||{}).name||"";const myF=String(me).split(" ")[0];const p=P();const seed=S.hotel.charCodeAt(4)+(per=="mo"?7:0);
   let rows=FIRST.slice(0,9).map((n,j)=>[n,((seed*(j+3))%97)+(per=="mo"?150:30)+j*7,(j*seed)%6]);rows.push([t("You"),per=="mo"?p.mo:p.wk,lvl(p.xp),1]);rows.sort((a,b)=>b[1]-a[1]);
-  return `<table class=t><tr><th>#</th><th>${t("Name")}</th><th>${t("Level")}</th><th>${t("pts")}</th></tr>${rows.map((r,k)=>`<tr${r[3]?' style="background:#fff3cd;font-weight:600"':""}><td>${k<3?["🥇","🥈","🥉"][k]:k+1}</td><td>${escH(r[0])}</td><td>${r[2]+1}</td><td>${r[1]}</td></tr>`).join("")}</table>`}
+  return `<table class=t><tr><th>#</th><th>${t("Name")}</th><th>${t("Level")}</th><th>${t("pts")}</th></tr>${rows.map((r,k)=>`<tr${r[3]?' style="background:#fff3cd;font-weight:600"':""}><td>${k<3?["🥇","🥈","🥉"][k]:k+1}</td><td><span style="display:flex;align-items:center;gap:6px">${window.avHTML?avHTML(r[3]?null:r[0],32):""}${escH(r[0])}</span></td><td>${r[2]+1}</td><td>${r[1]}</td></tr>`).join("")}</table>`}
 M.pts=["⭐","Points"];
 V.pts=function(){const p=P();S.ptab=S.ptab||"wk";
   const badges=BADGES.map(b=>{const v=p.st[b[4]]||0;let tier=-1;b[3].forEach((th,k)=>{if(v>=th)tier=k});const nxt=b[3][tier+1];return `<div style="border:1px solid #ddd;border-radius:10px;padding:8px;text-align:center;opacity:${tier<0?.45:1}"><div style="font-size:24px">${b[2]}${tier>=0?TIER[tier]:""}</div><small><b>${escH(LANG==="es"?b[1]:b[0])}</b><br>${v}${nxt?" / "+nxt:""}</small></div>`}).join("");
@@ -3423,8 +3425,8 @@ V.about=function(){const a=A().a;
   ${row("Favorite emoji","emoji",`<div style="display:flex;gap:6px;flex-wrap:wrap">${["😀","😎","🔥","🌮","⚽","🎵","🌈","⭐","🐶","🦋"].map(e=>`<button onclick="funSet('emoji','${e}');render()" style="${a.emoji==e?"outline:3px solid #f8961e":""}">${e}</button>`).join("")}</div>`)}
   ${row("Favorite color","color",`<input type="color" value="${a.color||"#577590"}" onchange="funSet('color',this.value)" style="height:44px">`)}
   <div style="display:flex;gap:8px;margin-top:12px"><button class=on onclick="funSave()">${t("Save")}</button><button onclick="funSkip()">${t("Skip")}</button></div></div>
-  <div class=card><b>${t("Avatar")}</b><div style="display:flex;gap:10px;align-items:center;margin-top:8px">${avatar(A().av,64)}<div style="display:flex;flex-wrap:wrap;gap:6px">${["😀","😎","🤠","🦸","🧑‍🍳","🧹","🔧","🛎️","🐱","🦊"].map(e=>`<button onclick="funAv('e','${e}')">${e}</button>`).join("")}${["#f9c74f","#90be6d","#577590","#f94144","#9b5de5","#00bbf9"].map(c=>`<button aria-label="color" onclick="funAv('bg','${c}')" style="background:${c};width:36px">&nbsp;</button>`).join("")}</div></div></div>`};
-function avatar(av,sz){return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;border-radius:50%;background:${av.bg||"#ddd"};font-size:${sz*.55}px;border:3px solid #fff;box-shadow:0 1px 4px #0003">${av.e||"🙂"}</span>`}
+  <div class=card style="display:flex;gap:12px;align-items:center">${avHTML(null,64)}<button class=on onclick="go('avatar')">${t("Edit avatar")}</button></div>`};
+function avatar(av,sz){if(window.avHTML)return avHTML(av.name||null,sz);return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;border-radius:50%;background:${av.bg||"#ddd"};font-size:${sz*.55}px;border:3px solid #fff;box-shadow:0 1px 4px #0003">${av.e||"🙂"}</span>`}
 window.funAv=function(k,v){const o=A();o.av[k]=v;SA(o);render()};
 const MATES=[["Ana","⚽","#90be6d",{teams:["Club América","Minnesota United"],genre:"Regional Mexicano",hobbies:["Soccer","Cooking"]}],["Luis","🎮","#577590",{teams:["Vikings"],hobbies:["Gaming","Fishing"]}],["Rosa","💃","#f94144",{genre:"Cumbia",hobbies:["Dancing","Family time"]}],["Kevin","🎣","#f9c74f",{teams:["Twins","Vikings"],hobbies:["Fishing"]}]];
 M.fun=["🎉","Fun"];
@@ -3436,7 +3438,7 @@ V.fun=function(){const me=A().a,today=new Date(),gm=GAMES.find(g=>(me.teams||[])
   <div class=card><b>💬 ${t("Question of the Day")}</b><p>${escH(L("Who on your team is a "+ib+" fan?","¿Quién de tu equipo es fan de "+ib+"?"))}</p><details><summary>${t("Who shared this?")}</summary>${escH((pool[ib]||[]).join(", "))}</details></div>
   <div class=card><b>🧠 ${t("Team Trivia")}</b><p>${escH(L(tq.q[0],tq.q[1]))}</p><div style="display:flex;gap:6px">${tq.c[0].map((c,i)=>`<button ${ans?"disabled":""} onclick="sessionStorage.setItem('jrtrivia','${i}');${i==tq.a?"ptsAward(5,'Trivia correct','Trivia correcta',true)":"ptsToast('❌')"};render()" style="${ans==i?(i==tq.a?"background:#43aa8b;color:#fff":"background:#f94144;color:#fff"):""}">${c}</button>`).join("")}</div>
    <table class=t style="margin-top:8px">${[["Rosa",4],["Kevin",3],[t("You"),ans==tq.a?1:0],["Luis",1]].sort((a,b)=>b[1]-a[1]).map((r,k)=>`<tr><td>${k+1}</td><td>${escH(r[0])}</td><td>${r[1]}</td></tr>`).join("")}</table></div>
-  <div class=card><b>👋 ${t("Get to know your team")}</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px">${MATES.map(m=>`<div style="border:1px solid #eee;border-radius:12px;padding:8px;text-align:center">${avatar({e:m[1],bg:m[2]},48)}<div><b>${m[0]}</b></div><small>${escH([...(m[3].teams||[]),m[3].genre||"",...(m[3].hobbies||[]).map(h=>{const x=HOBBIES.find(y=>y[0]==h);return x?x[2]+" "+L(x[0],x[1]):h})].filter(Boolean).join(" · "))}</small></div>`).join("")}</div></div>
+  <div class=card><b>👋 ${t("Get to know your team")}</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px">${MATES.map(m=>`<div style="border:1px solid #eee;border-radius:12px;padding:8px;text-align:center">${avatar({name:m[0]},48)}<div><b>${m[0]}</b></div><small>${escH([...(m[3].teams||[]),m[3].genre||"",...(m[3].hobbies||[]).map(h=>{const x=HOBBIES.find(y=>y[0]==h);return x?x[2]+" "+L(x[0],x[1]):h})].filter(Boolean).join(" · "))}</small></div>`).join("")}</div></div>
   <div class=card><button onclick="go('about')">🙂 ${t("About Me")}</button> <button onclick="funBurst()">🎊</button></div>`};
 M.celebr=["🎂","Celebrations"];
 V.celebr=function(){const d=new Date(),f=n=>{const x=new Date(d);x.setDate(x.getDate()+n);return x.toLocaleDateString(LANG==="es"?"es-MX":"en-US",{month:"short",day:"numeric"})},key="jrcel_"+S.hotel,done=JSON.parse(localStorage.getItem(key)||"{}");
@@ -3451,4 +3453,95 @@ const _hm=V.home;V.home=function(){const o=A();const prompt=!o.done&&!o.skip?`<d
   return ban+prompt+cel+_hm()};
 })();
 /*FUN_END*/
+/*AVATAR_START*/
+// Character avatars: DiceBear 9 (MIT) bundled locally in vendor/dicebear.min.js, no network calls.
+// Styles: "Avataaars" by Pablo Stanley (free for personal & commercial use), "Adventurer" by Lisa Wischofsky (CC BY 4.0). Remixed via DiceBear.
+(function(){
+Object.assign(I18N.es,{"Avatar builder":"Creador de avatar","Edit avatar":"Editar avatar","Style":"Estilo","Skin tone":"Tono de piel","Hair":"Cabello","Hair color":"Color de cabello","Eyes":"Ojos","Eyebrows":"Cejas","Mouth":"Boca","Facial hair":"Vello facial","Glasses":"Lentes","Head covering":"Cubierta de cabeza","Clothing":"Ropa","Clothing color":"Color de ropa","Background":"Fondo","Randomize":"Aleatorio","Work badge":"Insignia de trabajo","Frame":"Marco","None":"Ninguno","Locked":"Bloqueado","Unlocks at":"Se desbloquea en","Shout-outs":"Reconocimientos","Avatar art":"Arte de avatar","Hijab":"Hiyab","Turban":"Turbante","Headwrap / winter hat":"Pañuelo / gorro","Cap / hat":"Gorra / sombrero","Team color":"Color del equipo","Perfect Week glow":"Brillo Semana Perfecta"});
+const SKIN=["fde7d6","f9d4b8","f1c19e","e6a97f","d08b5b","b97448","a0623b","8a4f2c","6f3d22","5a2e17","43220f","2f170a"];
+const HAIRC=["0e0e0e","2c1b18","4a312c","724133","a55728","b58143","d6b370","ecdcbf","c93305","e8e1e1","9e9e9e","f59797","6c5ce7","00bbf9"];
+const BG=["e8f0ff","d1f2eb","fff3cd","fde2e4","e2ece9","cddafd","f1e4ff","ffffff","f9c74f","90be6d"];
+const CLO=["262e33","25557c","5199e4","65c9ff","3c4f5c","929598","e6e6e6","ff5c5c","ff488e","ffafb9","ffffb1","a7ffc4"];
+const ST={avataaars:{lbl:"Classic",opts:{
+  top:["shortFlat","shortRound","shortWaved","shortCurly","theCaesar","theCaesarAndSidePart","sides","shavedSides","fro","froBand","dreads","dreads01","dreads02","frizzle","shaggy","shaggyMullet","curly","curvy","bob","bun","bigHair","longButNotTooLong","miaWallace","straight01","straight02","straightAndStrand","frida"],
+  cover:["","hijab","turban","winterHat1","winterHat02","winterHat03","winterHat04","hat"],
+  eyes:["default","happy","wink","squint","side","surprised","hearts","closed"],
+  eyebrows:["defaultNatural","raisedExcitedNatural","flatNatural","upDownNatural","unibrowNatural","default","raisedExcited","sadConcernedNatural"],
+  mouth:["smile","default","twinkle","tongue","serious","eating","concerned"],
+  facialHair:["","beardLight","beardMedium","beardMajestic","moustacheFancy","moustacheMagnum"],
+  glasses:["","prescription01","prescription02","round","wayfarers","kurt","sunglasses"],
+  clothing:["shirtCrewNeck","shirtVNeck","shirtScoopNeck","hoodie","collarAndSweater","blazerAndShirt","blazerAndSweater","overall","graphicShirt"]}},
+ adventurer:{lbl:"Adventurer",opts:{
+  top:["short01","short02","short03","short04","short05","short06","short07","short08","short09","short10","short11","short12","short13","short14","short15","short16","short17","short18","short19","long01","long02","long03","long04","long05","long06","long07","long08","long09","long10","long11","long12","long13","long14","long15","long16","long17","long18","long19","long20","long21","long22","long23","long24","long25","long26"],
+  eyes:Array.from({length:26},(_,i)=>"variant"+String(i+1).padStart(2,"0")),
+  eyebrows:Array.from({length:15},(_,i)=>"variant"+String(i+1).padStart(2,"0")),
+  mouth:Array.from({length:30},(_,i)=>"variant"+String(i+1).padStart(2,"0")),
+  facialHair:["","mustache"],glasses:["","variant01","variant02","variant03","variant04","variant05"]}}};
+const ROLEB=[["","None","Ninguno",""],["hk","Housekeeping","Limpieza","🧹"],["mt","Maintenance","Mantenimiento","🔧"],["fd","Front Desk","Recepción","🛎️"],["bk","Breakfast","Desayuno","👨‍🍳"],["bar","Bartender","Bartender","🍸"],["drv","Driver","Chofer","🚐"],["ld","Laundry","Lavandería","🧺"]];
+const ROLE2B={Housekeeping:"hk",Housekeeper:"hk","House Person":"hk",Maintenance:"mt","Front Desk":"fd","Breakfast Attendant":"bk","Shuttle Driver":"drv","Laundry Attendant":"ld"};
+// unlockables: [id, EN, ES, test, unlock hint EN, ES]
+const lv=()=>window.ptsLevel?ptsLevel():0, st=()=>window.ptsStats?ptsStats():{};
+const FR=[["","None","Ninguno",()=>1,"",""],["silver","Silver frame","Marco plateado",()=>lv()>=2,"Pro","Profesional"],["gold","Gold frame","Marco dorado",()=>lv()>=3,"Star","Estrella"],["rainbow","Legend frame","Marco Leyenda",()=>lv()>=6,"Legend","Leyenda"]];
+const FRCSS={"":"3px solid #fff",silver:"4px solid #b8c2cc",gold:"4px solid #f5b700",rainbow:"4px solid transparent;background-image:linear-gradient(#fff,#fff),conic-gradient(#f94144,#f9c74f,#90be6d,#577590,#9b5de5,#f94144);background-origin:border-box;background-clip:content-box,border-box"};
+const SPECIALBG=[["team","Team color","Color del equipo",()=>!!teamCols(),"About Me team","Equipo en Sobre Mí"],["glow","Perfect Week glow","Brillo Semana Perfecta",()=>(st().pw||0)>=1,"Perfect Week badge","Insignia Semana Perfecta"]];
+function teamCols(){try{const id=(meUser()||{}).id||"x",a=(JSON.parse(localStorage.getItem("jrabout_"+id))||{}).a||{};const th=window.funTheme&&funTheme();return (a.teams||[]).length&&th?th.cols.slice(0,2):null}catch(e){return null}}
+const KEY=()=>"jravatar_"+((meUser()||{}).id||"x");
+function hash(s){let h=7;for(const c of String(s))h=(h*31+c.charCodeAt(0))>>>0;return h}
+function pick(a,r){return a[r%a.length]}
+function rnd(seed){let h=hash(seed);const r=()=>(h=(h*1103515245+12345)>>>0)>>>8;const style=r()%3?"avataaars":"adventurer",o=ST[style].opts,
+  c={style,skin:pick(SKIN,r()),hair:pick(o.top,r()),hairColor:pick(HAIRC,r()%8),eyes:pick(o.eyes,r()),eyebrows:pick(o.eyebrows,r()),mouth:pick(o.mouth.slice(0,4),r()),facialHair:r()%4?"":pick(o.facialHair,r()),glasses:r()%4?"":pick(o.glasses,r()),cover:"",clothing:o.clothing?pick(o.clothing,r()):"",clothesColor:pick(CLO,r()),bg:pick(BG,r()),role:"",frame:""};return c}
+function mine(){try{const c=JSON.parse(localStorage.getItem(KEY()));if(c)return c}catch(e){}const u=meUser()||{},c=rnd(u.id||"me");c.role=ROLE2B[u.role]||"";return c}
+function saveMine(c){try{localStorage.setItem(KEY(),JSON.stringify(c))}catch(e){}
+  // live: supabase.rpc('set_my_avatar',{p:c}) — profiles.avatar, self-edit only; team reads via team_avatars(hotel)
+  if(window.sb&&sb.rpc)sb.rpc("set_my_avatar",{p:c}).catch(()=>{})}
+function opts(c){const bgSolid=c.bg==="team"?(teamCols()||["#e8f0ff"])[0].replace("#",""):c.bg==="glow"?"fff3cd":c.bg;
+  if(c.style==="adventurer")return {seed:"x",skinColor:[c.skin],hair:[c.hair],hairColor:[c.hairColor],eyes:[c.eyes],eyebrows:[c.eyebrows],mouth:[c.mouth],glasses:c.glasses?[c.glasses]:[],glassesProbability:c.glasses?100:0,features:c.facialHair?["mustache"]:[],featuresProbability:c.facialHair?100:0,earringsProbability:0,backgroundColor:[bgSolid]};
+  return {seed:"x",skinColor:[c.skin],top:[c.cover||c.hair],topProbability:100,hairColor:[c.hairColor],hatColor:[c.clothesColor],eyes:[c.eyes],eyebrows:[c.eyebrows],mouth:[c.mouth],facialHair:c.facialHair?[c.facialHair]:[],facialHairProbability:c.facialHair?100:0,facialHairColor:[c.hairColor],accessories:c.glasses?[c.glasses]:[],accessoriesProbability:c.glasses?100:0,clothing:[c.clothing||"shirtCrewNeck"],clothesColor:[c.clothesColor],clothingGraphic:["hola"],backgroundColor:[bgSolid]}}
+const cache={};
+function uri(c){const k=JSON.stringify(c);if(cache[k])return cache[k];let u="";try{u=DB.createAvatar(DB.styles[c.style]||DB.styles.avataaars,opts(c)).toDataUri()}catch(e){u=""}return cache[k]=u}
+// name=null -> me; otherwise deterministic teammate avatar (live: from team_avatars)
+window.avConfig=n=>n?rnd("mate_"+n):mine();
+window.avHTML=function(name,sz,cfg){const c=cfg||avConfig(name),b=ROLEB.find(x=>x[0]==c.role),tc=c.bg==="team"&&teamCols(),glow=c.bg==="glow";
+  const bgimg=tc?`background:linear-gradient(135deg,${tc[0]},${tc[1]});`:"";
+  return `<span class=av style="position:relative;display:inline-block;flex:none;width:${sz}px;height:${sz}px"><img alt="" src="${uri(c)}" style="width:100%;height:100%;border-radius:50%;box-sizing:border-box;${bgimg}border:${FRCSS[c.frame||""]};${glow?"box-shadow:0 0 10px 2px #f9c74f;":"box-shadow:0 1px 4px #0003;"}">${b&&b[3]&&sz>=28?`<span style="position:absolute;right:-3px;bottom:-3px;background:#fff;border-radius:50%;font-size:${Math.max(10,sz*.3)}px;line-height:1;padding:2px;box-shadow:0 1px 3px #0004">${b[3]}</span>`:""}</span>`};
+window.avLevelUp=function(){const u=uri(mine());const el=document.createElement("div");el.innerHTML=`<img alt="" src="${u}" style="width:120px;height:120px;border-radius:50%;border:5px solid #f5b700;background:#fff">`;el.style.cssText="position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none";document.body.appendChild(el);
+  if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&el.animate)el.animate([{transform:"translate(-50%,-50%) scale(.3)",opacity:0},{transform:"translate(-50%,-60%) scale(1.15) rotate(-6deg)",opacity:1,offset:.4},{transform:"translate(-50%,-55%) scale(1) rotate(4deg)",opacity:1,offset:.7},{transform:"translate(-50%,-50%) scale(.9)",opacity:0}],{duration:1800,easing:"ease-out"});
+  setTimeout(()=>el.remove(),matchMedia("(prefers-reduced-motion: reduce)").matches?1200:1800)};
+let draft=null;
+window.avSet=function(k,v){draft[k]=v;if(k==="hair")draft.cover="";if(k==="style"){const o=ST[v].opts;draft.hair=o.top[0];draft.eyes=o.eyes[0];draft.eyebrows=o.eyebrows[0];draft.mouth=o.mouth[0];draft.facialHair="";draft.glasses="";draft.cover="";draft.clothing=o.clothing?o.clothing[0]:""}render()};
+window.avRand=function(){const k=draft.role,f=draft.frame;draft=rnd(Math.random()+"");draft.role=k;draft.frame=f;render()};
+window.avSave=function(){saveMine(draft);draft=null;window.ptsToast&&ptsToast("✅ "+t("Save"));go("about")};
+function L(en,es){return LANG==="es"?es:en}
+function sw(k,list,cur,hex){return `<div class=avrow>${list.map(v=>`<button aria-label="${escH(k+" "+v)}" onclick="avSet('${k}','${v}')" style="width:36px;height:36px;min-width:36px;padding:0;border-radius:50%;background:#${v};border:${cur==v?"3px solid #1f2a44":"1px solid #ccc"}"></button>`).join("")}</div>`}
+function thumbs(k,list,cur){return `<div class=avrow>${list.map(v=>{const c=Object.assign({},draft,{[k]:v});if(k==="cover"&&v)c.cover=v;if(k==="hair")c.cover="";return `<button aria-label="${escH(k+" "+(v||"none"))}" onclick="avSet('${k}','${v}')" style="padding:2px;min-width:56px;border-radius:12px;border:${cur==v?"3px solid #f8961e":"1px solid #ddd"};background:#fff"><img alt="" loading="lazy" src="${uri(c)}" style="width:48px;height:48px;display:block">${v?"":`<small>${t("None")}</small>`}</button>`}).join("")}</div>`}
+function sec(lbl,body,open){return `<details ${open?"open":""} class=card style="padding:10px"><summary><b>${t(lbl)}</b></summary>${body}</details>`}
+M.avatar=["🧑","Avatar builder"];
+V.avatar=function(){if(!draft)draft=Object.assign({},mine());const o=ST[draft.style].opts,c=draft;
+  const lock=(arr,k)=>`<div class=avrow>${arr.map(x=>{const ok=x[3]();return `<button ${ok?"":"disabled"} onclick="avSet('${k}','${x[0]}')" style="border-radius:12px;padding:6px 10px;border:${c[k]==x[0]?"3px solid #f8961e":"1px solid #ddd"};opacity:${ok?1:.5}">${ok?"":"🔒 "}${escH(L(x[1],x[2]))}${ok||!x[4]?"":`<br><small>${t("Unlocks at")} ${escH(L(x[4],x[5]))}</small>`}</button>`}).join("")}</div>`;
+  return `<style>.avrow{display:flex;gap:6px;overflow-x:auto;padding:6px 0;-webkit-overflow-scrolling:touch}.avrow button{flex:none}</style>
+  <h2>🧑 ${t("Avatar builder")}</h2>
+  <div class=card style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px">${avHTML(null,104,c)}<div style="display:flex;flex-direction:column;gap:6px;flex:1"><button onclick="avRand()">🎲 ${t("Randomize")}</button><button class=on onclick="avSave()">${t("Save")}</button></div></div>
+  ${sec("Style",`<div class=avrow>${Object.keys(ST).map(s=>`<button onclick="avSet('style','${s}')" style="border-radius:12px;padding:4px;border:${c.style==s?"3px solid #f8961e":"1px solid #ddd"};background:#fff"><img alt="" src="${uri(Object.assign(rnd("style"+s),{style:s,skin:c.skin}))}" style="width:56px;height:56px;display:block"><small>${ST[s].lbl}</small></button>`).join("")}</div>`,1)}
+  ${sec("Skin tone",sw("skin",SKIN,c.skin),1)}
+  ${sec("Hair",thumbs("hair",o.top,c.hair),1)}
+  ${sec("Hair color",sw("hairColor",HAIRC,c.hairColor))}
+  ${o.cover?sec("Head covering",thumbs("cover",o.cover,c.cover)+`<small>${t("Hijab")} · ${t("Turban")} · ${t("Headwrap / winter hat")} · ${t("Cap / hat")}</small>`):""}
+  ${sec("Eyes",thumbs("eyes",o.eyes,c.eyes))}
+  ${sec("Eyebrows",thumbs("eyebrows",o.eyebrows,c.eyebrows))}
+  ${sec("Mouth",thumbs("mouth",o.mouth,c.mouth))}
+  ${sec("Facial hair",thumbs("facialHair",o.facialHair,c.facialHair))}
+  ${sec("Glasses",thumbs("glasses",o.glasses,c.glasses))}
+  ${o.clothing?sec("Clothing",thumbs("clothing",o.clothing,c.clothing)):""}
+  ${o.clothing?sec("Clothing color",sw("clothesColor",CLO,c.clothesColor)):""}
+  ${sec("Background",sw("bg",BG,c.bg)+lock(SPECIALBG,"bg"))}
+  ${sec("Work badge",`<div class=avrow>${ROLEB.map(b=>`<button onclick="avSet('role','${b[0]}')" style="border-radius:12px;padding:6px 10px;border:${c.role==b[0]?"3px solid #f8961e":"1px solid #ddd"}">${b[3]} ${escH(L(b[1],b[2]))}</button>`).join("")}</div>`)}
+  ${sec("Frame",lock(FR,"frame"))}
+  <small style="display:block;margin:10px 4px;color:#666">${t("Avatar art")}: “Avataaars” by Pablo Stanley (free for personal & commercial use) · “Adventurer” by Lisa Wischofsky (CC BY 4.0) · via DiceBear (MIT)</small>`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("avatar"))TILES[r].push("avatar")});
+// Shout-outs wall with avatars (first names only)
+const SO=[["Ana","Rosa","Covered two extra rooms on a full house!","¡Cubrió dos habitaciones extra con hotel lleno!"],["Kevin","Luis","Fixed the ice machine before breakfast rush.","Arregló la máquina de hielo antes del desayuno."],["Rosa","Ana","Guest named her in a 5-star review!","¡Un huésped la nombró en una reseña de 5 estrellas!"]];
+const _fun=V.fun;V.fun=function(){return `<div class=card><b>📣 ${t("Shout-outs")}</b>${SO.map(s=>`<div style="display:flex;gap:10px;align-items:center;margin-top:10px">${avHTML(s[0],40)}<div><b>${s[0]}</b> → ${s[1]}<br><small>${escH(L(s[2],s[3]))}</small></div></div>`).join("")}</div>`+_fun()};
+const _hm=V.home;V.home=function(){const u=meUser()||{};return `<div class=card style="display:flex;align-items:center;gap:12px" onclick="go('avatar')">${avHTML(null,56)}<div><b>${escH(String(u.name||"").split(" ")[0])}</b><br><small>${t("Edit avatar")} ›</small></div></div>`+_hm()};
+})();
+/*AVATAR_END*/
 </script></body></html>
