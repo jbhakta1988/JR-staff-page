@@ -1,7 +1,5 @@
-/* JR Staff Portal service worker. Register with scope /JR-staff-page/. */
-var SB_PUSH_URL = "https://clxvmtbmveusrbxacnxe.supabase.co/rest/v1/rpc/acknowledge_alert";
-var SB_PUSH_KEY = "sb_publishable_ehDhAPcG-9jVDXx1FU_5PQ_QYb9YP77";
-
+/* JR Staff Portal service worker. Register with scope /JR-staff-page/.
+   The ack action opens /JR-staff-page/?ack=<alert_id> and does not call the API. */
 function idbGet(key) {
   return new Promise(function (resolve) {
     var req = indexedDB.open("jr-staff-push", 1);
@@ -22,12 +20,6 @@ function idbGet(key) {
   });
 }
 
-function rpcAlertId(id) {
-  if (typeof id === "number") return id;
-  if (typeof id === "string" && /^-?\d+$/.test(id)) return Number(id);
-  return id;
-}
-
 function readPayload(event) {
   var raw = {};
   if (event.data) {
@@ -41,6 +33,7 @@ function readPayload(event) {
     title: raw.title || note.title || "",
     body: raw.body || note.body || nested.body || "",
     url: raw.url || nested.url || note.url || "",
+    tag: raw.tag || nested.tag || "",
     alert_id: alertId == null ? null : alertId,
     lang: raw.lang || nested.lang || ""
   };
@@ -51,17 +44,16 @@ function absUrl(url) {
   catch (e) { return self.registration.scope; }
 }
 
-function appAlertUrl(data) {
-  var u = new URL("./", self.registration.scope);
-  if (data && data.alert_id != null && data.alert_id !== "") u.searchParams.set("alert", String(data.alert_id));
+function appUrl(alertId) {
+  var origin = new URL(self.registration.scope).origin;
+  var u = new URL("/JR-staff-page/", origin);
+  if (alertId != null && alertId !== "") u.searchParams.set("ack", String(alertId));
   return u.href;
 }
 
 async function storedLang(fallback) {
   var lang = await idbGet("lang");
   if (lang === "es" || lang === "en") return lang;
-  var session = await idbGet("session");
-  if (session && (session.lang === "es" || session.lang === "en")) return session.lang;
   return fallback === "es" ? "es" : "en";
 }
 
@@ -69,15 +61,14 @@ async function showPush(event) {
   var payload = readPayload(event);
   var lang = await storedLang(payload.lang);
   var title = payload.title || "JR Staff Portal";
+  var hasAlert = payload.alert_id != null && payload.alert_id !== "";
   var actions = [];
-  if (payload.alert_id != null && payload.alert_id !== "") {
-    actions.push({ action: "ack", title: lang === "es" ? "Confirmar" : "Acknowledge" });
-  }
+  if (hasAlert) actions.push({ action: "ack", title: lang === "es" ? "Confirmar" : "Acknowledge" });
   await self.registration.showNotification(title, {
     body: payload.body || "",
     icon: "icon-192.png",
     badge: "icon-192.png",
-    tag: payload.alert_id != null && payload.alert_id !== "" ? "alert-" + payload.alert_id : "jr-staff",
+    tag: payload.tag || (hasAlert ? "alert-" + payload.alert_id : "jr-staff"),
     data: { url: payload.url || "", alert_id: payload.alert_id, lang: lang },
     actions: actions
   });
@@ -90,35 +81,15 @@ async function openClient(url) {
   for (var i = 0; i < all.length; i++) {
     var c = all[i];
     if (!c.url || new URL(c.url).origin !== origin) continue;
-    if (typeof c.navigate === "function") { try { await c.navigate(target); } catch (e) {} }
-    if (typeof c.focus === "function") return c.focus();
+    if (typeof c.navigate === "function") {
+      try {
+        await c.navigate(target);
+        if (typeof c.focus === "function") return c.focus();
+        return;
+      } catch (e) {}
+    }
   }
   if (self.clients.openWindow) return self.clients.openWindow(target);
-}
-
-async function acknowledge(data) {
-  data = data || {};
-  var session = await idbGet("session");
-  var token = session && session.access_token;
-  var dest = data.url || appAlertUrl(data);
-  if (!token || data.alert_id == null || data.alert_id === "") {
-    await openClient(dest);
-    return;
-  }
-  try {
-    var res = await fetch(SB_PUSH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": SB_PUSH_KEY,
-        "Authorization": "Bearer " + token
-      },
-      body: JSON.stringify({ alert_id: rpcAlertId(data.alert_id) })
-    });
-    if (!res.ok) await openClient(dest);
-  } catch (e) {
-    await openClient(dest);
-  }
 }
 
 self.addEventListener("install", function () { self.skipWaiting(); });
@@ -128,8 +99,8 @@ self.addEventListener("notificationclick", function (event) {
   event.notification.close();
   var data = event.notification.data || {};
   if (event.action === "ack") {
-    event.waitUntil(acknowledge(data));
+    event.waitUntil(openClient(appUrl(data.alert_id)));
     return;
   }
-  event.waitUntil(openClient(data.url || appAlertUrl(data)));
+  event.waitUntil(openClient(data.url || appUrl(null)));
 });
