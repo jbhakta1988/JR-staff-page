@@ -152,6 +152,7 @@ body.he-print .wk button{display:none}
 <main id="app"></main><nav id="nav"></nav>
 <div id="toast" class="toast" hidden></div>
 <script src="vendor/dicebear.min.js"></script>
+<script src="fd-coverage.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
 // Example directory only. Do not put a live employee roster in this public file.
@@ -1203,7 +1204,7 @@ const save=()=>{sset(KEY,JSON.stringify(S));if(sbPush)queuePush()};const D=()=>S
 function go(t){if(meUser()&&t!="home"&&!navFor(S.role).includes(t)&&!tilesFor(S.role).includes(t)&&!(canSeeReports()&&(t==="health"||t==="score")))return;S.tab=t;save();render();scrollTo(0,0)}
 const V={
 home(){const d=D(),r=S.role,ow=d.wo.filter(w=>w.s!="Done").length,dirty=d.rooms.filter(x=>x.s.endsWith("D")).length,low=d.inv.filter(x=>x.oh<x.par*.5).length;
-let k=(r=="GM"&&leader())?`<div class="card"><h3>GM Dashboard</h3><div class="kpi"><div><b>${ow}</b>Open WOs</div><div><b>${dirty}</b>Dirty rooms</div><div><b>${low}</b>Low stock</div><div><b>${d.pm.filter(p=>!pdn(p)).length}</b>PMs due</div><div><b class="${lv()>0?'bad':'good'}">${lv()>0?'+':''}${lv()}</b>Labor var hrs</div><div><b>${d.fc[0].occ}%</b>Occ today</div></div><div class="kpi" style="margin-top:8px" onclick="go('gmc')">${["Daily","Weekly","Monthly"].map(x=>`<div><b>${gpct(x)}%</b>GM ${x}</div>`).join("")}</div></div>
+let k=(r=="GM"&&leader())?`<div class="card"><h3>GM Dashboard</h3><div class="kpi"><div><b>${ow}</b>Open WOs</div><div><b>${dirty}</b>Dirty rooms</div><div><b>${low}</b>Low stock</div><div><b>${d.pm.filter(p=>!pdn(p)).length}</b>PMs due</div><div><b class="${lv()>0?'bad':'good'}">${lv()>0?'+':''}${lv()}</b>Labor var hrs</div><div><b>${d.fc[0].occ}%</b>Occ today</div></div><div class="kpi" style="margin-top:8px" onclick="go('gmc')">${["Daily","Weekly","Monthly"].map(x=>`<div><b>${gpct(x)}%</b>GM ${x}</div>`).join("")}</div></div>${typeof fdCoverageCard==="function"?fdCoverageCard(S.hotel):""}
 ${reportHomeCards()}${missingDataPanel()}
 <div class="card"><h3>Open issues</h3>${d.wo.filter(w=>w.s!="Done").map(w=>`<div class="li" style="flex-wrap:wrap"><span class="pill ${w.p=='High'?'VD':'OD'}">${w.p}</span><span style="flex:1;min-width:0">${w.room}: ${noteHtml("home-"+w.id,w,w.t)}</span></div>`).join("")}</div>`:
 r=="Housekeeping"?hkLeadHome():r=="Housekeeper"?`<div class="card"><h3>${t("Today")} · ${escH(cw())}</h3>${hkProg(cw())}</div>`:LINE.includes(r)?(r=="Shuttle Driver"&&!SHH.includes(S.hotel)?'<div class="card">No shuttle at this property.</div>':`<div class="card"><h3>${t("Today")} · ${roleName(r)}</h3><div class="kpi"><div><b>${r=="Shuttle Driver"?SH().runs.filter(x=>x.st!="Complete").length:myReqs().filter(x=>x.st!="Done").length}</b>${r=="Shuttle Driver"?"Runs left":"Open requests"}</div><div><b>${lpct(r)}%</b>Checklist</div><div><b>${now()}</b>Now</div></div></div>`):`<div class="card"><h3>${t("Today")} · ${roleName(r)}</h3><div class="kpi"><div><b>${d.fc[0].arr}</b>Arrivals</div><div><b>${dirty}</b>Dirty</div><div><b>${ow}</b>Open WOs</div></div></div>`;
