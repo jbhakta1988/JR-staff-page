@@ -3294,4 +3294,29 @@ V.photos=function(){const tag=m=>m=="req"?`<b class=bad>${t("Required")}</b>`:m=
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("photos"))TILES[r].push("photos")});
 })();
 /*PHOTOS_END*/
+
+/*GOALS_START*/
+// Team goals (demo). Live: team_goals + team_goal_progress (nightly).
+(function(){
+Object.assign(I18N.es,{"Team Goals":"Metas de Equipo","Goal hit!":"¡Meta lograda!","bonus each":"de bono c/u","Target":"Meta","Week":"Semana","Month":"Mes","Pays only if inspections ≥ 90%":"Paga solo si inspecciones ≥ 90%","Hotel-wide":"Todo el hotel","Off until data":"Apagada hasta tener datos"});
+const G={"Front Desk":[["Loyalty enrollments","Inscripciones de lealtad",">=",30,22,"Month",150],["Positive name mentions","Menciones positivas",">=",5,3,"Month",100],["Checklists on time %","Listas a tiempo %",">=",95,97,"Week",25]],
+"Housekeeping":[["Guest cleanliness score","Puntaje de limpieza",">=",9.2,9.0,"Month",200],["Minutes per room","Minutos por habitación","<=",29,28.4,"Week",50,1],["Inspection pass %","Inspecciones aprobadas %",">=",95,93,"Week",25]],
+"Maintenance":[["Work orders in SLA %","Órdenes en tiempo %",">=",90,86,"Month",150],["PMs on schedule %","PM a tiempo %",">=",100,92,"Month",150],["Open WO backlog","Órdenes abiertas","<=",10,7,"Week",25]],
+"Breakfast Attendant":[["Checklists on time %","Listas a tiempo %",">=",95,100,"Week",25],["Photo-verified setup %","Montaje con foto %",">=",90,80,"Week",25]],
+"Shuttle Driver":[["Checklists on time %","Listas a tiempo %",">=",95,90,"Week",25]],
+"Bartender":[["Bar variance alerts","Alertas de variación","<=",0,0,"Month",100],["Cash over/short zero days %","Días sin faltante %",">=",100,96,"Month",100],["Closing counts %","Conteos de cierre %",">=",100,100,"Month",50]]};
+G.Housekeeper=G["House Person"]=G["Laundry Attendant"]=G.Housekeeping;G.GM=[].concat(G["Front Desk"].slice(0,1),G.Housekeeping.slice(0,2),G.Maintenance.slice(0,1));
+function list(){const l=(G[S.role]||[]).slice();if(S.role=="Bartender"&&S.hotel!="MSPMS")return [];return l}
+function met(g){return g[2]==">="?g[4]>=g[3]:g[4]<=g[3]}
+function pct(g){return g[2]==">="?Math.min(100,Math.round(g[4]/g[3]*100)):(g[4]<=g[3]?100:Math.max(0,Math.round(g[3]/g[4]*100)))}
+function bar(g){const ok=met(g),p=pct(g);return `<div style="margin:8px 0"><div style="display:flex;justify-content:space-between;gap:8px"><span>${ok?"✅ ":""}${escH(LANG==="es"?g[1]:g[0])}</span><small>${g[4]} / ${g[2]=="<="?"≤":"≥"}${g[3]}</small></div><div style="background:#e5e5e5;border-radius:6px;height:10px;overflow:hidden"><div style="width:${p}%;height:100%;background:${ok?"#43aa8b":"#f8961e"}"></div></div><small>${t(g[5])} · +${g[6]} ${t("pts")} ${t("bonus each")}${g[7]?" · "+t("Pays only if inspections ≥ 90%"):""}</small></div>`}
+window.goalsCard=function(){const l=list();if(!l.length)return "";return `<div class=card onclick="go('goals')" style="cursor:pointer"><b>🎯 ${t("Team Goals")}</b>${l.slice(0,2).map(bar).join("")}</div>`};
+M.goals=["🎯","Team Goals"];
+V.goals=function(){const l=list(),k="jrgoalcel_"+S.hotel+S.role+new Date().toDateString();if(l.some(met)&&!sessionStorage.getItem(k)){sessionStorage.setItem(k,1);setTimeout(()=>{const c=document.querySelector("canvas");window.ptsAward&&0;},0);setTimeout(()=>{if(window.ptsToast)ptsToast("🎉 "+t("Goal hit!"),2500);burst()},300)}
+  return `<h2>🎯 ${t("Team Goals")}</h2><div class=card>${l.map(bar).join("")||"—"}</div><div class=card><b>${t("Hotel-wide")}</b>${bar(["Overall guest score","Puntaje general del huésped",">=",9.0,8.8,"Month",100])}</div>`};
+function burst(){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;const c=document.createElement("canvas");c.style.cssText="position:fixed;inset:0;pointer-events:none;z-index:9998";c.width=innerWidth;c.height=innerHeight;document.body.appendChild(c);const x=c.getContext("2d"),ps=Array.from({length:120},()=>({x:Math.random()*c.width,y:-10,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,s:5+Math.random()*5,c:["#43aa8b","#f9c74f","#577590","#f94144"][Math.floor(Math.random()*4)]}));let f=0;(function a(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;x.fillStyle=p.c;x.fillRect(p.x,p.y,p.s,p.s)});if(++f<150)requestAnimationFrame(a);else c.remove()})()}
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("goals"))TILES[r].push("goals")});
+const _h=V.home;V.home=function(){const h=_h();const i=h.indexOf("</div>");return i>0&&h.indexOf("My Points")>-1?h.slice(0,i+6)+goalsCard()+h.slice(i+6):goalsCard()+h};
+})();
+/*GOALS_END*/
 </script></body></html>
