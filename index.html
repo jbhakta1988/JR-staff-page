@@ -22,18 +22,25 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 .rooms{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.rooms button{min-height:56px;font-weight:700;border:0}
 .bad{color:#c0262d;font-weight:700}.good{color:#1a7f37;font-weight:700}.li{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #eee;min-height:48px}
 .li input[type=checkbox]{width:26px;height:26px;min-height:0}img.prev{max-width:100%;border-radius:8px;margin-top:6px}.bar{height:10px;background:#14365d;border-radius:5px}
-.login h2{margin-top:8px}.acct{font-size:13px;padding:8px 0;border-bottom:1px solid #eee;line-height:1.35}details summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.login h2{margin-top:8px}.login .step{font-size:13px;font-weight:700;margin:14px 0 6px;color:#14365d}
+.sites{display:flex;flex-direction:column;gap:8px}.sites button{width:100%;min-height:72px;text-align:left;font-weight:700;font-size:16px;line-height:1.3;white-space:normal;background:#fff;border:2px solid #c5cbd6;padding:10px 12px}
+.sites button.on{background:#14365d;color:#fff;border-color:#14365d}
+#loginFind,#loginWho{width:100%;margin:0 0 8px}
+.dots{text-align:center;font-size:32px;letter-spacing:12px;min-height:48px;line-height:48px;font-weight:700}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kp button{min-height:68px;font-size:28px;font-weight:700;background:#e6ebf2;border:0;padding:0}
+.kp button.wide{font-size:16px}.kp button.btn{background:#14365d;color:#fff;font-size:18px}
 table.fit{width:100%;table-layout:fixed;font-size:12px}table.fit th,table.fit td{text-align:center;padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}table.fit .nm{text-align:left}table.fit button{min-height:36px;font-size:12px;padding:2px 0;width:100%}td.over,th.over{background:#fde2e1}.wk{display:flex;gap:6px;align-items:center;margin:6px 0}.wk b{flex:1;text-align:center;font-size:14px}
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span id="hbt"></span><span class="ex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
-// EXAMPLE USERS — edit this array only (name, pin, role, hotel).
+// Example directory only. Do not put a live employee roster in this public file.
 // Client-side filtering only, not real security, until a backend with real auth is added.
-// hotel null = Above Property (all hotels). Shuttle drivers exist only at MSPAM and MSPMS.
+// hotel null = Above Property (JR Corporate). Shuttle drivers exist only at MSPAM and MSPMS.
+// active:false hides a person from sign-in. Missing active means active.
 const DAYS=[0,1,2,3,4,5,6];
-const USERS=[
+const EXAMPLE_USERS=[
 {id:"jay",name:"Jay Bhakta",pin:"1001",role:"Above Property",hotel:null,shift:"AM",days:DAYS},
 {id:"chris",name:"Chris Uselman",pin:"1002",role:"Above Property",hotel:null,shift:"AM",days:DAYS},
 {id:"roshan",name:"Roshan Bhakta",pin:"1003",role:"Above Property",hotel:null,shift:"AM",days:DAYS},
@@ -67,6 +74,14 @@ const USERS=[
 {id:"mspms-la",name:"Mei Tran",pin:"4160",role:"Laundry Attendant",hotel:"MSPMS",shift:"AM",days:DAYS},
 {id:"mspms-ba",name:"Joy Bennett",pin:"4170",role:"Breakfast Attendant",hotel:"MSPMS",shift:"AM",days:DAYS}
 ];
+// Later, loadUsers() should read active staff from Supabase, for example:
+// const { data, error } = await supabase.from("staff").select("*").eq("active", true);
+// if (error) throw error;
+// return data;
+let USERS=[];
+function loadUsers(){
+  return Promise.resolve(EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>({...u,active:u.active!==false})));
+}
 function meUser(){return USERS.find(u=>u.id===S.uid)||null}
 function authRole(){const u=meUser();return u?u.role:""}
 function leader(){return authRole()=="Above Property"||authRole()=="GM"||authRole()=="AGM"}
@@ -255,20 +270,53 @@ function enforceAccess(){
   if(!leader())S.role=u.role;
   else if(!ROLES.includes(S.role))S.role="GM";
 }
+const LOGIN_SITES=[["MSPWE","MSPWE (Holiday Inn Express Golden Valley)"],["MSPAM","MSPAM (Hampton Inn & Suites Airport/MOA)"],["MSPMS","MSPMS (SpringHill Suites Airport/MOA)"],["CORP","JR Corporate"]];
+const LAST_SITE="jrportal_last_hotel";
+let loginSite="",loginQ="",loginUid="",loginPin="",loginErr="",loginBoot=false;
+function savedSite(){const v=sget(LAST_SITE)||"";return LOGIN_SITES.some(s=>s[0]===v)?v:""}
+function posOf(u){return u.role==="Housekeeping"?"HK Lead":(u.role||"")}
+function peopleAt(site){return USERS.filter(u=>u.active!==false&&(site==="CORP"?!u.hotel:u.hotel===site)).slice().sort((a,b)=>a.name.localeCompare(b.name,"en"))}
+function staffOptions(){
+  const q=loginQ.trim().toLowerCase();
+  const rows=peopleAt(loginSite).filter(u=>!q||(u.name+" "+posOf(u)).toLowerCase().includes(q));
+  return `<option value="">Select name</option>`+rows.map(u=>`<option value="${escH(u.id)}"${u.id===loginUid?" selected":""}>${escH(u.name)} — ${escH(posOf(u))}</option>`).join("");
+}
 function renderLogin(){
+  if(!loginBoot){loginSite=savedSite();loginBoot=true}
   $("hdr").hidden=true;$("hpanel").hidden=true;$("nav").innerHTML="";
   document.body.style.paddingBottom="16px";
-  const rows=USERS.map(u=>`<div class="acct"><b>${u.name}</b> PIN ${u.pin} · ${u.role}${u.hotel?" · "+u.hotel:" · all hotels"}</div>`).join("");
-  $("app").innerHTML=`<div class="card login"><span class="ex">EXAMPLE</span><h2>Staff sign in</h2><p style="font-size:13px;margin:6px 0 10px">Example data only. Sign-in is client-side filtering, not real security.</p><form onsubmit="signIn();return false"><input id="loginName" autocomplete="username" autocapitalize="words" placeholder="Name" aria-label="Name" style="width:100%;margin:6px 0"><input id="loginPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="current-password" placeholder="4-digit PIN" aria-label="PIN" style="width:100%;margin:6px 0"><button class="btn" type="submit" style="width:100%">Sign in</button></form><p id="loginErr" class="bad"></p><details><summary>Example accounts</summary>${rows}</details></div>`;
+  const sites=LOGIN_SITES.map(([id,label])=>`<button type="button" class="${id===loginSite?"on":""}" aria-pressed="${id===loginSite}" onclick="pickHotel('${id}')">${escH(label)}</button>`).join("");
+  const who=loginSite?`<p class="step">2. Your name</p><input id="loginFind" autocomplete="off" placeholder="Type to filter" aria-label="Filter names" value="${escH(loginQ)}" oninput="filterLogin(this.value)"><select id="loginWho" aria-label="Employee" onchange="pickUser(this.value)">${staffOptions()}</select><p class="step">3. PIN</p><div class="dots" id="pinDots" aria-label="PIN">${loginPin?"•".repeat(loginPin.length):"••••"}</div><div class="kp" aria-label="PIN keypad">${["1","2","3","4","5","6","7","8","9"].map(n=>`<button type="button" onclick="pinKey('${n}')">${n}</button>`).join("")}<button type="button" class="wide" onclick="pinKey('b')" aria-label="Delete">⌫</button><button type="button" onclick="pinKey('0')">0</button><button type="button" class="wide" onclick="pinKey('c')" aria-label="Clear">Clear</button><button type="button" class="btn" style="grid-column:1 / -1;min-height:64px;font-size:18px" onclick="signIn()">Sign in</button></div><p id="loginErr" class="bad">${escH(loginErr)}</p>`:`<p style="font-size:14px">Choose a hotel to see its staff.</p>`;
+  $("app").innerHTML=`<div class="card login"><span class="ex">EXAMPLE</span><h2>Staff sign in</h2><p style="font-size:13px;margin:6px 0 10px">Example names only. Sign-in on this page is not real security.</p><p class="step">1. Hotel</p><div class="sites">${sites}</div>${who}</div>`;
+}
+function pickHotel(id){
+  if(!LOGIN_SITES.some(s=>s[0]===id))return;
+  if(loginSite!==id){loginUid="";loginPin="";loginQ="";loginErr=""}
+  loginSite=id;sset(LAST_SITE,id);renderLogin();
+}
+function filterLogin(v){
+  loginQ=v;const sel=$("loginWho");if(!sel)return;
+  const keep=loginUid;sel.innerHTML=staffOptions();
+  if([...sel.options].some(o=>o.value===keep))sel.value=keep;else{loginUid="";sel.value=""}
+}
+function pickUser(id){if(id!==loginUid){loginPin="";loginErr=""}loginUid=id;const d=$("pinDots");if(d)d.textContent="••••";const e=$("loginErr");if(e)e.textContent=""}
+function pinKey(k){
+  if(k==="c")loginPin="";
+  else if(k==="b")loginPin=loginPin.slice(0,-1);
+  else if(loginPin.length<4)loginPin+=k;
+  loginErr="";
+  const d=$("pinDots");if(d)d.textContent=loginPin?"•".repeat(loginPin.length):"••••";
+  const e=$("loginErr");if(e)e.textContent="";
 }
 function signIn(){
-  const name=($("loginName").value||"").trim().replace(/\s+/g," ").toLowerCase();
-  const pin=($("loginPin").value||"").trim();
-  const u=USERS.find(x=>x.name.toLowerCase()===name&&x.pin===pin);
-  if(!u){const err=$("loginErr");if(err)err.textContent="Name or PIN doesn't match an example account.";return}
-  S.uid=u.id;S.hotel=u.hotel||S.hotel||"MSPWE";S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";save();render();
+  const u=USERS.find(x=>x.id===loginUid&&x.active!==false);
+  const siteOk=!!u&&(loginSite==="CORP"?!u.hotel:u.hotel===loginSite);
+  if(!u||!siteOk||u.pin!==loginPin){loginErr=!u||!siteOk?"Select your name, then enter the PIN.":"PIN doesn't match.";loginPin="";renderLogin();return}
+  sset(LAST_SITE,loginSite);
+  S.uid=u.id;S.hotel=u.hotel||(HOTELS[S.hotel]?S.hotel:"MSPWE");S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";
+  loginPin="";loginErr="";loginUid="";save();render();
 }
-function signOut(){S.uid="";S.tab="home";save();render()}
+function signOut(){S.uid="";S.tab="home";loginPin="";loginUid="";loginErr="";save();render()}
 function render(){
   const u=meUser();
   if(!u){renderLogin();return}
@@ -497,6 +545,11 @@ function schedPage(){
   return `<div id="schedRoot"><h2>Schedule</h2><p style="font-size:13px;margin:0">${where} · ${pub?"Published":"Draft"}</p>${pager}${mode}${tabs}<div class="card"><div class="row"><button type="button" class="btn2" onclick="copyLast()">Copy last week</button>${canPublish()&&!pub?`<button type="button" class="btn" onclick="publishWeek()">Publish week</button>`:""}</div>${SCHED_NOTE?`<p>${escH(SCHED_NOTE)}</p>`:""}<small>Plan hours are example data from Hotel Effectiveness. Var = scheduled − plan. Over plan is highlighted.${hk?" MPR = housekeeping minutes per room (target 30).":""}</small>${sumTable}</div><div class="card">${form}</div><div class="card">${byDay||"No shifts this position."}</div></div>`;
 }
 V.sched=schedPage;
-try{render()}catch(e){document.getElementById("app").innerHTML="<div class=card>Error: "+e.message+"</div>";throw e}
-fetch("data/labor.json").then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.laborPlan||!j.timePunches)return;laborPlan=j.laborPlan;timePunches=j.timePunches;try{render()}catch(e){}}).catch(()=>{});
+document.getElementById("app").innerHTML='<div class="card">Loading staff directory…</div>';
+loadUsers().then(list=>{
+  USERS=Array.isArray(list)?list:[];
+  const he=expandHE(USERS);laborPlan=he.laborPlan;timePunches=he.timePunches;
+  try{render()}catch(e){document.getElementById("app").innerHTML="<div class=card>Error: "+e.message+"</div>";throw e}
+  fetch("data/labor.json").then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.laborPlan||!j.timePunches)return;laborPlan=j.laborPlan;timePunches=j.timePunches;try{render()}catch(e){}}).catch(()=>{});
+}).catch(e=>{document.getElementById("app").innerHTML="<div class=card>Could not load the staff directory. "+escH(e&&e.message?e.message:"")+"</div>"});
 </script></body></html>
