@@ -3294,6 +3294,68 @@ V.photos=function(){const tag=m=>m=="req"?`<b class=bad>${t("Required")}</b>`:m=
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("photos"))TILES[r].push("photos")});
 })();
 /*PHOTOS_END*/
+/*QOTD_START*/
+// Question of the Day. Live: rpc get_qotd / answer_qotd / qotd_upsert / qotd_retire / qotd_analytics / qotd_struggling. Demo: data/qotd.json + localStorage.
+(function(){
+Object.assign(I18N.es,{"Question of the Day":"Pregunta del Día","Correct!":"¡Correcto!","Not quite":"Casi","Answer saved — come back tomorrow":"Respuesta guardada; vuelve mañana","Review":"Repaso","Why":"Por qué","Source":"Fuente","day streak":"días seguidos","Questions":"Preguntas","Add question":"Agregar pregunta","Retire":"Retirar","Restore":"Restaurar","Save":"Guardar","% correct":"% correcto","By topic":"Por tema","By role":"Por puesto","By hotel":"Por hotel","Weak topics":"Temas débiles","Who needs help":"Quién necesita apoyo","English and Spanish are both required":"Se requieren inglés y español","Spanish is a draft — not shown to staff until reviewed":"El español es un borrador; no se muestra al personal hasta revisarlo","Brainiac":"Cerebrito","Correct answer":"Respuesta correcta","Options (one per line)":"Opciones (una por línea)","Explanation":"Explicación","Topic":"Tema","Brand":"Marca","Role":"Puesto","Source link":"Enlace de la fuente","Answered":"Respondidas"});
+const BR={MSPWE:"IHG",MSPAM:"Hilton",MSPMS:"Marriott"};
+function grp(r){r=String(r||"").toLowerCase();if(/front|audit/.test(r))return"front_desk";if(/house|laundry|hk|keep/.test(r))return"housekeeping";if(/maint|eng/.test(r))return"maintenance";if(/breakfast/.test(r))return"breakfast";if(/driver|shuttle/.test(r))return"driver";if(/bar/.test(r))return"bartender";return"management"}
+let BANK=null;fetch("data/qotd.json").then(r=>r.json()).then(b=>{BANK=b;try{const x=JSON.parse(localStorage.getItem("jrqotd_custom")||"[]");BANK=BANK.concat(x)}catch(e){}if(S.tab==="home"||S.tab==="qotd")render()}).catch(()=>{});
+const today=()=>new Date().toLocaleDateString("en-CA",{timeZone:"America/Chicago"});
+const K=()=>"jrqotd_"+S.hotel+"_"+((meUser()||{}).id||"x");
+function st(){try{return JSON.parse(localStorage.getItem(K()))||{h:{},rev:{},streak:0,last:""}}catch(e){return {h:{},rev:{},streak:0,last:""}}}
+function sv(s){try{localStorage.setItem(K(),JSON.stringify(s))}catch(e){}}
+function retired(){try{return JSON.parse(localStorage.getItem("jrqotd_retired")||"[]")}catch(e){return []}}
+function pick(){if(!BANK)return null;const s=st(),d=today();if(s.h[d])return s.h[d];const b=BR[S.hotel],g=grp(authRole()||S.role),rt=retired();
+  const ok=BANK.filter(q=>(q[1]=="all"||q[1]==b)&&(q[2]=="all"||q[2]==g)&&!rt.includes(q[0])&&q[12]!==false);
+  let id=Object.keys(s.rev).map(Number).find(i=>s.rev[i]<=d&&ok.some(q=>q[0]==i)),review=!!id;
+  if(!id){const seen=new Set(Object.values(s.h).map(x=>x.id));const un=ok.filter(q=>!seen.has(q[0]));const pool=un.length?un:ok;
+    const w=pool.flatMap(q=>q[2]==g?[q,q]:[q]);id=(w[Math.floor(Math.random()*w.length)]||[])[0]}
+  if(!id)return null;s.h[d]={id,review};sv(s);return s.h[d]}
+const L=()=>S.qlang||LANG;
+const tl=(en,es)=>L()==="es"?es:en;
+window.qotdCard=function(){const a=pick();if(!a)return"";const q=BANK.find(x=>x[0]==a.id);if(!q)return"";const es=L()==="es",opts=es?q[7]:q[6],done=a.ans!=null,s=st();
+  return `<div class=card id=qotd style="background:linear-gradient(135deg,#eaf7ff,#f3ecff)"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>🧠 ${tl("Question of the Day","Pregunta del Día")}</b><span><small>🔥 ${s.streak} ${tl("day streak","días seguidos")}</small> <button class=btn2 style="padding:2px 8px;min-height:0" onclick="S.qlang=(L_()==='es'?'en':'es');render()" aria-label="EN/ES">${es?"EN":"ES"}</button></span></div>
+  ${a.review?`<small style="color:#6a1b9a">↻ ${tl("Review","Repaso")}</small>`:""}<div style="font-weight:600;margin:8px 0">${escH(es?q[5]:q[4])}</div>
+  <div style="display:grid;gap:6px">${opts.map((o,i)=>{let bg="#fff",an="";if(done){if(i==q[8]){bg="#c8f7c5";an="animation:qpop .5s"}else if(i==a.ans){bg="#ffd6d6";an="animation:qshake .4s"}}
+    return `<button ${done?"disabled":""} onclick="qotdAnswer(${i})" style="text-align:left;padding:10px;border-radius:10px;border:1px solid #c9d3e3;background:${bg};${an};min-height:44px;color:#111">${String.fromCharCode(65+i)}. ${escH(o)}</button>`}).join("")}</div>
+  ${done?`<div style="margin-top:8px;animation:qfade .6s"><b>${a.ans==q[8]?"✅ "+tl("Correct!","¡Correcto!"):"💡 "+tl("Not quite","Casi")}</b> ${escH(es?q[10]:q[9])}<br><small>${/^http/.test(q[11])?`<a href="${escH(q[11])}" target=_blank rel=noopener>${tl("Source","Fuente")}</a>`:escH(q[11])} · ${tl("Answer saved — come back tomorrow","Respuesta guardada; vuelve mañana")}</small></div>`:""}</div>`};
+window.L_=L;
+window.qotdAnswer=function(i){const s=st(),d=today(),a=s.h[d];if(!a||a.ans!=null)return;const q=BANK.find(x=>x[0]==a.id);a.ans=i;const ok=i==q[8];
+  s.streak=s.last===new Date(Date.now()-864e5).toLocaleDateString("en-CA",{timeZone:"America/Chicago"})?s.streak+1:(s.last===d?s.streak:1);s.last=d;
+  if(!ok)s.rev[a.id]=new Date(Date.now()+3*864e5).toLocaleDateString("en-CA",{timeZone:"America/Chicago"});else if(a.review)delete s.rev[a.id];
+  sv(s);if(useRemote()&&window.sb)sb.rpc("answer_qotd",{p_idx:i}).then(()=>{},()=>{});
+  render();setTimeout(()=>{if(window.ptsAward)ok?ptsAward(6,"Question of the Day — correct!","Pregunta del Día — ¡correcta!",true):ptsAward(1,"Question of the Day answered","Pregunta del Día respondida");
+    if([7,30,100].includes(s.streak))setTimeout(()=>ptsAward({7:20,30:75,100:250}[s.streak],"Brainiac badge!","¡Insignia Cerebrito!",true),1200)},350)};
+const css=document.createElement("style");css.textContent="@keyframes qpop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}@keyframes qshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}@keyframes qfade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}@media (prefers-reduced-motion:reduce){#qotd *{animation:none!important}}";document.head.appendChild(css);
+setTimeout(()=>{const _h=V.home;V.home=function(){return qotdCard()+_h()};if(S.tab==="home")render()},0); // wrap last so other home cards don't split ours
+// GM / owner: bank editor + analytics
+M.qotd=["🧠","Question of the Day"];
+V.qotd=function(){if(!BANK)return`<div class=card>…</div>`;const rt=retired(),s=st(),ans=Object.values(s.h).filter(x=>x.ans!=null);
+  const agg=k=>{const m={};ans.forEach(a=>{const q=BANK.find(x=>x[0]==a.id);if(!q)return;const g=q[k];m[g]=m[g]||[0,0];m[g][0]++;if(a.ans==q[8])m[g][1]++});return Object.entries(m).sort((a,b)=>a[1][1]/a[1][0]-b[1][1]/b[1][0])};
+  const tbl=rows=>`<table class=t><tr><th></th><th>${tl("Answered","Respondidas")}</th><th>${tl("% correct","% correcto")}</th></tr>${rows.map(r=>`<tr><td>${escH(r[0])}</td><td>${r[1][0]}</td><td>${Math.round(100*r[1][1]/r[1][0])}%</td></tr>`).join("")||"<tr><td colspan=3>—</td></tr>"}</table>`;
+  const b=BR[S.hotel],list=BANK.filter(q=>q[1]=="all"||q[1]==b);
+  return `<h2>🧠 ${tl("Question of the Day","Pregunta del Día")}</h2>
+  <div class=card><b>${tl("Weak topics","Temas débiles")} · ${tl("By topic","Por tema")}</b>${tbl(agg(3))}<b>${tl("By role","Por puesto")}</b>${tbl(agg(2))}<small>${tl("Demo shows this device only. Live: % correct by topic, role, hotel, and who needs help.","Demo muestra solo este dispositivo. En vivo: % correcto por tema, puesto, hotel y quién necesita apoyo.")}</small></div>
+  <div class=card><b>${tl("Add question","Agregar pregunta")}</b><small>${tl("English and Spanish are both required","Se requieren inglés y español")}</small>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><select id=qb><option>all</option><option>IHG</option><option>Hilton</option><option>Marriott</option></select><select id=qr>${["all","front_desk","housekeeping","maintenance","breakfast","driver","bartender","management"].map(x=>`<option>${x}</option>`).join("")}</select></div>
+   <input id=qt placeholder="${tl("Topic","Tema")}" style="width:100%;margin-top:6px"><textarea id=qe placeholder="Question (EN)" style="width:100%;margin-top:6px"></textarea><textarea id=qs placeholder="Pregunta (ES)" style="width:100%"></textarea>
+   <textarea id=qoe placeholder="${tl("Options (one per line)","Opciones (una por línea)")} — EN" style="width:100%"></textarea><textarea id=qos placeholder="${tl("Options (one per line)","Opciones (una por línea)")} — ES" style="width:100%"></textarea>
+   <label>${tl("Correct answer","Respuesta correcta")} <select id=qc><option value=0>A</option><option value=1>B</option><option value=2>C</option><option value=3>D</option></select></label>
+   <textarea id=qxe placeholder="${tl("Explanation","Explicación")} (EN)" style="width:100%"></textarea><textarea id=qxs placeholder="${tl("Explanation","Explicación")} (ES)" style="width:100%"></textarea><input id=qu placeholder="${tl("Source link","Enlace de la fuente")}" style="width:100%">
+   <label><input type=checkbox id=qd> ${tl("Spanish is a draft — not shown to staff until reviewed","El español es un borrador; no se muestra al personal hasta revisarlo")}</label><button onclick="qotdSave()" style="width:100%;margin-top:6px">${tl("Save","Guardar")}</button></div>
+  <div class=card><b>${tl("Questions","Preguntas")} (${list.length})</b><table class=t>${list.map(q=>`<tr style="opacity:${rt.includes(q[0])?.4:1}"><td><small>${escH(q[2])} · ${escH(q[3])}</small><br>${escH(L()==="es"?q[5]:q[4])}${q[12]===false?" <b class=bad>ES draft</b>":""}</td><td><button class=btn2 onclick="qotdRetire(${q[0]})">${rt.includes(q[0])?tl("Restore","Restaurar"):tl("Retire","Retirar")}</button></td></tr>`).join("")}</table></div>`};
+window.qotdRetire=function(id){let r=retired();r=r.includes(id)?r.filter(x=>x!=id):r.concat(id);localStorage.setItem("jrqotd_retired",JSON.stringify(r));if(useRemote()&&window.sb)sb.rpc("qotd_retire",{p_id:id,p_retire:r.includes(id)}).then(()=>{},()=>{});render()};
+window.qotdSave=function(){const v=id=>document.getElementById(id).value.trim(),oe=v("qoe").split("\n").map(x=>x.trim()).filter(Boolean),os=v("qos").split("\n").map(x=>x.trim()).filter(Boolean),c=+v("qc");
+  if(!v("qe")||!v("qs")||!v("qxe")||!v("qxs")||!v("qt")||oe.length<3||oe.length>4||os.length!==oe.length||c>=oe.length){alert(tl("English and Spanish are both required","Se requieren inglés y español")+" · 3–4 options");return}
+  const draft=document.getElementById("qd").checked,row=[Date.now(),v("qb"),v("qr"),v("qt"),v("qe"),v("qs"),oe,os,c,v("qxe"),v("qxs"),v("qu")||"general hospitality best practice",!draft];
+  const cu=JSON.parse(localStorage.getItem("jrqotd_custom")||"[]");cu.push(row);localStorage.setItem("jrqotd_custom",JSON.stringify(cu));BANK.push(row);
+  if(useRemote()&&window.sb)sb.rpc("qotd_upsert",{p_id:null,p:{brand:row[1],role_group:row[2],topic:row[3],question_en:row[4],question_es:row[5],options_en:oe,options_es:os,correct_idx:c,explain_en:row[9],explain_es:row[10],source_url:row[11],es_reviewed:!draft}}).then(()=>{},()=>{});
+  if(window.ptsToast)ptsToast("✅ "+tl("Save","Guardar"));render()};
+["GM","AGM","Above Property"].forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("qotd"))TILES[r].push("qotd")});
+})();
+/*QOTD_END*/
+
 
 /*GOALS_START*/
 // Team goals (demo). Live: team_goals + team_goal_progress (nightly).
