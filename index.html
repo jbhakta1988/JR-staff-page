@@ -3220,4 +3220,52 @@ loadLang();document.getElementById("app").innerHTML='<div class="card">'+t("Load
     if(!remoteLabor)fetch("data/labor.json").then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.laborPlan||!j.timePunches)return;laborPlan=j.laborPlan;timePunches=j.timePunches;try{render()}catch(e){}}).catch(()=>{});
   }catch(e){document.getElementById("app").innerHTML="<div class=card>"+t("Could not load the staff directory.")+" "+escH(e&&e.message?e.message:"")+"</div>"}
 })();
+/*POINTS_START*/
+// Points, levels, badges, leaderboard (demo data). Live data: points_ledger, user_stats, user_badges, leaderboard() RPC.
+(function(){
+const ES={"Points":"Puntos","My Points":"Mis Puntos","Level":"Nivel","This week":"Esta semana","This month":"Este mes","Leaderboard":"Clasificación","Badges":"Insignias","Streaks":"Rachas","How to earn":"Cómo ganar","Rewards":"Premios","Redeem":"Canjear","Needs GM approval":"Requiere aprobación del GM","Requested":"Solicitado","All departments":"Todos los departamentos","My department":"Mi departamento","Level up!":"¡Subiste de nivel!","Checklist complete!":"¡Lista completada!","pts":"pts","to next level":"para el siguiente nivel","On-time checklists":"Listas a tiempo","On-time clock-in":"Entrada a tiempo","Clean punches":"Marcajes perfectos","App days":"Días en la app","Recent":"Recientes","You":"Tú","Not enough points":"No tienes suficientes puntos","Ticket closed fast!":"¡Orden cerrada rápido!"};
+Object.assign(I18N.es,ES);
+const LV=[[0,"Rookie","Novato"],[250,"Team Member","Miembro del Equipo"],[750,"Pro","Profesional"],[1500,"Star","Estrella"],[3000,"All-Star","Súper Estrella"],[5000,"Captain","Capitán"],[8000,"Legend","Leyenda"]];
+const BADGES=[["On-Time Streak","Racha a Tiempo","🗓️",[5,10,30],"ck"],["Punctual","Puntual","⏰",[5,10,30],"ci"],["Clean Punches","Marcajes Perfectos","✅",[5,10,30],"pu"],["Perfect Week","Semana Perfecta","🌟",[1,4,12],"pw"],["Perfect Month","Mes Perfecto","🏆",[1,3,6],"pm"],["Team Player","Compañero de Equipo","🤝",[5,25,75],"hp"],["Fast Fixer","Reparador Rápido","⚡",[10,50,150],"ft"],["Spotless","Impecable","✨",[10,50,150],"ip"]];
+const TIER=["🥉","🥈","🥇"];
+const RULES=[["Checklist completed","Lista completada",10],["…on time","…a tiempo",5],["…all items done","…todos los puntos",5],["Urgent ticket ≤1h / ≤4h","Urgente ≤1h / ≤4h","25 / 10"],["High ≤4h / ≤24h","Alta ≤4h / ≤24h","20 / 10"],["Normal ≤24h / ≤72h","Normal ≤24h / ≤72h","15 / 5"],["Photo on ticket","Foto en la orden",2],["Room passed inspection","Habitación aprobada",5],["Room failed inspection","Habitación reprobada",-5],["Daily check-in / 7-day streak","Entrada diaria / racha 7 días","2 / 15"],["Shift note","Nota de turno",3],["Extra room helped","Habitación extra",5],["Guest cleanliness 10","Limpieza 10 del huésped",25],["Perfect week / month","Semana / mes perfecto","50 / 200"]];
+const FIRST=["Ana","Luis","Maria","Kevin","Rosa","Jose","Tina","Omar","Sofia","Marcus","Lupe","Dev"];
+const REWARDS=[["Free meal","Comida gratis",300],["$10 gift card","Tarjeta de regalo $10",500],["Pick your shift","Escoge tu turno",800],["Extra PTO hour","Hora extra de PTO",1200]];
+function KEY(){return "jrpts_"+S.hotel+"_"+((meUser()||{}).id||"x")}
+function P(){let p;try{p=JSON.parse(localStorage.getItem(KEY()))}catch(e){}if(!p){const r=(s=>()=>(s=(s*9301+49297)%233280)/233280)(KEY().length*77+S.hotel.charCodeAt(3));p={xp:600+Math.floor(r()*900),wk:40+Math.floor(r()*80),mo:180+Math.floor(r()*200),st:{ck:7,ci:4,pu:12,pw:1,pm:0,hp:6,ft:3,ip:14,app:5},log:[],red:[],last:"",ckd:{},woc:0}}return p}
+function SV(p){try{localStorage.setItem(KEY(),JSON.stringify(p))}catch(e){}}
+function lvl(xp){let i=0;LV.forEach((l,j)=>{if(xp>=l[0])i=j});return i}
+function nm(l){return LANG==="es"?l[2]:l[1]}
+window.ptsAward=function(n,en,es,big){const p=P(),before=lvl(p.xp);p.xp+=n;p.wk+=n;p.mo+=n;p.log.unshift([new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),en,es,n]);p.log=p.log.slice(0,15);const after=lvl(p.xp);SV(p);
+  ptsToast("+"+n+" "+t("pts")+" · "+(LANG==="es"?es:en));if(big)confetti();
+  if(after>before){p.xp+=LV.length*0+25*after;SV(p);setTimeout(()=>{confetti();ptsToast("🎉 "+t("Level up!")+" "+t("Level")+" "+(after+1)+" · "+nm(LV[after]),3500)},900)}};
+function ptsToast(msg,ms){let el=document.getElementById("ptsToast");if(!el){el=document.createElement("div");el.id="ptsToast";el.style.cssText="position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#1f2a44;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;z-index:9999;box-shadow:0 4px 14px #0004;transition:opacity .3s;max-width:92vw;text-align:center";document.body.appendChild(el)}el.textContent=msg;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,ms||2200)}
+function confetti(){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;const c=document.createElement("canvas");c.style.cssText="position:fixed;inset:0;pointer-events:none;z-index:9998";c.width=innerWidth;c.height=innerHeight;document.body.appendChild(c);const x=c.getContext("2d"),cols=["#f94144","#f8961e","#f9c74f","#90be6d","#43aa8b","#577590"],ps=Array.from({length:140},()=>({x:c.width/2,y:c.height/3,vx:(Math.random()-.5)*12,vy:Math.random()*-12-3,s:4+Math.random()*5,c:cols[Math.floor(Math.random()*6)],r:Math.random()*6}));let f=0;(function a(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.35;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});if(++f<110)requestAnimationFrame(a);else c.remove()})()}
+window.ptsCard=function(){const p=P(),i=lvl(p.xp),nx=LV[i+1],pct=nx?Math.round((p.xp-LV[i][0])/(nx[0]-LV[i][0])*100):100;
+  return `<div class=card onclick="go('pts')" style="cursor:pointer;background:linear-gradient(135deg,#fff7e0,#e8f0ff)"><div style="display:flex;justify-content:space-between;align-items:center"><b>⭐ ${t("My Points")}</b><span style="background:#1f2a44;color:#fff;border-radius:999px;padding:2px 10px;font-size:13px">${t("Level")} ${i+1} · ${escH(nm(LV[i]))}</span></div>
+  <div style="font-size:28px;font-weight:700;margin:6px 0">${p.xp.toLocaleString()} <small style="font-size:14px;font-weight:400">XP</small></div>
+  <div style="background:#ddd;border-radius:6px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#f8961e"></div></div>
+  <small>${nx?(nx[0]-p.xp)+" "+t("to next level"):"MAX"} · ${t("This week")}: ${p.wk} · 🔥 ${p.st.ck}</small></div>`};
+function board(per){const me=(meUser()||{}).name||"";const myF=String(me).split(" ")[0];const p=P();const seed=S.hotel.charCodeAt(4)+(per=="mo"?7:0);
+  let rows=FIRST.slice(0,9).map((n,j)=>[n,((seed*(j+3))%97)+(per=="mo"?150:30)+j*7,(j*seed)%6]);rows.push([t("You"),per=="mo"?p.mo:p.wk,lvl(p.xp),1]);rows.sort((a,b)=>b[1]-a[1]);
+  return `<table class=t><tr><th>#</th><th>${t("Name")}</th><th>${t("Level")}</th><th>${t("pts")}</th></tr>${rows.map((r,k)=>`<tr${r[3]?' style="background:#fff3cd;font-weight:600"':""}><td>${k<3?["🥇","🥈","🥉"][k]:k+1}</td><td>${escH(r[0])}</td><td>${r[2]+1}</td><td>${r[1]}</td></tr>`).join("")}</table>`}
+M.pts=["⭐","Points"];
+V.pts=function(){const p=P();S.ptab=S.ptab||"wk";
+  const badges=BADGES.map(b=>{const v=p.st[b[4]]||0;let tier=-1;b[3].forEach((th,k)=>{if(v>=th)tier=k});const nxt=b[3][tier+1];return `<div style="border:1px solid #ddd;border-radius:10px;padding:8px;text-align:center;opacity:${tier<0?.45:1}"><div style="font-size:24px">${b[2]}${tier>=0?TIER[tier]:""}</div><small><b>${escH(LANG==="es"?b[1]:b[0])}</b><br>${v}${nxt?" / "+nxt:""}</small></div>`}).join("");
+  return `<h2>⭐ ${t("Points")}</h2>${ptsCard()}
+  <div class=card><b>🏁 ${t("Leaderboard")}</b><div style="display:flex;gap:6px;margin:8px 0">${[["wk","This week"],["mo","This month"]].map(x=>`<button class="${S.ptab==x[0]?"on":""}" onclick="S.ptab='${x[0]}';render()">${t(x[1])}</button>`).join("")}</div>${board(S.ptab)}<small>${t("My department")} · ${escH(S.hotel)}</small></div>
+  <div class=card><b>🔥 ${t("Streaks")}</b><table class=t><tr><td>${t("On-time checklists")}</td><td>${p.st.ck}</td></tr><tr><td>${t("On-time clock-in")}</td><td>${p.st.ci}</td></tr><tr><td>${t("Clean punches")}</td><td>${p.st.pu}</td></tr><tr><td>${t("App days")}</td><td>${p.st.app}</td></tr></table></div>
+  <div class=card><b>🏅 ${t("Badges")}</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px">${badges}</div><small>🥉 Bronze · 🥈 Silver · 🥇 Gold</small></div>
+  <div class=card><b>🎁 ${t("Rewards")}</b><table class=t>${REWARDS.map((r,k)=>`<tr><td>${escH(LANG==="es"?r[1]:r[0])}</td><td>${r[2]}</td><td>${p.red.includes(k)?t("Requested"):`<button onclick="ptsRedeem(${k})">${t("Redeem")}</button>`}</td></tr>`).join("")}</table><small>${t("Needs GM approval")}</small></div>
+  <div class=card><b>📈 ${t("How to earn")}</b><table class=t>${RULES.map(r=>`<tr><td>${escH(LANG==="es"?r[1]:r[0])}</td><td>${r[2]}</td></tr>`).join("")}</table></div>
+  ${p.log.length?`<div class=card><b>${t("Recent")}</b><table class=t>${p.log.map(l=>`<tr><td>${escH(l[0])}</td><td>${escH(LANG==="es"?l[2]:l[1])}</td><td>+${l[3]}</td></tr>`).join("")}</table></div>`:""}`};
+window.ptsRedeem=function(k){const p=P();if(p.xp<REWARDS[k][2]){ptsToast(t("Not enough points"));return}p.red.push(k);SV(p);ptsToast("🎁 "+t("Requested")+" · "+t("Needs GM approval"));render()};
+Object.keys(TILES).forEach(r=>{if(!TILES[r].includes("pts"))TILES[r].push("pts")});ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("pts"))TILES[r].push("pts")});
+const _home=V.home;V.home=function(){return ptsCard()+_home()};
+const _render=render;render=function(){_render();if(!meUser())return;const p=P(),dd=D(),today=new Date().toDateString();
+  if(p.last!==today){const first=!p.last;p.last=today;p.st.app++;SV(p);if(!first)setTimeout(()=>ptsAward(2,"Daily check-in","Entrada diaria"),400)}
+  Object.keys(dd.check||{}).forEach(r=>{const l=dd.check[r],done=Array.isArray(l)&&l.length&&l.every(x=>x[1]),k=today+r;if(done&&!p.ckd[k]){const q=P();q.ckd[k]=1;q.st.ck++;SV(q);ptsAward(20,"Checklist complete!","¡Lista completada!",true)}});
+  const closed=(dd.wo||[]).filter(w=>/clos|done|complete/i.test(w.s||"")).length;const q=P();if(q.woc===0||q.woc==null){q.woc=closed;SV(q)}else if(closed>q.woc){q.woc=closed;q.st.ft++;SV(q);ptsAward(15,"Ticket closed fast!","¡Orden cerrada rápido!")}};
+})();
+/*POINTS_END*/
 </script></body></html>
