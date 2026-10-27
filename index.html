@@ -166,6 +166,7 @@ body.he-print .wk button{display:none}
 
 <script src="fd-coverage.js"></script>
 <script src="data/welcome-messages.js"></script>
+<script src="data/local-recs.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
 // Example directory only. Do not put a live employee roster in this public file.
@@ -3878,4 +3879,40 @@ V.lf=function(){const f=lfF(),due=lfDue(),s=S.lfs||"all",cnt=k=>lfList().filter(
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("lf")&&["GM","Front Desk","Housekeeping","Housekeeper","House Person","Laundry Attendant"].includes(r))TILES[r].push("lf")});
 const _homeLf=V.home;V.home=function(){const n=lfCanManage()?lfDue().length:0;return (n?`<div class="card" onclick="go('lf')" style="cursor:pointer"><b>🧳 ${bx("Lost & Found","Objetos Perdidos")}</b><div class="miss-banner" style="margin:6px 0 0">⏰ ${n} ${bx("item(s) past 90 days — dispose per policy","artículo(s) con más de 90 días — desechar según la política")}</div></div>`:"")+_homeLf()};
 /*LF_END*/
+/*RECS_START*/
+// Local recommendations card for front desk, drivers and bartenders. Defaults come from data/local-recs.js (built from QOTD local questions).
+// GMs can add tips, edit or hide any tip per hotel. No phone numbers are shipped; a GM may type one into a tip they add.
+const RC_CATS=[["food","🍽️","Food","Comida"],["late","🌙","Late night","Tarde en la noche"],["pharm","💊","Pharmacy / urgent care","Farmacia / urgencias"],["dir","🧭","MSP / MOA directions","Rutas MSP / MOA"],["coffee","☕","Coffee","Café"],["brew","🍺","Breweries","Cervecerías"],["attr","🎡","Attractions","Atracciones"],["ess","🛍️","Essentials","Básicos"]];
+function rcState(){const d=D();d.rc=d.rc||{add:[],hide:{},ov:{}};return d.rc}
+function rcAll(){const r=rcState(),def=(window.LOCAL_RECS||[]).filter(x=>x.h.includes("all")||x.h.includes(S.hotel)).filter(x=>!r.hide[x.id]).map(x=>{const o=r.ov[x.id];return o?Object.assign({},x,{t:[o.t,o.t],a:[o.a,o.a],n:[o.n||"",o.n||""],u:o.u||x.u,edited:1}):x});
+  const add=r.add.map(x=>({id:x.id,cat:x.cat,t:[x.t,x.t],a:[x.a,x.a],n:[x.n||"",x.n||""],u:x.u||"",custom:1}));return add.concat(def)}
+function rcHiddenCount(){const r=rcState();return (window.LOCAL_RECS||[]).filter(x=>(x.h.includes("all")||x.h.includes(S.hotel))&&r.hide[x.id]).length}
+function rcCat(c){return RC_CATS.find(x=>x[0]===c)||RC_CATS[3]}
+function rcSafeUrl(u){return /^https?:\/\//i.test(u||"")?u:""}
+function rcCard(x,mgr){const i=LANG==="es"?1:0,u=rcSafeUrl(x.u);
+  return `<div class="card" style="padding:10px"><div class="row" style="margin:0"><b style="flex:1" class="raw">${rcCat(x.cat)[1]} ${escH(x.t[i])}</b>${x.custom?`<span class="pill RFI" style="flex:0 0 auto">${bx("GM tip","Tip del GM")}</span>`:""}${x.edited?`<span class="pill OD" style="flex:0 0 auto">${bx("edited","editado")}</span>`:""}</div><div style="margin:6px 0;font-weight:600" class="raw">${escH(x.a[i])}</div>${x.n[i]?`<small class="raw">${escH(x.n[i])}</small>`:""}${u?`<div><a href="${escH(u)}" target="_blank" rel="noopener noreferrer"><small>🔗 ${bx("Source","Fuente")}</small></a></div>`:""}
+  ${x.qid?`<div><small style="color:#889">${bx("From training Q&A","De las preguntas de capacitación")} #${x.qid}</small></div>`:""}
+  ${mgr?`<div class="chips"><button class="chip" onclick="rcEdit('${x.id}')">${bx("Edit","Editar")}</button><button class="chip" onclick="rcDel('${x.id}')">${x.custom?bx("Delete","Borrar"):bx("Hide","Ocultar")}</button></div>`:""}</div>`}
+function rcRows(){const q=(S.rcq||"").toLowerCase(),c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",rows=rcAll().filter(x=>(c==="all"||x.cat===c)&&(!q||[x.t[0],x.t[1],x.a[0],x.a[1],x.n[0],x.n[1]].join(" ").toLowerCase().includes(q)));
+  const order=RC_CATS.map(x=>x[0]);rows.sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat));
+  let h=rows.map(x=>rcCard(x,mgr)).join("");
+  if(!h)h=`<div class="card"><small>${c!=="all"&&!q?bx("No tip here yet. The team has not added one for this hotel, and we do not guess.","Aún no hay tip aquí. El equipo no ha agregado uno para este hotel y no adivinamos."):bx("No tips match.","Ningún tip coincide.")}</small>${mgr?`<div style="margin-top:6px"><button class="btn2" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button></div>`:""}</div>`;
+  return h}
+function rcQ(v){S.rcq=v;const e=$("rcList");if(e)e.innerHTML=rcRows()}
+function rcSet(c){S.rcc=c;render()}
+function rcEdit(id){S.rce=id;render();const e=$("rcForm");if(e)e.scrollIntoView()}
+function rcDel(id){const r=rcState();if(id[0]==="c")r.add=r.add.filter(x=>x.id!==id);else r.hide[id]=1;save();render()}
+function rcRestore(){rcState().hide={};save();render()}
+function rcSave(){const r=rcState(),id=S.rce,t=$("rcT").value.trim(),a=$("rcA").value.trim(),n=$("rcN").value.trim(),u=rcSafeUrl($("rcU").value.trim()),cat=$("rcC").value;
+  if(!t||!a){$("rcErr").textContent=bx("Add a title and the answer.","Agrega un título y la respuesta.");return}
+  if(id==="new"){r.add.unshift({id:"c"+Date.now().toString(36),cat,t,a,n,u})}else if(id[0]==="c"){const x=r.add.find(y=>y.id===id);if(x)Object.assign(x,{cat,t,a,n,u})}else r.ov[id]={t,a,n,u};
+  S.rce="";save();render()}
+function rcForm(){const id=S.rce;if(!id)return "";const x=id==="new"?{cat:S.rcc&&S.rcc!=="all"?S.rcc:"food",t:["",""],a:["",""],n:["",""],u:""}:rcAll().find(y=>y.id===id)||{cat:"food",t:["",""],a:["",""],n:["",""],u:""},i=LANG==="es"?1:0;
+  return `<div class="card" id="rcForm"><h3>${id==="new"?bx("Add a tip for ","Agregar un tip para ")+escH(S.hotel):bx("Edit tip","Editar tip")}</h3><select id="rcC" ${id!=="new"&&id[0]!=="c"?"disabled":""}>${RC_CATS.map(c=>`<option value="${c[0]}" ${x.cat===c[0]?"selected":""}>${c[1]} ${bx(c[2],c[3])}</option>`).join("")}</select><input id="rcT" style="width:100%;margin-top:6px" placeholder="${escH(bx("Title (e.g. place name)","Título (ej. nombre del lugar)"))}" value="${escH(x.t[i])}"><textarea id="rcA" style="width:100%;margin-top:6px" placeholder="${escH(bx("What to tell the guest (address, hours, phone you verified)","Qué decirle al huésped (dirección, horario, teléfono verificado)"))}">${escH(x.a[i])}</textarea><input id="rcN" style="width:100%;margin-top:6px" placeholder="${escH(bx("Note (optional)","Nota (opcional)"))}" value="${escH(x.n[i])}"><input id="rcU" style="width:100%;margin-top:6px" placeholder="https:// ${escH(bx("link (optional)","enlace (opcional)"))}" value="${escH(x.u||"")}"><small>${bx("Only add details you have verified. Text you type shows the same in English and Spanish.","Agrega solo datos verificados. El texto que escribas se muestra igual en inglés y español.")}</small><div class="bad" id="rcErr" role="alert"></div><div class="row"><button class="btn" onclick="rcSave()">${bx("Save","Guardar")}</button><button class="btn2" onclick="S.rce='';render()">${bx("Cancel","Cancelar")}</button></div></div>`}
+M.recs=["📍","Local Tips"];
+V.recs=function(){const c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",cnt=k=>rcAll().filter(x=>k==="all"||x.cat===k).length,hid=rcHiddenCount();
+  return `<h2>📍 ${bx("Local Tips","Tips Locales")} · ${escH(S.hotel)}</h2><div class="card"><small>${bx("Quick answers for the front desk, drivers and bartenders. Tips are for this hotel's area.","Respuestas rápidas para recepción, conductores y cantineros. Los tips son para el área de este hotel.")}</small><input id="rcSearch" type="search" style="width:100%;margin-top:6px" placeholder="🔍 ${escH(bx("Search (brewery, zoo, Target…)","Buscar (cervecería, zoológico, Target…)"))}" value="${escH(S.rcq||"")}" oninput="rcQ(this.value)" aria-label="${escH(bx("Search local tips","Buscar tips locales"))}"><div class="chips"><button class="chip ${c==="all"?"on":""}" aria-pressed="${c==="all"}" onclick="rcSet('all')">${bx("All","Todos")} (${cnt("all")})</button>${RC_CATS.map(x=>`<button class="chip ${c===x[0]?"on":""}" aria-pressed="${c===x[0]}" onclick="rcSet('${x[0]}')">${x[1]} ${bx(x[2],x[3])} (${cnt(x[0])})</button>`).join("")}</div>${mgr?`<button class="btn2" style="width:100%" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button>${hid?`<div style="margin-top:6px"><button class="chip" onclick="rcRestore()">${bx("Show "+hid+" hidden","Mostrar "+hid+" ocultos")}</button></div>`:""}`:""}</div>${rcForm()}<div id="rcList">${rcRows()}</div>`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("recs"))TILES[r].push("recs")});
+const _homeRc=V.home;V.home=function(){const r=authRole();return (r==="Front Desk"||r==="Shuttle Driver"?`<div class="card" onclick="go('recs')" style="cursor:pointer"><b>📍 ${bx("Local tips","Tips locales")}</b> <small>${bx("food · MSP/MOA directions · attractions ›","comida · rutas MSP/MOA · atracciones ›")}</small></div>`:"")+_homeRc()};
+/*RECS_END*/
 </script></body></html>
