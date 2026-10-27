@@ -224,6 +224,25 @@ main{max-width:1400px;margin:0 auto;padding:24px 32px 40px}
 .f2{grid-template-columns:repeat(3,1fr)}
 }
 /*RESP1_CSS_END*/
+
+/*RESP2_CSS_START*/
+.rt-wrap{padding:0;overflow:hidden}
+table.rt{width:100%;border-collapse:separate;border-spacing:0;font-size:15px}
+table.rt th{position:sticky;top:0;background:#eef3fa;padding:0;border-bottom:2px solid #d5dbe6;text-align:left;white-space:nowrap}
+table .rt-sort{width:100%;min-height:44px;background:none;border:0;border-radius:0;font-weight:800;font-size:14px;color:#14365d;text-align:left;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px}
+table .rt-sort:hover{background:#e0e9f5}
+table .rt-sort .ar{font-size:11px;opacity:.5}th[aria-sort=ascending] .ar:after{content:"▲";opacity:1}th[aria-sort=descending] .ar:after{content:"▼"}th:not([aria-sort]) .ar:after{content:"↕"}
+table.rt td{padding:10px 12px;border-bottom:1px solid #e6ebf2;vertical-align:top;overflow-wrap:anywhere}
+table.rt tr.rt-r{cursor:pointer}table.rt tr.rt-r:nth-child(4n+1) td{background:#fbfcfe}
+table.rt tr.rt-r:hover td{background:#eef4fc}
+table.rt tr.rt-r:focus-visible{outline:3px solid #1f6feb;outline-offset:-3px}
+table.rt tr.rt-r td:first-child:before{content:"▸ ";color:#14365d}table.rt tr.rt-r[aria-expanded=true] td:first-child:before{content:"▾ "}
+table.rt tr.rt-d>td{background:#f4f7fb;padding:12px 16px}
+table.rt tr.rt-d .card{box-shadow:none;margin:0;border:1px solid #e1e6ee}
+table.rt tr.rt-d[hidden]{display:none}
+.rt-cap{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;font-size:13px;color:#475569}
+table.t th{padding:0;background:#eef3fa}table.t th .rt-sort{min-height:40px;font-size:13px}
+/*RESP2_CSS_END*/
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span class="hhq" style="font-weight:800;letter-spacing:.3px;white-space:nowrap">Hotel<span style="color:#f9c74f">HQ</span></span><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
@@ -4118,4 +4137,46 @@ function respPost(){const u=meUser();if(!u)return;const b=document.body,m=rMode(
  addEventListener("keydown",e=>{if(e.key!=="Escape")return;if($("welcome")){if(window.welcomeDismiss)welcomeDismiss();return}if(window.respPalClose&&respPalClose())return;if($("heSheet")&&window.heClose){heClose();return}const hp=$("hpanel");if(hp&&!hp.hidden&&rMode()!=="desk")tp(0)});
  if(meUser())render();else renderLogin()}
 /*RESP1_END*/
+
+/*RESP2_START*/
+const RT_SORT={},RT_OPEN={};
+function rtVal(v){if(v&&typeof v==="object")return v;return {t:v==null?"":String(v)}}
+function rtCmp(a,b){const x=a.s!=null?a.s:a.t,y=b.s!=null?b.s:b.t;if(typeof x==="number"&&typeof y==="number")return x-y;return String(x).localeCompare(String(y),undefined,{numeric:true,sensitivity:"base"})}
+function respTbl(key,items,cols,o){o=o||{};if(!items.length)return;const first=items[0],host=first.parentNode;
+  const wrap=document.createElement("div");wrap.className="rt-wrap card";const tbl=document.createElement("table");tbl.className="rt";
+  const cap=document.createElement("div");cap.className="rt-cap";cap.textContent=items.length+" "+bx((items.length===1?"row":"rows")+" · click a column to sort"+(o.detail?" · click a row for details":""),(items.length===1?"fila":"filas")+" · toca una columna para ordenar"+(o.detail?" · toca una fila para ver detalles":""));
+  const rows=items.map((it,i)=>({it,cells:cols.map(c=>rtVal(c[1](it))),id:key+":"+i}));rows.forEach(r=>{r.id=key+":"+(r.cells[0].t||"")+":"+(r.cells[1]?r.cells[1].t:"")});
+  const st=RT_SORT[key];if(st)rows.sort((a,b)=>st.dir*rtCmp(a.cells[st.i],b.cells[st.i]));
+  const hr=cols.map((c,i)=>`<th scope="col" ${st&&st.i===i?`aria-sort="${st.dir>0?"ascending":"descending"}"`:""}><button type="button" class="rt-sort" data-i="${i}">${escH(c[0])}<span class="ar" aria-hidden="true"></span></button></th>`).join("");
+  tbl.insertAdjacentHTML("beforeend",`<thead><tr>${hr}</tr></thead>`);const tb=document.createElement("tbody");
+  rows.forEach(r=>{const tr=document.createElement("tr");tr.className="rt-r";tr.tabIndex=0;r.cells.forEach(c=>{const td=document.createElement("td");if(c.cls){const p=document.createElement("span");p.className="pill "+c.cls;p.textContent=c.t;td.appendChild(p)}else td.textContent=c.t;tr.appendChild(td)});tb.appendChild(tr);
+    if(o.detail){const dr=document.createElement("tr");dr.className="rt-d";const open=!!RT_OPEN[r.id];dr.hidden=!open;tr.setAttribute("aria-expanded",open);const td=document.createElement("td");td.colSpan=cols.length;td.appendChild(r.it);dr.appendChild(td);tb.appendChild(dr);
+      const tg=()=>{const h=!dr.hidden;dr.hidden=h;tr.setAttribute("aria-expanded",!h);RT_OPEN[r.id]=!h};tr.addEventListener("click",tg);tr.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tg()}})}
+    else if(o.click){const hid=document.createElement("div");hid.hidden=true;hid.appendChild(r.it);wrap.appendChild(hid);const go2=()=>o.click(r.it);tr.addEventListener("click",go2);tr.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go2()}})}
+    else r.it.remove()});
+  tbl.appendChild(tb);wrap.insertBefore(tbl,wrap.firstChild);wrap.appendChild(cap);host.insertBefore(wrap,host.firstChild===first?first:null);if(!wrap.parentNode)host.appendChild(wrap);
+  tbl.querySelector("thead").addEventListener("click",e=>{const b=e.target.closest(".rt-sort");if(!b)return;const i=+b.dataset.i,c=RT_SORT[key];RT_SORT[key]={i,dir:c&&c.i===i?-c.dir:1};render()})}
+function respSortPlain(){document.querySelectorAll("#app table").forEach(tb=>{if(tb.classList.contains("rt")||tb.classList.contains("fit")||tb.classList.contains("assign")||tb.dataset.sp)return;const tr=[...tb.querySelectorAll("tr")];const hr=tr[0];if(!hr||!hr.querySelector("th")||tr.length<3)return;tb.dataset.sp="1";const body=tr.slice(1),ths=[...hr.children],key="p:"+S.tab+":"+(ths.map(x=>x.textContent).join("|"));
+  const sort=(i,dir)=>{const par=body[0].parentNode;body.slice().sort((a,b)=>dir*rtCmp({t:a.children[i].textContent.trim(),s:parseFloat(a.children[i].textContent.replace(/,/g,""))||undefined},{t:b.children[i].textContent.trim(),s:parseFloat(b.children[i].textContent.replace(/,/g,""))||undefined})).forEach(r=>par.appendChild(r));ths.forEach((h,j)=>{if(j===i)h.setAttribute("aria-sort",dir>0?"ascending":"descending");else h.removeAttribute("aria-sort")})};
+  ths.forEach((th,i)=>{const label=th.textContent;th.innerHTML=`<button type="button" class="rt-sort">${escH(label)}<span class="ar" aria-hidden="true"></span></button>`;th.firstChild.addEventListener("click",()=>{const c=RT_SORT[key];const dir=c&&c.i===i?-c.dir:1;RT_SORT[key]={i,dir};sort(i,dir)})});if(RT_SORT[key])sort(RT_SORT[key].i,RT_SORT[key].dir)})}
+const q1=(e,s)=>e.querySelector(s),qt=(e,s)=>{const x=e.querySelector(s);return x?x.textContent.trim():""};
+const SEVR={High:3,Alta:3,Med:2,Medium:2,Media:2,Low:1,Baja:1};
+function respTables(){const A=$("app"),tab=S.tab;
+  if(tab==="wo"){const it=[...A.children].filter(c=>c.classList.contains("card")&&/^#\d+/.test(qt(c,":scope>b")));
+    respTbl("wo",it,[["#",c=>({t:qt(c,":scope>b").split("·")[0].replace("#","").trim(),s:parseInt(qt(c,":scope>b").replace("#",""),10)})],[bx("Room","Habitación"),c=>qt(c,":scope>b").split("·")[1]||""],[bx("Priority","Prioridad"),c=>{const p=q1(c,":scope>.pill");return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):"",s:SEVR[p?p.textContent:""]||0}}],[bx("Issue","Problema"),c=>qt(c,".ft-text")],[bx("Status","Estado"),c=>{const s=q1(c,"select");return s?s.options[s.selectedIndex].text:""}],[bx("Comments","Comentarios"),c=>({t:String(c.querySelectorAll(":scope>.li").length),s:c.querySelectorAll(":scope>.li").length})]],{detail:true})}
+  if(tab==="gi"){const it=[...A.children].filter(c=>c.classList.contains("card")&&q1(c,":scope>.row>b")&&q1(c,":scope>.row .pill"));
+    respTbl("gi",it,[[bx("Room","Habitación"),c=>qt(c,":scope>.row>b").replace("🛏️","").trim()],[bx("Severity","Gravedad"),c=>{const p=c.querySelectorAll(":scope>.row .pill")[0];return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):"",s:SEVR[p?p.textContent:""]||0}}],[bx("Status","Estado"),c=>{const p=c.querySelectorAll(":scope>.row .pill")[1];return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):""}}],[bx("Category","Categoría"),c=>qt(c,".pill.RFI")],[bx("Issue","Problema"),c=>qt(c,".raw")],[bx("Goes to","Va a"),c=>qt(c,"div small").replace("→","").trim()],[bx("Date","Fecha"),c=>{const sm=[...c.querySelectorAll(":scope>small")].map(x=>x.textContent).find(x=>/·/.test(x))||"";return sm.split("·")[0].trim()}]],{detail:true})}
+  if(tab==="lf"){const L=$("lfList");if(L)respTbl("lf",[...L.children].filter(c=>c.classList.contains("card")),[[bx("Item","Artículo"),c=>qt(c,"b.raw")],[bx("Where","Dónde"),c=>qt(c,"small")],[bx("Found","Encontrado"),c=>qt(c,"small:nth-of-type(2)")],[bx("Status","Estado"),c=>{const ps=[...c.querySelectorAll(".pill")].filter(p=>!/EXAMPLE|EJEMPLO/.test(p.textContent));const p=ps[0];return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):""}}],[bx("Contacts","Contactos"),c=>{const m=qt(c,"small:last-child").match(/\d+/);return {t:m?m[0]:"0",s:m?+m[0]:0}}]],{click:c=>{const e=c.querySelector("[onclick]");if(e)e.click()}})}
+  if(tab==="notes"){const it=[...A.querySelectorAll(".card>.li")].filter(c=>q1(c,".ft"));const hasR=it.some(c=>q1(c,".chip"));
+    const hd=c=>{let x="";for(const n of c.firstElementChild.childNodes){if(n.nodeName==="BR")break;x+=n.textContent}return x.split("·")},cols=[[bx("Shift","Turno"),c=>qt(c,"b")],[bx("By","Por"),c=>(hd(c)[1]||"").trim()],[bx("Time","Hora"),c=>(hd(c)[2]||"").trim()],[bx("Note","Nota"),c=>qt(c,".ft-text")]];if(hasR)cols.push([bx("Read by","Leído por"),c=>{const ch=q1(c,".chip");const m=ch?ch.textContent.match(/(\d+) \S+ (\d+)/):null;return {t:ch?ch.textContent.replace(/[👁▼▲]/g,"").trim():"",s:m?+m[1]/(+m[2]||1):-1}}]);
+    respTbl("notes",it,cols,{detail:true})}
+  if(tab==="labor"){const R=$("wlRoot");if(R){
+    respTbl("lb-miss",[...R.querySelectorAll(".miss-row")],[[bx("Person","Persona"),c=>qt(c,"b")],[bx("Shift","Turno"),c=>qt(c,".wlnote .raw")],[bx("Issue","Problema"),c=>{const d=c.querySelectorAll(":scope>div")[2];return d?d.textContent.replace(/^[^:]*:\s*/,""):""}],[bx("Min late","Min tarde"),c=>{const d=c.querySelectorAll(":scope>div")[3];const v=d?d.textContent.replace(/^[^:]*:\s*/,""):"";return {t:v,s:parseFloat(v)||0}}],[bx("Status","Estado"),c=>{const p=q1(c,".pill");return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):""}}]],{detail:true});
+    const num=v=>({t:v,s:parseFloat(v.replace(/[+$,]/g,""))||0});
+    const days=[...R.querySelectorAll(".wlday:not(.week)")];
+    respTbl("lb-day",days,[[bx("Day","Día"),c=>qt(c,".top b")],[bx("Result","Resultado"),c=>{const p=q1(c,".pill");return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):""}}],[bx("Actual","Real"),c=>num(c.querySelectorAll(".wlnums .raw")[0]?.textContent||"")],[bx("Plan","Plan"),c=>num(c.querySelectorAll(".wlnums .raw")[1]?.textContent||"")],[bx("Scheduled","Programado"),c=>num(c.querySelectorAll(".wlnums .raw")[2]?.textContent||"")],[bx("Var (hrs)","Var (hrs)"),c=>num(c.querySelectorAll(".wlsub .raw")[0]?.textContent||"")],["$",c=>num(c.querySelectorAll(".wlsub .raw")[1]?.textContent||"")]]);
+    respTbl("lb-pos",[...R.querySelectorAll(".wlpos")],[[bx("Position","Puesto"),c=>qt(c,"b")],[bx("Result","Resultado"),c=>{const p=q1(c,".pill");return {t:p?p.textContent:"",cls:p?p.className.replace("pill ",""):""}}],[bx("Actual","Real"),c=>num(c.querySelectorAll(".wlnote .raw")[0]?.textContent||"")],[bx("Plan","Plan"),c=>num(c.querySelectorAll(".wlnote .raw")[1]?.textContent||"")],[bx("Scheduled","Programado"),c=>num(c.querySelectorAll(".wlnote .raw")[2]?.textContent||"")],[bx("Var (hrs)","Var (hrs)"),c=>num(c.querySelectorAll(".wlnote .raw")[3]?.textContent||"")],["$",c=>num(c.querySelectorAll(".wlnote .raw")[4]?.textContent||"")]])}}
+  respSortPlain()}
+{const _p2=window.respPost2;window.respPost2=function(m){if(_p2)_p2(m);if(m==="desk")respTables()}}
+/*RESP2_END*/
 </script></body></html>
