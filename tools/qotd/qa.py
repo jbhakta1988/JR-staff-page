@@ -15,6 +15,10 @@ def check(x):
     if len(oe)!=len(os_): e.append("EN/ES option count mismatch")
     if len({norm(o) for o in oe})!=len(oe): e.append("duplicate EN options")
     if len({norm(o) for o in os_})!=len(os_): e.append("duplicate ES options")
+    for o in oe+os_:
+        t=str(o).strip()
+        if re.fullmatch(r"[A-Da-d][.)]?",t) or (len(t)<2 and not t.isdigit()): e.append("one-letter/empty option: "+repr(t))
+        elif re.search(r"(\.\.\.|…|[,;:\-/(])$",t): e.append("truncated option: "+t[-20:])
     if not 0<=x["c"]<len(oe): e.append("bad correct index")
     if not str(x["src"]).startswith("http") and x["src"]!="general hospitality best practice": e.append("bad source")
     if "{" in x["qe"]+x["qs"]+"".join(oe+os_)+x["ee"]+x["es"]: e.append("unfilled placeholder")
