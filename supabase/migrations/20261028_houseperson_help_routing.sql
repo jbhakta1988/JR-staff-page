@@ -16,7 +16,7 @@ alter table public.staff_request_routes enable row level security;
 
 drop policy if exists staff_request_routes_read on public.staff_request_routes;
 create policy staff_request_routes_read on public.staff_request_routes
-  for select using (auth.uid() is not null);
+  for select to authenticated using ((select auth.uid()) is not null);
 
 insert into public.staff_request_routes (kind, canonical, notify_roles, label_en, label_es) values
   ('houseperson_help', 'houseperson_help', array['house_person','shuttle_driver'], 'Houseperson help', 'Ayuda de houseperson'),
@@ -40,7 +40,7 @@ returns text[]
 language sql
 stable
 security invoker
-set search_path = public
+set search_path = ''
 as $$
   select r.notify_roles
   from public.staff_request_routes r
@@ -48,5 +48,5 @@ as $$
   limit 1
 $$;
 
-revoke all on function public.staff_request_notify_roles(text) from public;
+revoke all on function public.staff_request_notify_roles(text) from public, anon;
 grant execute on function public.staff_request_notify_roles(text) to authenticated;
