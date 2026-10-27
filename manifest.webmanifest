@@ -1,6 +1,6 @@
 {
-  "name": "JR Staff Portal",
-  "short_name": "JR Staff",
+  "name": "HotelHQ",
+  "short_name": "HotelHQ",
   "start_url": "/JR-staff-page/",
   "scope": "/JR-staff-page/",
   "display": "standalone",
