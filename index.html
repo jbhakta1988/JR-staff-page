@@ -4005,4 +4005,19 @@ V.brief=function(){const d=D(),b=brData(),fc=d.fc&&d.fc[0]||{occ:0,arr:0},occ=b.
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("brief")&&!["Shuttle Driver","House Person","Laundry Attendant"].includes(r))TILES[r].push("brief")});
 const _homeBr=V.home;V.home=function(){const r=authRole();return (["GM","AGM","Front Desk","Housekeeping","Maintenance","Above Property"].includes(r)?`<div class="card" onclick="go('brief')" style="cursor:pointer;background:#fff8e6"><b>☀️ ${bx("Morning huddle","Junta de la mañana")}</b> <small>${bx("Today's briefing ›","Informe de hoy ›")}</small></div>`:"")+_homeBr()};
 /*BRIEF_END*/
+/*NOTEREAD_START*/
+// Read receipts on Shift Notes & Handoff. Opening the notes screen records a read (user + time) for each note.
+// Only AGM, GM and corporate (Above Property) are shown who has / has not read. Everyone else gets no receipt UI, counts or data in the page.
+// Server design: supabase/migrations/20261027_shift_note_reads.sql (select limited to agm/gm/above_property, users insert only their own read).
+function nrCanSee(){const r=authRole();return r==="GM"||r==="AGM"||r==="Above Property"}
+function nrId(n,i){if(!n.id)n.id="n"+(D().notes.length-i)+"_"+String(n.at||"").replace(/\W/g,"");return n.id}
+function nrReads(){const d=D();if(!d.reads){d.reads={};const n=d.notes[0],st=ST().filter(s=>s.role!=="Above Property"&&s.role!=="GM");if(n){nrId(n,0);d.reads[n.id]=st.slice(0,2).map((s,i)=>({u:careUid(s.n),n:s.n,at:Date.now()-(40-i*15)*60000,ex:1}))}}return d.reads}
+function nrMark(){const u=meUser();if(!u||u.role==="Above Property")return;const d=D(),R=nrReads();let ch=0;d.notes.forEach((n,i)=>{const id=nrId(n,i),a=R[id]=R[id]||[];if(!a.some(x=>x.u===u.id)){a.push({u:u.id,n:u.name,at:Date.now()});ch=1}});if(ch)save()}
+function nrExpected(n){const own=String(n.by||"").split(" ")[0];return ST().filter(s=>s.role!=="Above Property"&&s.days.includes(DOW)&&String(s.n).split(" ")[0]!==own)}
+function nrTog(id){S.nro=S.nro===id?"":id;render()}
+function nrBox(n,i){if(!nrCanSee())return "";const id=nrId(n,i),R=(nrReads()[id]||[]),exp=nrExpected(n),readIds=new Set(R.map(x=>x.u)),read=R.filter(x=>exp.some(e=>careUid(e.n)===x.u)),unread=exp.filter(e=>!readIds.has(careUid(e.n))),open=S.nro===id,tm=ts=>new Date(ts).toLocaleTimeString(localeTag(),{hour:"numeric",minute:"2-digit"});
+  return `<div style="flex:1 1 100%"><button class="chip" aria-expanded="${open}" onclick="nrTog('${id}')">👁 ${bx("Read by","Leído por")} ${read.length} ${bx("of","de")} ${exp.length} ${open?"▲":"▼"}</button>${open?`<div class="card" style="background:#f4f7fb;margin:6px 0 0"><small><b>${bx("Read","Leído")}</b></small>${read.map(x=>`<div class="wlpos"><span class="raw">${escH(x.n)}</span> · ${escH(tm(x.at))}${x.ex?` <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}</div>`).join("")||`<div><small>${bx("Nobody yet.","Nadie aún.")}</small></div>`}<small><b>${bx("Not read yet (scheduled today)","Sin leer (programados hoy)")}</b></small>${unread.map(e=>`<div class="wlpos"><span class="raw">${escH(e.n)}</span> <small>${escH(shortRole(e.role))}</small></div>`).join("")||`<div><small>${bx("Everyone has read it.","Todos lo han leído.")}</small></div>`}</div>`:""}</div>`}
+V.notes=function(){const d=D();nrMark();return `<h2>Shift Notes & Handoff</h2><div class="card"><select id="ns" style="width:100%"><option>AM</option><option>PM</option><option>Night Audit</option></select><textarea id="nt" style="width:100%;min-height:90px" placeholder="Handoff notes for next shift"></textarea><button class="btn" style="width:100%" onclick="addN()">Post handoff</button></div>
+<div class="card"><h3>Log</h3>${d.notes.map((n,i)=>`<div class="li" style="flex-wrap:wrap"><div style="flex:1;min-width:0"><b>${n.sh}</b> · ${n.by} · ${n.at}<br>${noteHtml("note"+i,n,n.t)}</div>${nrBox(n,i)}</div>`).join("")}</div>`};
+/*NOTEREAD_END*/
 </script></body></html>
