@@ -865,8 +865,8 @@ function initialsOf(n){const w=String(n||"").trim().split(/\s+/).filter(Boolean)
 function initialsHTML(n,sz){return `<span class=av aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;flex:none;width:${sz}px;height:${sz}px;border-radius:50%;background:#e3e8f0;color:#1f2a44;font-weight:700;font-size:${Math.round(sz*.38)}px;box-sizing:border-box">${escH(initialsOf(n))}</span>`}
 function leader(){return authRole()=="Above Property"||authRole()=="GM"||authRole()=="AGM"}
 const M={home:["🏠","Home"],rooms:["🛏️","Rooms"],insp:["🔍","Inspect"],wo:["🔧","Work Orders"],pm:["🗓️","PMs"],equip:["🔩","Equipment"],pmsch:["📆","PM Schedule"],notes:["📝","Shift Notes"],check:["✅","Checklists"],walk:["🚶","Prop Walk"],inv:["📦","Inventory"],order:["🛒","Ordering"],labor:["⏱️","Labor"],fc:["📈","Forecast"],gmc:["📋","GM Checklists"],my:["👤","My Tasks"],myrooms:["🛏️","My Rooms"],lf:["🧳","Lost & Found"],esc:["🚩","Escalations"],rules:["⚙️","Assign Rules"],line:["📋","Station"],lreq:["📨","Line Staff"],shut:["🚐","Shuttle"],sched:["📅","Schedule"],health:["📉","Room Health"],score:["🧹","Cleaning Scorecard"]};
-const NAV={GM:["home","sched","my","wo","labor"],"Front Desk":["home","sched","my","rooms","notes"],Housekeeping:["home","sched","rooms","insp","esc"],"Housekeeper":["home","sched","myrooms","check"],Maintenance:["home","sched","my","wo","pm","equip","pmsch"],"Shuttle Driver":["home","sched","shut","line"],"House Person":["home","sched","my","line","check"],"Laundry Attendant":["home","sched","my","line","check"],"Breakfast Attendant":["home","sched","my","line","check"]};
-const TILES={"Shuttle Driver":["sched","shut","line"],"House Person":["sched","my","line","check"],"Laundry Attendant":["sched","my","line","check"],"Breakfast Attendant":["sched","my","line","check"],GM:["health","score","sched","my","rules","lreq","shut","gmc","rooms","insp","wo","pm","equip","pmsch","notes","check","walk","inv","order","labor","fc"],"Front Desk":["sched","my","shut","lreq","rooms","notes","check","wo","fc"],Housekeeping:["health","score","sched","my","rooms","insp","esc","lf","labor","inv","order","check","lreq"],"Housekeeper":["sched","myrooms","check"],Maintenance:["health","score","sched","my","wo","pm","equip","pmsch","walk","check","inv","order"]};
+const NAV={GM:["home","sched","my","wo","labor"],"Front Desk":["home","sched","my","rooms","notes"],Housekeeping:["home","sched","myrooms","rooms","insp","esc"],"Housekeeper":["home","sched","myrooms","check"],Maintenance:["home","sched","my","wo","pm","equip","pmsch"],"Shuttle Driver":["home","sched","shut","line"],"House Person":["home","sched","my","line","check"],"Laundry Attendant":["home","sched","my","line","check"],"Breakfast Attendant":["home","sched","my","line","check"]};
+const TILES={"Shuttle Driver":["sched","shut","line"],"House Person":["sched","my","line","check"],"Laundry Attendant":["sched","my","line","check"],"Breakfast Attendant":["sched","my","line","check"],GM:["health","score","sched","my","rules","lreq","shut","gmc","rooms","insp","wo","pm","equip","pmsch","notes","check","walk","inv","order","labor","fc"],"Front Desk":["sched","my","shut","lreq","rooms","notes","check","wo","fc"],Housekeeping:["health","score","sched","my","myrooms","rooms","insp","esc","lf","labor","inv","order","check","lreq"],"Housekeeper":["sched","myrooms","check"],Maintenance:["health","score","sched","my","wo","pm","equip","pmsch","walk","check","inv","order"]};
 const KEY="jrportal_v7";let MEM={},STORE_OK=true;
 function sget(k){try{return window.localStorage.getItem(k)}catch(e){STORE_OK=false;return MEM[k]||null}}
 function sset(k,v){MEM[k]=v;try{window.localStorage.setItem(k,v)}catch(e){STORE_OK=false}}
@@ -1433,7 +1433,7 @@ function ld(o=0){const d=new Date();d.setDate(d.getDate()+o);return d.getFullYea
 function pk(t,o=0){const n=new Date();if(t=="Quarterly"){const q=Math.floor(n.getMonth()/3)+o,y=n.getFullYear()+Math.floor(q/4);return "Q"+(((q%4)+4)%4+1)+" "+y}if(t=="Annually")return "Year "+(n.getFullYear()+o);if(t=="Daily")return ld(o);if(t=="Monthly")return new Date(n.getFullYear(),n.getMonth()+o,1).toLocaleString("en-US",{month:"long",year:"numeric"});const m=new Date(n);m.setDate(n.getDate()-((n.getDay()+6)%7)+7*o);return "Week of "+m.toLocaleDateString()}
 function poff(t){const n=new Date(),doy=Math.floor((n-new Date(n.getFullYear(),0,1))/864e5);return t=="Daily"?doy:t=="Weekly"?Math.floor(doy/7):t=="Monthly"?n.getMonth():t=="Quarterly"?Math.floor(n.getMonth()/3):0}
 function ST(){const d=D();if(!d.staff)d.staff=USERS.filter(u=>u.hotel==S.hotel).map(u=>({n:u.name,role:u.role,shift:u.shift,days:u.days}));return d.staff}
-function onS(role,sh){const roles=role=="GM"?["GM","AGM"]:[role];const a=ST().filter(s=>roles.includes(s.role)&&s.days.includes(DOW)),b=sh?a.filter(s=>s.shift==sh):a;return b.length?b:a.length?a:ST().filter(s=>roles.includes(s.role))}
+function onS(role,sh){const roles=role=="GM"?["GM","AGM"]:role=="Housekeeper"?["Housekeeper","Housekeeping"]:[role];const a=ST().filter(s=>roles.includes(s.role)&&s.days.includes(DOW)),b=sh?a.filter(s=>s.shift==sh):a;return b.length?b:a.length?a:ST().filter(s=>roles.includes(s.role))}
 function cw(){const u=meUser();return u?u.name:"(signed out)"}
 function INIT(d){if(d.init)return;d.init=1;const y=pk("Daily",-1);d.since={};["GM","Front Desk","Housekeeping","Maintenance"].forEach(k=>(d.check[k]||[]).forEach(c=>d.since[k+"|"+enOf(c[0])]=y));d.touched={[y]:1};d.done={};Object.keys(d.check).forEach(k=>d.check[k].slice(0,2).forEach(c=>d.done[y+"|"+k+"|"+enOf(c[0])]=true));d.pmRooms=[d.rooms[0].n];d.pmDay={[ld(-1)]:[{room:d.rooms[3].n,who:"Luis (EX)",done:false},{room:d.rooms[0].n,who:"Dev (EX)",done:true}]}}
 function ITEMS(){const d=D(),o=[],ov=QUORE.over[S.hotel]||[];QL().forEach(l=>l.items.forEach(x=>o.push({key:"Q|"+l.name+"|"+enOf(x),label:x,grp:l.name,per:l.per,def:l.role,shift:l.shift,src:1})));Object.keys(d.check).filter(k=>!ov.includes(k)).forEach(k=>d.check[k].forEach(c=>o.push({key:k+"|"+enOf(c[0]),label:c[0],grp:k+" daily",per:"Daily",def:k})));["Daily","Weekly","Monthly"].forEach(per=>G().items[per].forEach(x=>o.push({key:"GM-"+per+"|"+enOf(x),label:x,grp:"GM "+per,per:per,def:"GM"})));return o}
@@ -1598,6 +1598,7 @@ function inspectPanel(x){
 function openInspect(n){S.inspectRoom=S.inspectRoom==n?0:n;inspPh="";render()}
 function inspFailedItems(){return [...document.querySelectorAll(".ic-room")].filter(c=>!c.checked).map(c=>c.dataset.i)}
 function inspPass(n){
+  {const rm=D().rooms.find(r=>r.n==n);if(rm&&rm.hk&&rm.hk===cw()){showToast(LANG==="es"?"Tú limpiaste este cuarto. Lo debe inspeccionar el GM/AGM u otro supervisor.":"You cleaned this room. The GM/AGM or another lead must inspect it.");return}}
   const failed=inspFailedItems(),items=(TPL.Guestroom||[]).length||1;
   D().insp.unshift({tpl:"Guestroom",failed,room:n,score:Math.round(100*(items-failed.length)/items),by:cw(),notes:"Passed inspection",date:new Date().toLocaleDateString(localeTag())});
   S.inspectRoom=0;inspPh="";
@@ -4769,7 +4770,7 @@ function pvBar(){if(!canEditSched()||!window.LPX||!LPX.planWeek)return "";const 
  ${(()=>{try{const o=LCMD.otRisk(h);return `<div class="${o.list.length?"pv-r":""}"><small>OT %</small><b>${o.pct}</b></div>`}catch(e){return ""}})()}<button type=button class=pv-tg onclick="S.pvOpen=${!open};render()" aria-expanded="${open}">${open?B("Hide by day","Ocultar por día")+" ▴":B("By position & day","Por puesto y día")+" ▾"}</button></div>${open?tbl:""}${(()=>{try{const o=LCMD.otRisk(h);return o.list.length?`<div class=oc-warn>⏱️ ${B("Overtime risk (projected > 40 hrs this week)","Riesgo de horas extra (proyectado > 40 hrs esta semana)")}: ${o.list.map(x=>E(x.n)+" "+f1(x.h)+"h").join(", ")}</div>`:""}catch(e){return ""}})()}</div>`}
 const _sched=V.sched;V.sched=function(){const html=_sched();if(!canEditSched()||S.sv==="win"||S.sv==="clock")return html;const bar=pvBar();const i=html.indexOf("</h2>");return i>0?html.slice(0,i+5)+bar+html.slice(i+5):bar+html};
 // ---------- Projected out times ----------
-const OTR=["Housekeeper","Laundry Attendant","House Person"];
+const OTR=["Housekeeper","Housekeeping","Laundry Attendant","House Person"];
 const st=()=>{try{return LPX.std_(S.hotel).ot}catch(e){return {co:30,so:20,oth:25,brk:30,side:20,lbsCO:12,lbsSO:5,lbsLoad:50,minLoad:20,sup:3,t_pub:45,t_trash:20,t_linen:30,t_rest:20}}};
 const TASKS=[["t_pub","Public areas","Áreas públicas"],["t_trash","Trash run","Recorrido de basura"],["t_linen","Linen runs","Recorridos de blancos"],["t_rest","Lobby restrooms","Baños del lobby"]];
 const DK="jrportal_otday_v1",BK="jrportal_otbonus_v1",RK="jrportal_otrec_v1";
@@ -4784,7 +4785,7 @@ function shiftOf(u){const t=today(),sh=(S.shifts||[]).find(s=>s.who===u.name&&s.
 const REM=["dirty","progress","reclean"];
 function roomsToday(){return (D().rooms||[]).filter(r=>["dirty","progress","reclean","cleaned"].includes(roomFlow(r))||(r.cleanedAt&&new Date(r.cleanedAt).toDateString()===new Date().toDateString()))}
 function proj(u){const o=st(),ds=dayS(),sh=shiftOf(u),base=Math.max(nowM(),sh.start);let work=0,label="",done=false,sig="";
- if(u.role==="Housekeeper"){const mine=(D().rooms||[]).filter(r=>r.hk===u.name),rem=mine.filter(r=>REM.includes(roomFlow(r)));
+ if(u.role==="Housekeeper"||u.role==="Housekeeping"){const mine=(D().rooms||[]).filter(r=>r.hk===u.name),rem=mine.filter(r=>REM.includes(roomFlow(r)));
   work=sum(rem.map(r=>{const m=r.ty==="other"?o.oth:r.occ?o.so:o.co;return roomFlow(r)==="progress"?m/2:m}));
   const co=rem.filter(r=>!r.occ).length,so=rem.length-co;label=`${rem.length} ${B("rooms left","cuartos rest.")} (${co} CO · ${so} SO)`;done=!rem.length;sig=mine.map(r=>r.n).sort().join(",")}
  else if(u.role==="Laundry Attendant"){const rt=roomsToday(),co=rt.filter(r=>!r.occ).length,so=rt.length-co;const tot=Math.ceil((co*o.lbsCO+so*o.lbsSO)/Math.max(1,o.lbsLoad))+(+ds.carry||0),left=Math.max(0,tot-(+ds.loads||0));
@@ -4819,8 +4820,8 @@ window.OTX={
  task(k,on){const u=meUser(),d=dayS();d.tasks[u.name]=d.tasks[u.name]||{};d.tasks[u.name][k]=on;daySave(d);render()},
  cfg(k,v){if(!["GM","AGM"].includes(role()))return;const a=jget(BK,{});a[S.hotel]=Object.assign(bonusCfg(),{[k]:Math.max(0,parseInt(v)||0)});sset(BK,JSON.stringify(a));render()},
  clockOut(at){const u=meUser();if(!u)return;const p=proj(u),L=locked(u,p),d=dayS(),c=bonusCfg(),now=at!=null?at:nowM();
-  const mine=(D().rooms||[]).filter(r=>r.hk===u.name),fail=u.role==="Housekeeper"&&mine.some(r=>roomFlow(r)==="reclean"||r.failNote);
-  let pts=0,why="";if(!p.done)why=B("Out-time bonus needs all assigned work done.","El bono requiere todo el trabajo asignado terminado.");else if(fail)why=B("No bonus today: a room failed inspection or needed a reclean.","Sin bono hoy: un cuarto falló la inspección o necesitó relimpieza.");else if(now>L)why=B("Clocked out after your projected time — try again tomorrow!","Saliste después de tu hora estimada — ¡mañana otra vez!");else pts=L-now>=c.earlyMin?c.early:c.on;
+  const mine=(D().rooms||[]).filter(r=>r.hk===u.name),fail=(u.role==="Housekeeper"||u.role==="Housekeeping")&&mine.some(r=>roomFlow(r)==="reclean"||r.failNote),noInsp=u.role==="Housekeeping"&&mine.some(r=>roomFlow(r)==="cleaned"||!(D().insp||[]).some(i=>String(i.room)===String(r.n)&&i.by!==u.name&&!(i.failed||[]).length));
+  let pts=0,why="";if(!p.done)why=B("Out-time bonus needs all assigned work done.","El bono requiere todo el trabajo asignado terminado.");else if(fail)why=B("No bonus today: a room failed inspection or needed a reclean.","Sin bono hoy: un cuarto falló la inspección o necesitó relimpieza.");else if(noInsp)why=B("Bonus needs your rooms inspected by the GM/AGM or another lead.","El bono requiere que el GM/AGM u otro supervisor inspeccione tus cuartos.");else if(now>L)why=B("Clocked out after your projected time — try again tomorrow!","Saliste después de tu hora estimada — ¡mañana otra vez!");else pts=L-now>=c.earlyMin?c.early:c.on;
   const rec=jget(RK,{});const y=new Date();y.setDate(y.getDate()-1);const yk=S.hotel+"|"+ymd(y)+"|"+u.name;const streak=pts?((rec[yk]&&rec[yk].ok?(rec[yk].streak||1):0)+1):0;
   rec[S.hotel+"|"+today()+"|"+u.name]={ok:!!pts,lock:L,at:now,streak};sset(RK,JSON.stringify(rec));
   d.out[u.name]={at:now,pts,why,streak};daySave(d);
@@ -5077,4 +5078,5 @@ const css=document.createElement("style");css.textContent=`
 })();
 /*ONCLOCK_END*/
 </script>
-<script src="quore-parity.js"></script></body></html>
+<script src="quore-parity.js"></script>
+<script src="ux.js"></script></body></html>
