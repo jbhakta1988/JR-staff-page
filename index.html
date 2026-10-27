@@ -156,6 +156,10 @@ body.he-print .wk button{display:none}
 #welcome .wl-go:focus-visible,#welcome .wl-lang:focus-visible{outline:3px solid #fff;outline-offset:2px}
 #welcome .wl-lang{position:absolute;right:0;top:-8px;min-width:44px;min-height:44px;border:1px solid #ffffff80;border-radius:999px;background:transparent;color:#fff;font-weight:700;cursor:pointer}
 @keyframes wlfade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:reduce){#welcome{animation:none}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chip{min-height:40px;border-radius:20px;padding:6px 12px;background:#e6ebf2;color:#14365d;font-weight:600;border:1px solid #d5dbe6;font-size:13px}.chip.on{background:#14365d;color:#fff;border-color:#14365d}
+.cx{border-left:4px solid #f9c74f}.cx .cm{margin:6px 0;line-height:1.4}.cx small{color:#556}
+.cxtags{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.cxtag{display:flex;align-items:center;gap:6px;background:#f4f7fb;border-radius:999px;padding:3px 10px 3px 4px;font-size:13px;font-weight:600}
+.brsrc{font-size:11px;color:#667;margin-top:6px}
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span class="hhq" style="font-weight:800;letter-spacing:.3px;white-space:nowrap">Hotel<span style="color:#f9c74f">HQ</span></span><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
@@ -163,6 +167,7 @@ body.he-print .wk button{display:none}
 
 <script src="fd-coverage.js"></script>
 <script src="data/welcome-messages.js"></script>
+<script src="data/local-recs.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
 // Example directory only. Do not put a live employee roster in this public file.
@@ -725,7 +730,7 @@ function initialsOf(n){const w=String(n||"").trim().split(/\s+/).filter(Boolean)
 function initialsHTML(n,sz){return `<span class=av aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;flex:none;width:${sz}px;height:${sz}px;border-radius:50%;background:#e3e8f0;color:#1f2a44;font-weight:700;font-size:${Math.round(sz*.38)}px;box-sizing:border-box">${escH(initialsOf(n))}</span>`}
 function leader(){return authRole()=="Above Property"||authRole()=="GM"||authRole()=="AGM"}
 const M={home:["🏠","Home"],rooms:["🛏️","Rooms"],insp:["🔍","Inspect"],wo:["🔧","Work Orders"],pm:["🗓️","PMs"],equip:["🔩","Equipment"],pmsch:["📆","PM Schedule"],notes:["📝","Shift Notes"],check:["✅","Checklists"],walk:["🚶","Prop Walk"],inv:["📦","Inventory"],order:["🛒","Ordering"],labor:["⏱️","Labor"],fc:["📈","Forecast"],gmc:["📋","GM Checklists"],my:["👤","My Tasks"],myrooms:["🛏️","My Rooms"],lf:["🧳","Lost & Found"],esc:["🚩","Escalations"],rules:["⚙️","Assign Rules"],line:["📋","Station"],lreq:["📨","Line Staff"],shut:["🚐","Shuttle"],sched:["📅","Schedule"],health:["📉","Room Health"],score:["🧹","Cleaning Scorecard"]};
-const NAV={GM:["home","sched","my","wo","labor"],"Front Desk":["home","sched","my","rooms","notes"],Housekeeping:["home","sched","rooms","insp","esc"],"Housekeeper":["home","sched","myrooms","check"],Maintenance:["home","sched","my","wo","pm","equip","pmsch"],"Shuttle Driver":["home","sched","shut","line"],"House Person":["home","sched","my","line","check"],"Laundry Attendant":["home","sched","my","line","check"],"Breakfast Attendant":[["Guest survey: Breakfast","Encuesta: Desayuno",">=",9.0,8.6,"Month",200],"home","sched","my","line","check"]};
+const NAV={GM:["home","sched","my","wo","labor"],"Front Desk":["home","sched","my","rooms","notes"],Housekeeping:["home","sched","rooms","insp","esc"],"Housekeeper":["home","sched","myrooms","check"],Maintenance:["home","sched","my","wo","pm","equip","pmsch"],"Shuttle Driver":["home","sched","shut","line"],"House Person":["home","sched","my","line","check"],"Laundry Attendant":["home","sched","my","line","check"],"Breakfast Attendant":["home","sched","my","line","check"]};
 const TILES={"Shuttle Driver":["sched","shut","line"],"House Person":["sched","my","line","check"],"Laundry Attendant":["sched","my","line","check"],"Breakfast Attendant":["sched","my","line","check"],GM:["health","score","sched","my","rules","lreq","shut","gmc","rooms","insp","wo","pm","equip","pmsch","notes","check","walk","inv","order","labor","fc"],"Front Desk":["sched","my","shut","lreq","rooms","notes","check","wo","fc"],Housekeeping:["health","score","sched","my","rooms","insp","esc","lf","labor","inv","order","check","lreq"],"Housekeeper":["sched","myrooms","check"],Maintenance:["health","score","sched","my","wo","pm","equip","pmsch","walk","check","inv","order"]};
 const KEY="jrportal_v7";let MEM={},STORE_OK=true;
 function sget(k){try{return window.localStorage.getItem(k)}catch(e){STORE_OK=false;return MEM[k]||null}}
@@ -1136,7 +1141,7 @@ function ensureDemoAlerts(){
 }
 function alertsCard(){
   ensureDemoAlerts();
-  const rows=(S.alerts||[]).filter(a=>a&&!a.acknowledged_at);
+  const rows=(S.alerts||[]).filter(a=>a&&!a.acknowledged_at&&(!a.hotel||a.hotel===S.hotel||authRole()==="Above Property")&&(!a.role||a.role===authRole()||leader())&&(!a.uid||a.uid===S.uid));
   const focus=String(ackParam());
   const list=rows.length?rows.map(a=>{
     const id=String(a.id);
@@ -1220,7 +1225,7 @@ const save=()=>{sset(KEY,JSON.stringify(S));if(sbPush)queuePush()};const D=()=>S
 function go(t){if(meUser()&&t!="home"&&!navFor(S.role).includes(t)&&!tilesFor(S.role).includes(t)&&!(canSeeReports()&&(t==="health"||t==="score")))return;S.tab=t;save();render();scrollTo(0,0)}
 const V={
 home(){const d=D(),r=S.role,ow=d.wo.filter(w=>w.s!="Done").length,dirty=d.rooms.filter(x=>x.s.endsWith("D")).length,low=d.inv.filter(x=>x.oh<x.par*.5).length;
-let k=(r=="GM"&&leader())?`<div class="card"><h3>GM Dashboard</h3><div class="kpi"><div><b>${ow}</b>Open WOs</div><div><b>${dirty}</b>Dirty rooms</div><div><b>${low}</b>Low stock</div><div><b>${d.pm.filter(p=>!pdn(p)).length}</b>PMs due</div><div><b class="${lv()>0?'bad':'good'}">${lv()>0?'+':''}${lv()}</b>Labor var hrs</div><div><b>${d.fc[0].occ}%</b>Occ today</div></div><div class="kpi" style="margin-top:8px" onclick="go('gmc')">${["Daily","Weekly","Monthly"].map(x=>`<div><b>${gpct(x)}%</b>GM ${x}</div>`).join("")}</div></div>${typeof fdCoverageCard==="function"?fdCoverageCard(S.hotel):""}
+let k=(r=="GM"&&leader())?`<div class="card"><h3>GM Dashboard</h3><div class="kpi"><div><b>${ow}</b>Open WOs</div><div><b>${dirty}</b>Dirty rooms</div><div><b>${low}</b>Low stock</div><div><b>${d.pm.filter(p=>!pdn(p)).length}</b>PMs due</div><div><b class="${lv()>0?'bad':'good'}">${lv()>0?'+':''}${lv()}</b>Labor var hrs</div><div><b>${d.fc[0].occ}%</b>Occ today</div><div onclick="go('gi')" style="cursor:pointer"><b class="${typeof giOpen==='function'&&giOpen().length?'bad':'good'}">${typeof giOpen==='function'?giOpen().length:0}</b>${LANG==='es'?'Quejas abiertas':'Guest issues'}</div></div><div class="kpi" style="margin-top:8px" onclick="go('gmc')">${["Daily","Weekly","Monthly"].map(x=>`<div><b>${gpct(x)}%</b>GM ${x}</div>`).join("")}</div></div>${typeof fdCoverageCard==="function"?fdCoverageCard(S.hotel):""}
 ${reportHomeCards()}${missingDataPanel()}
 <div class="card"><h3>Open issues</h3>${d.wo.filter(w=>w.s!="Done").map(w=>`<div class="li" style="flex-wrap:wrap"><span class="pill ${w.p=='High'?'VD':'OD'}">${w.p}</span><span style="flex:1;min-width:0">${w.room}: ${noteHtml("home-"+w.id,w,w.t)}</span></div>`).join("")}</div>`:
 r=="Housekeeping"?hkLeadHome():r=="Housekeeper"?`<div class="card"><h3>${t("Today")} · ${escH(cw())}</h3>${hkProg(cw())}</div>`:LINE.includes(r)?(r=="Shuttle Driver"&&!SHH.includes(S.hotel)?'<div class="card">No shuttle at this property.</div>':`<div class="card"><h3>${t("Today")} · ${roleName(r)}</h3><div class="kpi"><div><b>${r=="Shuttle Driver"?SH().runs.filter(x=>x.st!="Complete").length:myReqs().filter(x=>x.st!="Done").length}</b>${r=="Shuttle Driver"?"Runs left":"Open requests"}</div><div><b>${lpct(r)}%</b>Checklist</div><div><b>${now()}</b>Now</div></div></div>`):`<div class="card"><h3>${t("Today")} · ${roleName(r)}</h3><div class="kpi"><div><b>${d.fc[0].arr}</b>Arrivals</div><div><b>${dirty}</b>Dirty</div><div><b>${ow}</b>Open WOs</div></div></div>`;
@@ -3268,13 +3273,14 @@ loadLang();document.getElementById("app").innerHTML='<div class="card">'+t("Load
 const ES={"Points":"Puntos","My Points":"Mis Puntos","Level":"Nivel","This week":"Esta semana","This month":"Este mes","Leaderboard":"Clasificación","Badges":"Insignias","Streaks":"Rachas","How to earn":"Cómo ganar","Rewards":"Premios","Redeem":"Canjear","Needs GM approval":"Requiere aprobación del GM","Requested":"Solicitado","All departments":"Todos los departamentos","My department":"Mi departamento","Level up!":"¡Subiste de nivel!","Checklist complete!":"¡Lista completada!","pts":"pts","to next level":"para el siguiente nivel","On-time checklists":"Listas a tiempo","On-time clock-in":"Entrada a tiempo","Clean punches":"Marcajes perfectos","App days":"Días en la app","Recent":"Recientes","You":"Tú","Not enough points":"No tienes suficientes puntos","Ticket closed fast!":"¡Orden cerrada rápido!","Delivered by Tremendous":"Entregado por Tremendous","You pick the brand: Amazon, Target, Walmart, restaurants, prepaid Visa and more":"Tú eliges la marca: Amazon, Target, Walmart, restaurantes, Visa prepagada y más","Sent to your email or phone on file":"Se envía a tu correo o teléfono registrado"};
 Object.assign(I18N.es,ES);
 const LV=[[0,"Rookie","Novato"],[250,"Team Member","Miembro del Equipo"],[750,"Pro","Profesional"],[1500,"Star","Estrella"],[3000,"All-Star","Súper Estrella"],[5000,"Captain","Capitán"],[8000,"Legend","Leyenda"]];
-const BADGES=[["On-Time Streak","Racha a Tiempo","🗓️",[5,10,30],"ck"],["Punctual","Puntual","⏰",[5,10,30],"ci"],["Clean Punches","Marcajes Perfectos","✅",[5,10,30],"pu"],["Perfect Week","Semana Perfecta","🌟",[1,4,12],"pw"],["Perfect Month","Mes Perfecto","🏆",[1,3,6],"pm"],["Team Player","Compañero de Equipo","🤝",[5,25,75],"hp"],["Fast Fixer","Reparador Rápido","⚡",[10,50,150],"ft"],["Spotless","Impecable","✨",[10,50,150],"ip"]];
+const BADGES=[["On-Time Streak","Racha a Tiempo","🗓️",[5,10,30],"ck"],["Punctual","Puntual","⏰",[5,10,30],"ci"],["Clean Punches","Marcajes Perfectos","✅",[5,10,30],"pu"],["Perfect Week","Semana Perfecta","🌟",[1,4,12],"pw"],["Perfect Month","Mes Perfecto","🏆",[1,3,6],"pm"],["Team Player","Compañero de Equipo","🤝",[5,25,75],"hp"],["Fast Fixer","Reparador Rápido","⚡",[10,50,150],"ft"],["Spotless","Impecable","✨",[10,50,150],"ip"],["Guest Favorite","Favorito de los Huéspedes","💌",[1,3,10],"gc"]];
 const TIER=["🥉","🥈","🥇"];
-const RULES=[["Checklist completed","Lista completada",10],["…on time","…a tiempo",5],["…all items done","…todos los puntos",5],["Urgent ticket ≤1h / ≤4h","Urgente ≤1h / ≤4h","25 / 10"],["High ≤4h / ≤24h","Alta ≤4h / ≤24h","20 / 10"],["Normal ≤24h / ≤72h","Normal ≤24h / ≤72h","15 / 5"],["Photo on ticket","Foto en la orden",2],["Room passed inspection","Habitación aprobada",5],["Room failed inspection","Habitación reprobada",-5],["Daily check-in / 7-day streak","Entrada diaria / racha 7 días","2 / 15"],["Shift note","Nota de turno",3],["Extra room helped","Habitación extra",5],["Guest cleanliness 10","Limpieza 10 del huésped",25],["Perfect week / month","Semana / mes perfecto","50 / 200"]];
+const RULES=[["Checklist completed","Lista completada",10],["…on time","…a tiempo",5],["…all items done","…todos los puntos",5],["Urgent ticket ≤1h / ≤4h","Urgente ≤1h / ≤4h","25 / 10"],["High ≤4h / ≤24h","Alta ≤4h / ≤24h","20 / 10"],["Normal ≤24h / ≤72h","Normal ≤24h / ≤72h","15 / 5"],["Photo on ticket","Foto en la orden",2],["Room passed inspection","Habitación aprobada",5],["Room failed inspection","Habitación reprobada",-5],["Daily check-in / 7-day streak","Entrada diaria / racha 7 días","2 / 15"],["Shift note","Nota de turno",3],["Tagged on a guest compliment","Etiquetado en un cumplido de huésped","50 (GM sets)"],["Extra room helped","Habitación extra",5],["Guest cleanliness 10","Limpieza 10 del huésped",25],["Perfect week / month","Semana / mes perfecto","50 / 200"]];
 const FIRST=["Ana","Luis","Maria","Kevin","Rosa","Jose","Tina","Omar","Sofia","Marcus","Lupe","Dev"];
 const REWARDS=[5,10,25,50].map(d=>["$"+d+" gift card","Tarjeta de regalo $"+d,d*50]);
 function KEY(){return "jrpts_"+S.hotel+"_"+((meUser()||{}).id||"x")}
-function P(){let p;try{p=JSON.parse(localStorage.getItem(KEY()))}catch(e){}if(!p){const r=(s=>()=>(s=(s*9301+49297)%233280)/233280)(KEY().length*77+S.hotel.charCodeAt(3));p={xp:600+Math.floor(r()*900),wk:40+Math.floor(r()*80),mo:180+Math.floor(r()*200),st:{ck:7,ci:4,pu:12,pw:1,pm:0,hp:6,ft:3,ip:14,app:5},log:[],red:[],last:"",ckd:{},woc:0}}return p}
+function Pfor(key,hotel){let p;try{p=JSON.parse(localStorage.getItem(key))}catch(e){}if(!p){const r=(s=>()=>(s=(s*9301+49297)%233280)/233280)(key.length*77+hotel.charCodeAt(3));p={xp:600+Math.floor(r()*900),wk:40+Math.floor(r()*80),mo:180+Math.floor(r()*200),st:{ck:7,ci:4,pu:12,pw:1,pm:0,hp:6,ft:3,ip:14,app:5},log:[],red:[],last:"",ckd:{},woc:0}}return p}
+function P(){return Pfor(KEY(),S.hotel)}
 function SV(p){try{localStorage.setItem(KEY(),JSON.stringify(p))}catch(e){}}
 function lvl(xp){let i=0;LV.forEach((l,j)=>{if(xp>=l[0])i=j});return i}
 function nm(l){return LANG==="es"?l[2]:l[1]}
@@ -3283,6 +3289,8 @@ window.ptsAward=function(n,en,es,big){if(gamifyOff())return;const p=P(),before=l
   if(after>before){p.xp+=LV.length*0+25*after;SV(p);setTimeout(()=>{confetti();window.avLevelUp&&avLevelUp();ptsToast("🎉 "+t("Level up!")+" "+t("Level")+" "+(after+1)+" · "+nm(LV[after]),3500)},900)}};
 function ptsToast(msg,ms){if(gamifyOff())return;let el=document.getElementById("ptsToast");if(!el){el=document.createElement("div");el.id="ptsToast";el.style.cssText="position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);pointer-events:none;background:#1f2a44;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;z-index:9999;box-shadow:0 4px 14px #0004;transition:opacity .3s;max-width:92vw;text-align:center";document.body.appendChild(el)}el.textContent=msg;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,ms||2200)}
 function confetti(){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;if(window.funBurst){window.funBurst();return}const c=document.createElement("canvas");c.style.cssText="position:fixed;inset:0;pointer-events:none;z-index:9998";c.width=innerWidth;c.height=innerHeight;document.body.appendChild(c);const x=c.getContext("2d"),cols=["#f94144","#f8961e","#f9c74f","#90be6d","#43aa8b","#577590"],ps=Array.from({length:140},()=>({x:c.width/2,y:c.height/3,vx:(Math.random()-.5)*12,vy:Math.random()*-12-3,s:4+Math.random()*5,c:cols[Math.floor(Math.random()*6)],r:Math.random()*6}));let f=0;(function a(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.35;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});if(++f<110)requestAnimationFrame(a);else c.remove()})()}
+// Credit points/stat to another associate (e.g. tagged on a guest compliment). Works for any hotel's demo store; no toast for the giver.
+window.ptsAwardTo=function(uid,hotel,n,en,es,stat){if(!uid||!hotel)return;const key="jrpts_"+hotel+"_"+uid,p=Pfor(key,hotel),before=lvl(p.xp);p.xp+=n;p.wk+=n;p.mo+=n;if(stat)for(const k in stat)p.st[k]=(p.st[k]||0)+stat[k];p.log.unshift([new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),en,es,n]);p.log=p.log.slice(0,15);const after=lvl(p.xp);if(after>before)p.xp+=25*after;try{localStorage.setItem(key,JSON.stringify(p))}catch(e){}};
 window.ptsToast=ptsToast;window.ptsLevel=()=>lvl(P().xp);window.ptsStats=()=>P().st;
 window.ptsCard=function(){if(gamifyOff())return "";const p=P(),i=lvl(p.xp),nx=LV[i+1],pct=nx?Math.round((p.xp-LV[i][0])/(nx[0]-LV[i][0])*100):100;
   return `<div class=card onclick="go('pts')" style="cursor:pointer;background:linear-gradient(135deg,#fff7e0,#e8f0ff)"><div style="display:flex;justify-content:space-between;align-items:center"><b>⭐ ${t("My Points")}</b><span style="background:#1f2a44;color:#fff;border-radius:999px;padding:2px 10px;font-size:13px">${t("Level")} ${i+1} · ${escH(nm(LV[i]))}</span></div>
@@ -3695,4 +3703,321 @@ const _hm=V.home;V.home=function(){const u=meUser()||{};if(gamifyOff())return `<
 window.avGrid=function(){return Object.keys(CRED).map(s=>avHTML(null,72,{...rnd("grid"+s,s),frame:["","gold","silver","neon","rainbow","double"][hash(s)%6],pin:"",role:ROLEB[hash(s)%ROLEB.length][0]})).join("")};
 })();
 /*AVATAR_END*/
+/*CARE_CORE_START*/
+// Shared helpers for the guest-care features (compliments, issues, lost & found, local tips, rush rooms, daily briefing).
+// Demo data lives in localStorage with the rest of the app state; everything is per hotel (S.h[hotel]). Live tables are a TODO.
+function bx(en,es){return LANG==="es"?es:en}
+function careLead(){const r=authRole();return r==="GM"||r==="AGM"||r==="Above Property"}
+function careStaff(){return ST().filter(s=>s.role!=="Above Property")}
+function careUid(name){const u=USERS.find(x=>x.name===name&&x.hotel===S.hotel);return u?u.id:""}
+function careNextId(a){return (a||[]).reduce((m,x)=>Math.max(m,+x.id||0),0)+1}
+function careDate(iso){const d=new Date(iso);return isNaN(d)?"":d.toLocaleDateString(localeTag(),{month:"short",day:"numeric"})}
+function careMonth(iso){const d=new Date(iso),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)}
+function careAgo(n){return new Date(Date.now()-n*864e5).toISOString()}
+function careAlert(title,body,o){ensureDemoAlerts();o=o||{};S.alerts.unshift(Object.assign({id:"c"+Date.now().toString(36)+Math.floor(Math.random()*1e4),title,body,hotel:S.hotel},o))}
+function careSet(k,v){S.care=S.care||{};S.care[k]=v}
+function careGet(k,def){return (S.care&&S.care[k]!=null)?S.care[k]:def}
+function careAv(name,sz){return window.avHTML?avHTML(name,sz):""}
+/*CARE_CORE_END*/
+/*COMP_START*/
+// Guest compliments wall. Logged by GM / front desk; tagged associates get bonus points (GM-set, default 50) and the Guest Favorite badge.
+const COMP_SRC=[["survey","Survey","Encuesta"],["review","Online review","Reseña en línea"],["person","In person","En persona"],["email","Email","Correo"]];
+function compSrcName(k){const x=COMP_SRC.find(y=>y[0]===k)||COMP_SRC[2];return bx(x[1],x[2])}
+function compList(){const d=D();if(!d.comp){const st=careStaff().filter(s=>s.role==="Front Desk"||s.role==="Housekeeper"||s.role==="Breakfast Attendant");const nm=i=>(st[i%Math.max(1,st.length)]||{n:"Team"}).n;d.comp=[{id:1,at:careAgo(1),src:"survey",txt:"The front desk remembered our names and had our room ready early. We felt so welcome.",txtEs:"La recepción recordó nuestros nombres y tuvo la habitación lista temprano. Nos sentimos muy bienvenidos.",tags:[nm(0)],by:"",ex:1},{id:2,at:careAgo(3),src:"review",txt:"Spotless room and a thoughtful note on the pillow. Best night's sleep of our trip.",txtEs:"Habitación impecable y una nota amable en la almohada. La mejor noche de sueño del viaje.",tags:[nm(1)],by:"",ex:1},{id:3,at:careAgo(6),src:"person",txt:"Breakfast was hot and fresh, and she made my daughter's day with a smile.",txtEs:"El desayuno estuvo caliente y fresco, y ella alegró el día de mi hija con una sonrisa.",tags:[nm(2),nm(0)],by:"",ex:1}]}return d.comp}
+function compPts(){const d=D();return d.compPts==null?50:d.compPts}
+function compCanLog(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"}
+function compForm(){S.cmp=S.cmp||{src:"survey",txt:"",tags:[]};return S.cmp}
+function compSrcSet(k){compForm().src=k;render()}
+function compTagTog(n){const f=compForm(),i=f.tags.indexOf(n);if(i<0)f.tags.push(n);else f.tags.splice(i,1);render()}
+function compPtsSet(v){const n=Math.max(0,Math.min(500,Math.round(+v||0)));D().compPts=n;save();render()}
+function compPost(){const f=compForm(),txt=($("cmTxt")&&$("cmTxt").value||f.txt||"").trim();f.txt=txt;
+  if(!txt){const e=$("cmErr");if(e)e.textContent=bx("Add what the guest said.","Escribe lo que dijo el huésped.");return}
+  if(!f.tags.length){const e=$("cmErr");if(e)e.textContent=bx("Tag at least one associate.","Etiqueta al menos a un asociado.");return}
+  const d=D(),pts=compPts(),tags=f.tags.slice();
+  compList().unshift({id:careNextId(d.comp),at:new Date().toISOString(),src:f.src,txt,tags,by:cw(),pts});
+  tags.forEach(n=>{const u=careUid(n);if(window.ptsAwardTo)ptsAwardTo(u,S.hotel,pts,"Guest compliment","Cumplido de huésped",{gc:1});
+    if(u)careAlert(bx("💌 A guest complimented you!","💌 ¡Un huésped te felicitó!"),bx("+"+pts+" pts and the Guest Favorite badge. Thank you for making guests feel welcome.","+"+pts+" pts y la insignia Favorito de los Huéspedes. Gracias por hacer sentir bienvenidos a los huéspedes."),{uid:u})});
+  S.cmp={src:f.src,txt:"",tags:[]};save();showToast(bx("Posted. "+tags.length+" associate(s) got +"+pts+" pts.","Publicado. "+tags.length+" asociado(s) recibieron +"+pts+" pts."));render()}
+function compItem(c){const txt=LANG==="es"&&c.txtEs?c.txtEs:c.txt;
+  return `<div class="card cx"><div class="row" style="margin:0"><span class="pill VC" style="flex:0 0 auto">${escH(compSrcName(c.src))}</span><small style="flex:1;text-align:right">${escH(careDate(c.at))}${c.ex?` · <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}</small></div><div class="cm raw">“${escH(txt)}”</div><div class="cxtags">${c.tags.map(n=>`<span class="cxtag">${careAv(n,26)}${escH(String(n).split(" ")[0])}</span>`).join("")}</div>${c.by?`<small>${bx("Logged by","Registrado por")} ${escH(String(c.by).split(" ")[0])}</small>`:""}${c.pts?` <small>· +${c.pts} pts</small>`:""}</div>`}
+function compMonthTable(){const mk=careMonth(new Date().toISOString()),pm=careMonth(new Date(new Date().getFullYear(),new Date().getMonth()-1,15).toISOString()),L2=compList(),cnt=(m)=>{const o={};L2.filter(c=>careMonth(c.at)===m).forEach(c=>c.tags.forEach(n=>o[n]=(o[n]||0)+1));return o},a=cnt(mk),b=cnt(pm),names=[...new Set([...Object.keys(a),...Object.keys(b)])].sort((x,y)=>(a[y]||0)-(a[x]||0)||x.localeCompare(y));
+  return `<div class="card"><h3>${bx("Compliments by associate","Cumplidos por asociado")}</h3><table><tr><th>${bx("Associate","Asociado")}</th><th>${bx("This month","Este mes")}</th><th>${bx("Last month","Mes pasado")}</th></tr>${names.map(n=>`<tr><td><span style="display:flex;align-items:center;gap:6px">${careAv(n,26)}${escH(n)}</span></td><td><b>${a[n]||0}</b></td><td>${b[n]||0}</td></tr>`).join("")||`<tr><td colspan="3">${bx("No compliments logged yet.","Aún no hay cumplidos.")}</td></tr>`}</table><small>${bx("Total this month","Total este mes")}: <b>${Object.values(a).reduce((x,y)=>x+y,0)}</b> ${bx("tags","etiquetas")}</small></div>`}
+M.comp=["💌","Compliments"];
+V.comp=function(){const f=compForm(),staff=careStaff(),mgr=authRole()==="GM"||authRole()==="AGM",L2=compList();
+  const form=compCanLog()?`<div class="card"><h3>${bx("Log a guest compliment","Registrar un cumplido de huésped")}</h3><small>${bx("Where did it come from?","¿De dónde vino?")}</small><div class="chips" role="group">${COMP_SRC.map(x=>`<button type="button" class="chip ${f.src===x[0]?"on":""}" aria-pressed="${f.src===x[0]}" onclick="compSrcSet('${x[0]}')">${bx(x[1],x[2])}</button>`).join("")}</div>
+  <textarea id="cmTxt" style="width:100%;min-height:76px" placeholder="${escH(bx("What did the guest say?","¿Qué dijo el huésped?"))}" oninput="compForm().txt=this.value">${escH(f.txt)}</textarea>
+  <small>${bx("Tag the associates (each gets","Etiqueta a los asociados (cada uno recibe")} +${compPts()} pts ${bx("and the Guest Favorite badge)","y la insignia Favorito de los Huéspedes)")}</small><div class="chips">${staff.map(s=>`<button type="button" class="chip ${f.tags.includes(s.n)?"on":""}" aria-pressed="${f.tags.includes(s.n)}" onclick="compTagTog(${escH(JSON.stringify(s.n)).replace(/"/g,"&quot;")})">${escH(String(s.n).split(" ")[0])} <small>${escH(shortRole(s.role))}</small></button>`).join("")}</div>
+  <div class="bad" id="cmErr" role="alert"></div><button class="btn" style="width:100%" onclick="compPost()">${bx("Post compliment","Publicar cumplido")}</button></div>`:"";
+  const cfg=mgr?`<div class="card"><h3>${bx("Bonus points","Puntos de bono")}</h3><div class="row"><input type="number" min="0" max="500" id="cmPts" value="${compPts()}" aria-label="${escH(bx("Bonus points per tagged associate","Puntos por asociado etiquetado"))}"><button class="btn2" style="flex:0 0 90px" onclick="compPtsSet($('cmPts').value)">${bx("Save","Guardar")}</button></div><small>${bx("Points each tagged associate gets. Default 50.","Puntos que recibe cada asociado etiquetado. Por defecto 50.")}</small></div>`:"";
+  return `<h2>💌 ${bx("Guest Compliments","Cumplidos de Huéspedes")}</h2>${form}${careLead()?compMonthTable():""}${cfg}<div class="card"><h3>${bx("Compliment wall","Muro de cumplidos")} · ${escH(S.hotel)}</h3><small>${bx("Real guest words, thanks to our team.","Palabras reales de huéspedes, gracias a nuestro equipo.")}</small></div>${L2.slice(0,20).map(compItem).join("")}`};
+function compHomeCard(){const c=compList()[0];if(!c)return "";return `<div class="card" onclick="go('comp')" style="cursor:pointer"><b>💌 ${bx("Guest compliments","Cumplidos de huéspedes")}</b>${compItem(c).replace('class="card cx"','class="cx" style="margin-top:8px;padding-left:10px"')}<small>${bx("See the wall ›","Ver el muro ›")}</small></div>`}
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("comp"))TILES[r].push("comp")});
+const _homeComp=V.home;V.home=function(){return compHomeCard()+_homeComp()};
+const _funComp=V.fun;V.fun=function(){const L2=compList().slice(0,2);return `<div class="card" onclick="go('comp')" style="cursor:pointer"><b>💌 ${bx("Guest compliments","Cumplidos de huéspedes")}</b>${L2.map(c=>compItem(c).replace('class="card cx"','class="cx" style="margin-top:8px;padding-left:10px"')).join("")}<small>${bx("See the wall ›","Ver el muro ›")}</small></div>`+_funComp()};
+/*COMP_END*/
+/*GI_START*/
+// Guest issue log: front desk logs in ~10 s, routes to the owning department queue, maintenance also becomes a work order.
+const GI_CATS=[["room","Room","Habitación","Housekeeping"],["clean","Cleanliness","Limpieza","Housekeeping"],["noise","Noise","Ruido","Front Desk"],["maint","Maintenance","Mantenimiento","Maintenance"],["bfast","Breakfast","Desayuno","Breakfast"],["staff","Staff","Personal","GM"],["bill","Billing","Facturación","GM"],["other","Other","Otro","Front Desk"]];
+const GI_SEV=[["low","Low","Baja"],["med","Medium","Media"],["high","High","Alta"]];
+const GI_ST=[["open","Open","Abierta"],["prog","In progress","En proceso"],["done","Resolved","Resuelta"]];
+const GI_REC=[["none","None yet","Ninguna aún"],["apology","Apology","Disculpa"],["amenity","Amenity / snack","Cortesía / bocadillo"],["points","Points / loyalty","Puntos / lealtad"],["discount","Discount","Descuento"],["comp","Room comped","Habitación de cortesía"],["other","Other","Otro"]];
+const GI_DEPT={"Housekeeping":["Housekeeping","Ama de llaves"],"Maintenance":["Maintenance","Mantenimiento"],"Breakfast":["Breakfast","Desayuno"],"Front Desk":["Front Desk","Recepción"],"GM":["Management","Gerencia"]};
+const GI_ROLEOF={Housekeeping:"Housekeeping",Maintenance:"Maintenance",Breakfast:"Breakfast Attendant",GM:"GM","Front Desk":"Front Desk"};
+function giFind(a,k){return a.find(x=>x[0]===k)||a[0]}
+function giCatName(k){const x=giFind(GI_CATS,k);return bx(x[1],x[2])}
+function giSevName(k){const x=giFind(GI_SEV,k);return bx(x[1],x[2])}
+function giStName(k){const x=giFind(GI_ST,k);return bx(x[1],x[2])}
+function giRecName(k){const x=giFind(GI_REC,k);return bx(x[1],x[2])}
+function giDeptName(k){const x=GI_DEPT[k]||GI_DEPT["Front Desk"];return bx(x[0],x[1])}
+function giYmd(n){const d=new Date(Date.now()+(n||0)*864e5),p=x=>String(x).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}
+function giMyDept(){const r=S.role;return r==="Housekeeping"||r==="Housekeeper"?"Housekeeping":r==="Maintenance"?"Maintenance":r==="Breakfast Attendant"?"Breakfast":r==="Front Desk"?"Front Desk":""}
+function giCanLog(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"}
+function giCanWork(){return authRole()!=="Above Property"}
+function giList(){const d=D();if(!d.gi){d.gi=[];
+  const wid=careNextId(d.wo||[]);d.wo=d.wo||[];d.wo.push({id:wid,room:"108",t:"Guest issue: AC is loud and not cooling (guest reported at desk)",p:"Med",s:"In Progress",photo:"",comments:[],gi:2});
+  d.gi=[{id:1,room:"214",cat:"noise",sev:"high",note:"Loud party next door after 11 PM, guest could not sleep.",st:"open",rec:"none",dep:giYmd(1),dept:"Front Desk",at:careAgo(0.2),by:"",ex:1},
+  {id:2,room:"108",cat:"maint",sev:"med",note:"AC is loud and not cooling.",st:"prog",rec:"amenity",dep:giYmd(0),dept:"Maintenance",at:careAgo(0.4),by:"",wo:wid,ex:1},
+  {id:3,room:"305",cat:"bfast",sev:"low",note:"Waffle station was out of batter at 8:30.",st:"done",rec:"apology",dep:giYmd(-1),dept:"Breakfast",at:careAgo(1.5),by:"",ex:1}]}return d.gi}
+function giForm(){S.gif=S.gif||{room:"",cat:"room",sev:"med",note:"",dep:"",rec:"none"};return S.gif}
+function giSet(k,v){giForm()[k]=v;render()}
+function giSync(){const f=giForm();["gRoom","gNote","gDep"].forEach(id=>{const e=$(id);if(e)f[id==="gRoom"?"room":id==="gNote"?"note":"dep"]=e.value})}
+function giPick(k,v){giSync();giForm()[k]=v;render()}
+function giPost(){giSync();const f=giForm();
+  if(!f.room.trim()||!f.note.trim()){const e=$("gErr");if(e)e.textContent=bx("Add the room and a short note.","Agrega la habitación y una nota corta.");return}
+  const d=D(),list=giList(),cat=giFind(GI_CATS,f.cat),id=careNextId(list),row={id,room:f.room.trim(),cat:f.cat,sev:f.sev,note:f.note.trim(),st:"open",rec:f.rec,dep:f.dep||"",dept:cat[3],at:new Date().toISOString(),by:cw(),photo:ph||""};
+  if(f.cat==="maint"){const wid=careNextId(d.wo);d.wo.unshift({id:wid,room:row.room,t:"Guest issue: "+row.note+" (logged by "+cw()+")",p:f.sev==="high"?"High":f.sev==="low"?"Low":"Med",s:"Open",photo:ph||"",comments:[],gi:id});row.wo=wid}
+  list.unshift(row);
+  const to=GI_ROLEOF[row.dept];if(to&&to!==authRole())careAlert(bx("🛎️ New guest issue · Rm "+row.room,"🛎️ Nueva queja de huésped · Hab. "+row.room),giCatName(row.cat)+" · "+giSevName(row.sev)+": "+row.note,{role:to});
+  S.gif={room:"",cat:"room",sev:"med",note:"",dep:"",rec:"none"};ph="";phFile=null;save();showToast(bx("Issue logged and sent to "+giDeptName(row.dept),"Queja registrada y enviada a "+giDeptName(row.dept)));render()}
+function giStatus(id,st){const g=giList().find(x=>x.id===id);if(!g)return;g.st=st;if(st==="done")g.doneAt=new Date().toISOString();save();render()}
+function giRecSet(id,v){const g=giList().find(x=>x.id===id);if(!g)return;g.rec=v;save();render()}
+function giDepDay(g){if(!g.dep)return 99;const a=new Date(g.dep+"T00:00:00"),b=new Date(giYmd(0)+"T00:00:00");return Math.round((a-b)/864e5)}
+function giOpen(){return giList().filter(g=>g.st!=="done")}
+function giDue(){return giOpen().filter(g=>giDepDay(g)<=1&&giDepDay(g)>=0).sort((a,b)=>giDepDay(a)-giDepDay(b))}
+function giDepLabel(g){const n=giDepDay(g);return n===99?"":n===0?bx("departs today","sale hoy"):n===1?bx("departs tomorrow","sale mañana"):n<0?bx("departed","ya salió"):bx("departs "+g.dep.slice(5),"sale "+g.dep.slice(5))}
+const GI_SEVC={low:"VC",med:"OD",high:"VD"};
+function giCard(g){const rem=g.st!=="done"&&giDepDay(g)<=1&&giDepDay(g)>=0,wo=g.wo&&(D().wo||[]).find(w=>w.id===g.wo),can=giCanWork();
+  return `<div class="card ${rem?"miss-red":""}" style="${rem?"":"border-left:4px solid #c0262d"}"><div class="row" style="margin:0"><b style="flex:0 0 auto">🛏️ ${bx("Rm","Hab.")} ${escH(g.room)}</b><span class="pill ${GI_SEVC[g.sev]}" style="flex:0 0 auto">${giSevName(g.sev)}</span><span class="pill ${g.st==="done"?"VC":g.st==="prog"?"OC":"VD"}" style="flex:0 0 auto">${giStName(g.st)}</span>${g.ex?`<span class="pill OD" style="flex:0 0 auto">${bx("EXAMPLE","EJEMPLO")}</span>`:""}</div>
+  <div style="margin:6px 0"><span class="pill RFI">${giCatName(g.cat)}</span> <small>→ ${giDeptName(g.dept)}</small></div><div class="raw">${escH(g.note)}</div>${g.photo?`<img class="prev" alt="" src="${g.photo}">`:""}
+  <small>${escH(careDate(g.at))}${g.by?" · "+escH(String(g.by).split(" ")[0]):""}${g.dep?" · 🧳 "+escH(giDepLabel(g)):""}</small>
+  ${rem?`<div class="bad" style="margin-top:4px">⏰ ${bx("Follow up with this guest before they check out.","Da seguimiento a este huésped antes de que salga.")}</div>`:""}
+  ${wo?`<div style="margin-top:6px"><button class="btn2" onclick="go('wo')">🔧 ${bx("Work order","Orden de trabajo")} #${wo.id} · ${escH(wo.s)} ›</button></div>`:""}
+  <div class="row" style="margin-top:6px"><label style="flex:0 0 auto"><small>${bx("Recovery offered","Compensación ofrecida")}</small></label><select ${can?"":"disabled"} aria-label="${escH(bx("Recovery offered","Compensación ofrecida"))}" onchange="giRecSet(${g.id},this.value)">${GI_REC.map(r=>`<option value="${r[0]}" ${g.rec===r[0]?"selected":""}>${bx(r[1],r[2])}</option>`).join("")}</select></div>
+  ${can?`<div class="chips">${GI_ST.map(s=>`<button class="chip ${g.st===s[0]?"on":""}" aria-pressed="${g.st===s[0]}" onclick="giStatus(${g.id},'${s[0]}')">${bx(s[1],s[2])}</button>`).join("")}</div>`:""}</div>`}
+M.gi=["🛎️","Guest Issues"];
+V.gi=function(){const f=giForm(),all=giList(),mine=giMyDept(),lead=careLead(),sel=S.giv||(lead?"all":"mine");
+  const form=giCanLog()?`<div class="card"><h3>${bx("Log a guest issue","Registrar queja de huésped")}</h3><div class="row"><input id="gRoom" inputmode="numeric" placeholder="${escH(bx("Room #","Hab. #"))}" value="${escH(f.room)}" aria-label="${escH(bx("Room number","Número de habitación"))}"><input id="gDep" type="date" value="${escH(f.dep)}" aria-label="${escH(bx("Guest departure date (optional)","Fecha de salida (opcional)"))}"></div><small>${bx("Departure date is optional; it powers the follow-up reminder.","La fecha de salida es opcional; activa el recordatorio de seguimiento.")}</small>
+  <div class="chips" role="group">${GI_CATS.map(c=>`<button type="button" class="chip ${f.cat===c[0]?"on":""}" aria-pressed="${f.cat===c[0]}" onclick="giPick('cat','${c[0]}')">${bx(c[1],c[2])}</button>`).join("")}</div>
+  <div class="chips" role="group">${GI_SEV.map(c=>`<button type="button" class="chip ${f.sev===c[0]?"on":""}" aria-pressed="${f.sev===c[0]}" onclick="giPick('sev','${c[0]}')">${bx(c[1],c[2])}</button>`).join("")}</div>
+  <textarea id="gNote" style="width:100%;min-height:64px" placeholder="${escH(bx("Short note","Nota corta"))}">${escH(f.note)}</textarea>
+  <div class="row"><select id="gRec" onchange="giPick('rec',this.value)" aria-label="${escH(bx("Recovery offered","Compensación ofrecida"))}">${GI_REC.map(r=>`<option value="${r[0]}" ${f.rec===r[0]?"selected":""}>${bx("Recovery: ","Compensación: ")}${bx(r[1],r[2])}</option>`).join("")}</select></div>
+  <div class="row">${photoField()}</div>${photoPrev()}<small>${bx("Goes to","Va a")}: <b>${giDeptName(giFind(GI_CATS,f.cat)[3])}</b>${f.cat==="maint"?" + "+bx("work order","orden de trabajo"):""}</small>
+  <div class="bad" id="gErr" role="alert"></div><button class="btn" style="width:100%" onclick="giPost()">${bx("Log issue","Registrar queja")}</button></div>`:"";
+  const rows=sel==="mine"&&mine?all.filter(g=>g.dept===mine):sel!=="all"&&sel!=="mine"?all.filter(g=>g.dept===sel):all,open=rows.filter(g=>g.st!=="done"),done=rows.filter(g=>g.st==="done");
+  const tabs=`<div class="chips">${mine&&!lead?`<button class="chip ${sel==="mine"?"on":""}" onclick="S.giv='mine';render()">${bx("My queue","Mi cola")} (${all.filter(g=>g.dept===mine&&g.st!=="done").length})</button>`:""}<button class="chip ${sel==="all"?"on":""}" onclick="S.giv='all';render()">${bx("All","Todas")} (${giOpen().length})</button>${Object.keys(GI_DEPT).map(k=>`<button class="chip ${sel===k?"on":""}" onclick="S.giv='${k}';render()">${giDeptName(k)} (${all.filter(g=>g.dept===k&&g.st!=="done").length})</button>`).join("")}</div>`;
+  const due=giDue();
+  return `<h2>🛎️ ${bx("Guest Issues","Quejas de Huéspedes")}</h2>${due.length&&giCanWork()?`<div class="miss-banner">⏰ ${due.length} ${bx("guest(s) with open issues leave today/tomorrow — follow up","huésped(es) con quejas abiertas salen hoy/mañana — dar seguimiento")}</div>`:""}${form}<div class="card"><h3>${bx("Department queues","Colas por departamento")}</h3>${tabs}</div>${open.map(giCard).join("")||`<div class="card"><small>${bx("No open issues here. 🎉","Sin quejas abiertas aquí. 🎉")}</small></div>`}${done.length?`<div class="card"><h3>${bx("Resolved","Resueltas")} (${done.length})</h3></div>${done.map(giCard).join("")}`:""}`};
+function giHomeCard(){const r=S.role,due=giDue(),mine=giMyDept(),n=mine?giList().filter(g=>g.dept===mine&&g.st!=="done").length:0;
+  if(!(giCanWork()&&(authRole()==="GM"||authRole()==="AGM"||authRole()==="Front Desk"||n)))return "";
+  const lines=[];if(due.length)lines.push(`<div class="miss-banner" style="margin:6px 0 0">⏰ ${due.length} ${bx("guest(s) with open issues depart soon — follow up","huésped(es) con quejas abiertas salen pronto — dar seguimiento")}</div>`);
+  if(authRole()==="Front Desk"||authRole()==="GM"||authRole()==="AGM"){}else if(n)lines.push(`<div style="margin-top:6px">${n} ${bx("open in your queue","abiertas en tu cola")}</div>`);
+  if(!lines.length&&!(authRole()==="Front Desk"))return "";
+  return `<div class="card" onclick="go('gi')" style="cursor:pointer"><b>🛎️ ${bx("Guest issues","Quejas de huéspedes")}</b> <span class="badge ${giOpen().length?"":"zero"}">${giOpen().length}</span>${lines.join("")}<br><small>${giCanLog()?bx("Log or review ›","Registrar o revisar ›"):bx("Open my queue ›","Abrir mi cola ›")}</small></div>`}
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("gi")&&!["Shuttle Driver","House Person","Laundry Attendant"].includes(r))TILES[r].push("gi")});
+const _homeGi=V.home;V.home=function(){return giHomeCard()+_homeGi()};
+/*GI_END*/
+/*LF_START*/
+// Lost & found v2: photo, where/room/found by/date, guest contact log, status (stored/claimed/shipped/disposed),
+// release-to + signature checkbox, 90-day disposal reminder, search. Replaces the old simple list (old rows are migrated once).
+const LF_ST=[["stored","Stored","Guardado"],["claimed","Claimed","Reclamado"],["shipped","Shipped","Enviado"],["disposed","Disposed","Desechado"]];
+const LF_DAYS=90,LF_SOON=75;
+function lfStName(k){const x=LF_ST.find(y=>y[0]===k)||LF_ST[0];return bx(x[1],x[2])}
+function lfList(){const d=D();if(!d.lfx){const old=Array.isArray(d.lf)?d.lf:[],map={Holding:"stored",Claimed:"claimed",Shipped:"shipped",Disposed:"disposed"};
+  d.lfx=old.map((x,i)=>({id:i+1,photo:"",desc:x.it||"-",where:"",room:String(x.room||""),by:x.by||"",at:careAgo(2+i),st:map[x.st]||"stored",contacts:[],rel:null,ex:1}));
+  const n=()=>careNextId(d.lfx);
+  d.lfx.push({id:n(),photo:"",desc:"Gold ring (small), found by the sink",where:"Bathroom, checked-out room",room:"108",by:"Rosa (EX)",at:careAgo(95),st:"stored",contacts:[{at:careAgo(92),who:"Front desk",how:"call",note:"Left voicemail for the guest"},{at:careAgo(85),who:"Front desk",how:"email",note:"Emailed claim instructions, no reply"}],rel:null,ex:1});
+  d.lfx.push({id:n(),photo:"",desc:"Navy hoodie",where:"Pool deck",room:"",by:"Maria (EX)",at:careAgo(20),st:"claimed",contacts:[{at:careAgo(18),who:"Front desk",how:"call",note:"Guest will pick up"}],rel:{to:"Guest (EXAMPLE)",sig:true,at:careAgo(15)},ex:1});
+  d.lf=d.lf||[]}
+  return d.lfx}
+function lfCanManage(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"||r==="Housekeeping"}
+function lfCanLog(){return authRole()!=="Above Property"}
+function lfAge(x){return Math.floor((Date.now()-new Date(x.at).getTime())/864e5)}
+function lfDueDays(x){return LF_DAYS-lfAge(x)}
+function lfDue(){return lfList().filter(x=>x.st==="stored"&&lfDueDays(x)<=0)}
+function lfSoon(){return lfList().filter(x=>x.st==="stored"&&lfDueDays(x)>0&&lfDueDays(x)<=LF_DAYS-LF_SOON)}
+function lfF(){S.lff=S.lff||{room:"",desc:"",where:"",by:"",date:""};return S.lff}
+function lfSync(){const f=lfF();[["lfDesc","desc"],["lfWhere","where"],["lfRoom","room"],["lfBy","by"],["lfDate","date"]].forEach(([i,k])=>{const e=$(i);if(e)f[k]=e.value})}
+function lfAdd(){lfSync();const f=lfF();if(!f.desc.trim()){const e=$("lfErr");if(e)e.textContent=bx("Add a short description.","Agrega una descripción corta.");return}
+  const list=lfList();list.unshift({id:careNextId(list),photo:ph||"",desc:f.desc.trim(),where:f.where.trim(),room:f.room.trim(),by:f.by.trim()||cw(),at:f.date?new Date(f.date+"T12:00:00").toISOString():new Date().toISOString(),st:"stored",contacts:[],rel:null});
+  S.lff={room:"",desc:"",where:"",by:"",date:""};ph="";phFile=null;save();showToast(bx("Item logged","Artículo registrado"));render()}
+function lfQ(v){S.lfq=v;const e=$("lfList");if(e)e.innerHTML=lfRows()}
+function lfFilt(k){S.lfs=k;render()}
+function lfOpen(id){S.lfo=S.lfo===id?0:id;S.lfrel=0;render()}
+function lfContact(id){const x=lfList().find(y=>y.id===id);if(!x)return;const how=$("lcHow"+id).value,note=$("lcNote"+id).value.trim();x.contacts.push({at:new Date().toISOString(),who:cw(),how,note});save();render()}
+function lfRelForm(id){S.lfrel=S.lfrel===id?0:id;render()}
+function lfRelease(id,kind){const x=lfList().find(y=>y.id===id);if(!x)return;const to=($("lrTo"+id).value||"").trim(),sig=$("lrSig"+id).checked,e=$("lrErr"+id);
+  if(!to){e.textContent=bx("Enter who it is released to.","Escribe a quién se entrega.");return}
+  if(!sig){e.textContent=bx("Check the signature box once the guest has signed.","Marca la casilla cuando el huésped haya firmado.");return}
+  x.st=kind;x.rel={to,sig:true,at:new Date().toISOString(),by:cw(),track:($("lrTrk"+id)&&$("lrTrk"+id).value||"").trim()};S.lfrel=0;save();render()}
+function lfDispose(id){const x=lfList().find(y=>y.id===id);if(!x)return;x.st="disposed";x.rel={to:bx("Disposed per policy","Desechado según política"),sig:false,at:new Date().toISOString(),by:cw()};save();render()}
+function lfHit(x,q){return !q||[x.desc,x.where,x.room,x.by,x.rel&&x.rel.to,x.st,lfStName(x.st)].join(" ").toLowerCase().includes(q.toLowerCase())}
+const LF_HOW={call:["Call","Llamada"],email:["Email","Correo"],text:["Text","Texto"],person:["In person","En persona"]};
+function lfCard(x){const open=S.lfo===x.id,mg=lfCanManage(),due=x.st==="stored"&&lfDueDays(x)<=0,soon=x.st==="stored"&&!due&&lfDueDays(x)<=LF_DAYS-LF_SOON;
+  const flag=due?`<span class="pill VD">${bx("Disposal due","Desechar ya")}</span>`:soon?`<span class="pill OD">${bx("Disposal in","Desechar en")} ${lfDueDays(x)}${bx("d","d")}</span>`:"";
+  let det="";
+  if(open){det=`<div style="margin-top:8px"><small><b>${bx("Guest contact log","Registro de contacto")}</b></small>${x.contacts.map(c=>`<div class="wlpos"><small>${escH(careDate(c.at))} · ${bx(LF_HOW[c.how][0],LF_HOW[c.how][1])} · ${escH(String(c.who).split(" ")[0])}</small><br>${escH(c.note||"")}</div>`).join("")||`<div><small>${bx("No contact attempts yet.","Aún sin intentos de contacto.")}</small></div>`}
+    ${lfCanLog()&&x.st==="stored"?`<div class="row"><select id="lcHow${x.id}" style="flex:0 0 110px" aria-label="${escH(bx("Contact method","Medio de contacto"))}">${Object.keys(LF_HOW).map(k=>`<option value="${k}">${bx(LF_HOW[k][0],LF_HOW[k][1])}</option>`).join("")}</select><input id="lcNote${x.id}" placeholder="${escH(bx("What happened?","¿Qué pasó?"))}"><button class="btn2" style="flex:0 0 64px" onclick="lfContact(${x.id})">+</button></div>`:""}
+    ${x.rel?`<div class="wlpos">${x.st==="disposed"?"🗑️":"✍️"} ${escH(x.rel.to)} · ${escH(careDate(x.rel.at))}${x.rel.sig?" · "+bx("signed","firmado"):""}${x.rel.track?" · "+escH(x.rel.track):""}</div>`:""}
+    ${mg&&x.st==="stored"?`<div class="chips"><button class="chip" onclick="lfRelForm(${x.id})">${bx("Release / ship","Entregar / enviar")}</button>${lfDueDays(x)<=0?`<button class="chip" onclick="lfDispose(${x.id})">${bx("Mark disposed","Marcar desechado")}</button>`:""}</div>`:""}
+    ${S.lfrel===x.id?`<div class="card" style="background:#f4f7fb"><input id="lrTo${x.id}" style="width:100%" placeholder="${escH(bx("Released to (name)","Entregado a (nombre)"))}" aria-label="${escH(bx("Released to","Entregado a"))}"><input id="lrTrk${x.id}" style="width:100%;margin-top:6px" placeholder="${escH(bx("Tracking # if shipped (optional)","# de rastreo si se envía (opcional)"))}"><label class="li"><input type="checkbox" id="lrSig${x.id}"><span>${bx("Recipient signed for the item","El destinatario firmó de recibido")}</span></label><div class="bad" id="lrErr${x.id}" role="alert"></div><div class="row"><button class="btn" onclick="lfRelease(${x.id},'claimed')">${bx("Claimed","Reclamado")}</button><button class="btn" onclick="lfRelease(${x.id},'shipped')">${bx("Shipped","Enviado")}</button></div></div>`:""}</div>`}
+  return `<div class="card" style="padding:10px"><div style="display:flex;gap:10px;align-items:flex-start" onclick="lfOpen(${x.id})">${x.photo?`<img alt="" src="${x.photo}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none">`:`<span style="width:64px;height:64px;border-radius:8px;background:#eef3fa;display:flex;align-items:center;justify-content:center;font-size:28px;flex:none">🧳</span>`}<div style="flex:1;min-width:0"><b class="raw">${escH(x.desc)}</b>${x.ex?` <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}<br><small>${x.room?bx("Rm ","Hab. ")+escH(x.room)+" · ":""}${escH(x.where||"")}</small><br><small>${bx("Found","Encontrado")} ${escH(careDate(x.at))} · ${escH(String(x.by).split(" ")[0])} · ${lfAge(x)}${bx("d ago","d")}</small><div style="margin-top:4px"><span class="pill ${x.st==="stored"?"OC":x.st==="disposed"?"OOO":"VC"}">${lfStName(x.st)}</span> ${flag} ${x.contacts.length?`<small>📞 ${x.contacts.length}</small>`:""}</div></div></div>${det}</div>`}
+function lfRows(){const q=S.lfq||"",s=S.lfs||"all",rows=lfList().filter(x=>(s==="all"||x.st===s)&&lfHit(x,q));return rows.map(lfCard).join("")||`<div class="card"><small>${bx("No items match.","Ningún artículo coincide.")}</small></div>`}
+M.lf=["🧳","Lost & Found"];
+V.lf=function(){const f=lfF(),due=lfDue(),s=S.lfs||"all",cnt=k=>lfList().filter(x=>k==="all"||x.st===k).length;
+  return `<h2>🧳 ${bx("Lost & Found","Objetos Perdidos")}</h2>${due.length&&lfCanManage()?`<div class="miss-banner">⏰ ${due.length} ${bx("item(s) past 90 days — dispose per policy","artículo(s) con más de 90 días — desechar según la política")}</div>`:""}
+  ${lfCanLog()?`<div class="card"><h3>${bx("Log a found item","Registrar objeto encontrado")}</h3><input id="lfDesc" style="width:100%" placeholder="${escH(bx("Description","Descripción"))}" value="${escH(f.desc)}"><div class="row"><input id="lfWhere" placeholder="${escH(bx("Where found","Dónde se encontró"))}" value="${escH(f.where)}"><input id="lfRoom" inputmode="numeric" placeholder="${escH(bx("Room #","Hab. #"))}" value="${escH(f.room)}"></div><div class="row"><input id="lfBy" placeholder="${escH(bx("Found by (you)","Encontrado por (tú)"))}" value="${escH(f.by)}"><input id="lfDate" type="date" value="${escH(f.date)}" aria-label="${escH(bx("Date found (blank = today)","Fecha (vacío = hoy)"))}"></div><div class="row">${photoField()}</div>${photoPrev()}<div class="bad" id="lfErr" role="alert"></div><button class="btn" style="width:100%" onclick="lfAdd()">${bx("Log item","Registrar artículo")}</button></div>`:""}
+  <div class="card"><input id="lfSearch" type="search" style="width:100%" placeholder="🔍 ${escH(bx("Search description, room, found by…","Buscar descripción, hab., quién lo encontró…"))}" value="${escH(S.lfq||"")}" oninput="lfQ(this.value)" aria-label="${escH(bx("Search lost and found","Buscar en objetos perdidos"))}"><div class="chips">${[["all",bx("All","Todos")]].concat(LF_ST.map(x=>[x[0],bx(x[1],x[2])])).map(x=>`<button class="chip ${s===x[0]?"on":""}" aria-pressed="${s===x[0]}" onclick="lfFilt('${x[0]}')">${x[1]} (${cnt(x[0])})</button>`).join("")}</div></div><div id="lfList">${lfRows()}</div>`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("lf")&&["GM","Front Desk","Housekeeping","Housekeeper","House Person","Laundry Attendant"].includes(r))TILES[r].push("lf")});
+const _homeLf=V.home;V.home=function(){const n=lfCanManage()?lfDue().length:0;return (n?`<div class="card" onclick="go('lf')" style="cursor:pointer"><b>🧳 ${bx("Lost & Found","Objetos Perdidos")}</b><div class="miss-banner" style="margin:6px 0 0">⏰ ${n} ${bx("item(s) past 90 days — dispose per policy","artículo(s) con más de 90 días — desechar según la política")}</div></div>`:"")+_homeLf()};
+/*LF_END*/
+/*RECS_START*/
+// Local recommendations card for front desk, drivers and bartenders. Defaults come from data/local-recs.js (built from QOTD local questions).
+// GMs can add tips, edit or hide any tip per hotel. No phone numbers are shipped; a GM may type one into a tip they add.
+const RC_CATS=[["food","🍽️","Food","Comida"],["late","🌙","Late night","Tarde en la noche"],["pharm","💊","Pharmacy / urgent care","Farmacia / urgencias"],["dir","🧭","MSP / MOA directions","Rutas MSP / MOA"],["coffee","☕","Coffee","Café"],["brew","🍺","Breweries","Cervecerías"],["attr","🎡","Attractions","Atracciones"],["ess","🛍️","Essentials","Básicos"]];
+function rcState(){const d=D();d.rc=d.rc||{add:[],hide:{},ov:{}};return d.rc}
+function rcAll(){const r=rcState(),def=(window.LOCAL_RECS||[]).filter(x=>x.h.includes("all")||x.h.includes(S.hotel)).filter(x=>!r.hide[x.id]).map(x=>{const o=r.ov[x.id];return o?Object.assign({},x,{t:[o.t,o.t],a:[o.a,o.a],n:[o.n||"",o.n||""],u:o.u||x.u,edited:1}):x});
+  const add=r.add.map(x=>({id:x.id,cat:x.cat,t:[x.t,x.t],a:[x.a,x.a],n:[x.n||"",x.n||""],u:x.u||"",custom:1}));return add.concat(def)}
+function rcHiddenCount(){const r=rcState();return (window.LOCAL_RECS||[]).filter(x=>(x.h.includes("all")||x.h.includes(S.hotel))&&r.hide[x.id]).length}
+function rcCat(c){return RC_CATS.find(x=>x[0]===c)||RC_CATS[3]}
+function rcSafeUrl(u){return /^https?:\/\//i.test(u||"")?u:""}
+function rcCard(x,mgr){const i=LANG==="es"?1:0,u=rcSafeUrl(x.u);
+  return `<div class="card" style="padding:10px"><div class="row" style="margin:0"><b style="flex:1" class="raw">${rcCat(x.cat)[1]} ${escH(x.t[i])}</b>${x.custom?`<span class="pill RFI" style="flex:0 0 auto">${bx("GM tip","Tip del GM")}</span>`:""}${x.edited?`<span class="pill OD" style="flex:0 0 auto">${bx("edited","editado")}</span>`:""}</div><div style="margin:6px 0;font-weight:600" class="raw">${escH(x.a[i])}</div>${x.n[i]?`<small class="raw">${escH(x.n[i])}</small>`:""}${u?`<div><a href="${escH(u)}" target="_blank" rel="noopener noreferrer"><small>🔗 ${bx("Source","Fuente")}</small></a></div>`:""}
+  ${x.qid?`<div><small style="color:#889">${bx("From training Q&A","De las preguntas de capacitación")} #${x.qid}</small></div>`:""}
+  ${mgr?`<div class="chips"><button class="chip" onclick="rcEdit('${x.id}')">${bx("Edit","Editar")}</button><button class="chip" onclick="rcDel('${x.id}')">${x.custom?bx("Delete","Borrar"):bx("Hide","Ocultar")}</button></div>`:""}</div>`}
+function rcRows(){const q=(S.rcq||"").toLowerCase(),c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",rows=rcAll().filter(x=>(c==="all"||x.cat===c)&&(!q||[x.t[0],x.t[1],x.a[0],x.a[1],x.n[0],x.n[1]].join(" ").toLowerCase().includes(q)));
+  const order=RC_CATS.map(x=>x[0]);rows.sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat));
+  let h=rows.map(x=>rcCard(x,mgr)).join("");
+  if(!h)h=`<div class="card"><small>${c!=="all"&&!q?bx("No tip here yet. The team has not added one for this hotel, and we do not guess.","Aún no hay tip aquí. El equipo no ha agregado uno para este hotel y no adivinamos."):bx("No tips match.","Ningún tip coincide.")}</small>${mgr?`<div style="margin-top:6px"><button class="btn2" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button></div>`:""}</div>`;
+  return h}
+function rcQ(v){S.rcq=v;const e=$("rcList");if(e)e.innerHTML=rcRows()}
+function rcSet(c){S.rcc=c;render()}
+function rcEdit(id){S.rce=id;render();const e=$("rcForm");if(e)e.scrollIntoView()}
+function rcDel(id){const r=rcState();if(id[0]==="c")r.add=r.add.filter(x=>x.id!==id);else r.hide[id]=1;save();render()}
+function rcRestore(){rcState().hide={};save();render()}
+function rcSave(){const r=rcState(),id=S.rce,t=$("rcT").value.trim(),a=$("rcA").value.trim(),n=$("rcN").value.trim(),u=rcSafeUrl($("rcU").value.trim()),cat=$("rcC").value;
+  if(!t||!a){$("rcErr").textContent=bx("Add a title and the answer.","Agrega un título y la respuesta.");return}
+  if(id==="new"){r.add.unshift({id:"c"+Date.now().toString(36),cat,t,a,n,u})}else if(id[0]==="c"){const x=r.add.find(y=>y.id===id);if(x)Object.assign(x,{cat,t,a,n,u})}else r.ov[id]={t,a,n,u};
+  S.rce="";save();render()}
+function rcForm(){const id=S.rce;if(!id)return "";const x=id==="new"?{cat:S.rcc&&S.rcc!=="all"?S.rcc:"food",t:["",""],a:["",""],n:["",""],u:""}:rcAll().find(y=>y.id===id)||{cat:"food",t:["",""],a:["",""],n:["",""],u:""},i=LANG==="es"?1:0;
+  return `<div class="card" id="rcForm"><h3>${id==="new"?bx("Add a tip for ","Agregar un tip para ")+escH(S.hotel):bx("Edit tip","Editar tip")}</h3><select id="rcC" ${id!=="new"&&id[0]!=="c"?"disabled":""}>${RC_CATS.map(c=>`<option value="${c[0]}" ${x.cat===c[0]?"selected":""}>${c[1]} ${bx(c[2],c[3])}</option>`).join("")}</select><input id="rcT" style="width:100%;margin-top:6px" placeholder="${escH(bx("Title (e.g. place name)","Título (ej. nombre del lugar)"))}" value="${escH(x.t[i])}"><textarea id="rcA" style="width:100%;margin-top:6px" placeholder="${escH(bx("What to tell the guest (address, hours, phone you verified)","Qué decirle al huésped (dirección, horario, teléfono verificado)"))}">${escH(x.a[i])}</textarea><input id="rcN" style="width:100%;margin-top:6px" placeholder="${escH(bx("Note (optional)","Nota (opcional)"))}" value="${escH(x.n[i])}"><input id="rcU" style="width:100%;margin-top:6px" placeholder="https:// ${escH(bx("link (optional)","enlace (opcional)"))}" value="${escH(x.u||"")}"><small>${bx("Only add details you have verified. Text you type shows the same in English and Spanish.","Agrega solo datos verificados. El texto que escribas se muestra igual en inglés y español.")}</small><div class="bad" id="rcErr" role="alert"></div><div class="row"><button class="btn" onclick="rcSave()">${bx("Save","Guardar")}</button><button class="btn2" onclick="S.rce='';render()">${bx("Cancel","Cancelar")}</button></div></div>`}
+M.recs=["📍","Local Tips"];
+V.recs=function(){const c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",cnt=k=>rcAll().filter(x=>k==="all"||x.cat===k).length,hid=rcHiddenCount();
+  return `<h2>📍 ${bx("Local Tips","Tips Locales")} · ${escH(S.hotel)}</h2><div class="card"><small>${bx("Quick answers for the front desk, drivers and bartenders. Tips are for this hotel's area.","Respuestas rápidas para recepción, conductores y cantineros. Los tips son para el área de este hotel.")}</small><input id="rcSearch" type="search" style="width:100%;margin-top:6px" placeholder="🔍 ${escH(bx("Search (brewery, zoo, Target…)","Buscar (cervecería, zoológico, Target…)"))}" value="${escH(S.rcq||"")}" oninput="rcQ(this.value)" aria-label="${escH(bx("Search local tips","Buscar tips locales"))}"><div class="chips"><button class="chip ${c==="all"?"on":""}" aria-pressed="${c==="all"}" onclick="rcSet('all')">${bx("All","Todos")} (${cnt("all")})</button>${RC_CATS.map(x=>`<button class="chip ${c===x[0]?"on":""}" aria-pressed="${c===x[0]}" onclick="rcSet('${x[0]}')">${x[1]} ${bx(x[2],x[3])} (${cnt(x[0])})</button>`).join("")}</div>${mgr?`<button class="btn2" style="width:100%" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button>${hid?`<div style="margin-top:6px"><button class="chip" onclick="rcRestore()">${bx("Show "+hid+" hidden","Mostrar "+hid+" ocultos")}</button></div>`:""}`:""}</div>${rcForm()}<div id="rcList">${rcRows()}</div>`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("recs"))TILES[r].push("recs")});
+const _homeRc=V.home;V.home=function(){const r=authRole();return (r==="Front Desk"||r==="Shuttle Driver"?`<div class="card" onclick="go('recs')" style="cursor:pointer"><b>📍 ${bx("Local tips","Tips locales")}</b> <small>${bx("food · MSP/MOA directions · attractions ›","comida · rutas MSP/MOA · atracciones ›")}</small></div>`:"")+_homeRc()};
+/*RECS_END*/
+/*RUSH_START*/
+// Rush room queue: front desk flags a room (early check-in time, guest priority, note). Pins to the top of the room board and the
+// attendant's list with a countdown, and notifies the front desk in-app when the room is cleaned and when it is inspected (guest ready).
+// Reuses the existing "rush" housekeeping priority (r.pri) and adds r.rush metadata.
+const RUSH_G=[["vip","VIP","VIP"],["elite","Elite member","Miembro elite"],["standard","Standard","Estándar"]];
+function rushG(k){const x=RUSH_G.find(y=>y[0]===k)||RUSH_G[2];return bx(x[1],x[2])}
+function rushCanFlag(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"}
+function rushIsOn(r){return hkPri(r)==="rush"&&roomFlow(r)!=="ready"&&roomFlow(r)!=="ooo"}
+function rushDemo(){const d=D();if(d.rushDemo||!d.rooms)return;d.rushDemo=1;const r=d.rooms.find(x=>x.n==101);if(r&&hkPri(r)==="rush"&&!r.rush)r.rush={by:"",at:Date.now()-10*60000,due:Date.now()+45*60000,guest:"vip",note:"Guest landed early and is coming straight from the airport.",ex:1}}
+function rushList(){rushDemo();return (D().rooms||[]).filter(rushIsOn).sort((a,b)=>((a.rush&&a.rush.due)||9e15)-((b.rush&&b.rush.due)||9e15)||a.n-b.n)}
+function rushCd(r){if(!r.rush||!r.rush.due)return bx("ASAP","Lo antes posible");const m=Math.round((r.rush.due-Date.now())/60000);if(m>=60)return bx(Math.floor(m/60)+"h "+(m%60)+"m left","faltan "+Math.floor(m/60)+"h "+(m%60)+"m");return m>=0?bx(m+" min left","faltan "+m+" min"):bx("OVERDUE "+(-m)+" min","ATRASADO "+(-m)+" min")}
+function rushTime(r){return r.rush&&r.rush.due?new Date(r.rush.due).toLocaleTimeString(localeTag(),{hour:"numeric",minute:"2-digit"}):""}
+function rushLate(r){return r.rush&&r.rush.due&&r.rush.due<Date.now()}
+function rushTick(){document.querySelectorAll("[data-rid]").forEach(e=>{const r=(D().rooms||[]).find(x=>x.n==e.dataset.rid);if(r){e.textContent=rushCd(r);e.classList.toggle("bad",!!rushLate(r))}})}
+setInterval(rushTick,15000);
+function rushF(){S.rf=S.rf||{room:"",time:"",guest:"vip",note:""};return S.rf}
+function rushSync(){const f=rushF();[["rfRoom","room"],["rfTime","time"],["rfNote","note"]].forEach(([i,k])=>{const e=$(i);if(e)f[k]=e.value})}
+function rushPick(v){rushSync();rushF().guest=v;render()}
+function rushFlag(){rushSync();const f=rushF(),d=D(),e=$("rfErr"),r=d.rooms.find(x=>x.n==f.room);
+  if(!r){e.textContent=bx("Pick a room.","Elige una habitación.");return}
+  if(roomFlow(r)==="ready"){e.textContent=bx("That room is already guest ready.","Esa habitación ya está lista para el huésped.");return}
+  let due=0;if(f.time){const [h,m]=f.time.split(":").map(Number),t0=new Date();t0.setHours(h,m,0,0);due=t0.getTime()}
+  r.pri="rush";r.rush={by:cw(),at:Date.now(),due,guest:f.guest,note:f.note.trim(),done:0};
+  const hk=r.hk&&USERS.find(u=>u.name===r.hk&&u.hotel===S.hotel);
+  careAlert(bx("⚡ Rush room "+r.n,"⚡ Habitación urgente "+r.n),bx("Early check-in"+(due?" at "+rushTime(r):"")+" · "+rushG(f.guest)+(r.rush.note?" · "+r.rush.note:""),"Entrada temprana"+(due?" a las "+rushTime(r):"")+" · "+rushG(f.guest)+(r.rush.note?" · "+r.rush.note:"")),hk?{uid:hk.id}:{role:"Housekeeping"});
+  S.rf={room:"",time:"",guest:"vip",note:""};save();showToast(bx("Room "+r.n+" flagged rush","Habitación "+r.n+" marcada urgente"));render()}
+function rushClear(n){const r=D().rooms.find(x=>x.n==n);if(!r)return;r.pri="normal";if(r.rush)r.rush.done=Date.now();save();render()}
+// notify the front desk when a rush room is cleaned / inspected
+{const _srf=setRoomFlow;setRoomFlow=function(n,status,extra){const r0=(D().rooms||[]).find(x=>x.n==n),was=!!(r0&&hkPri(r0)==="rush"&&roomFlow(r0)!=="ready");_srf.apply(this,arguments);
+  const r=(D().rooms||[]).find(x=>x.n==n);if(!r||!was||(status!=="cleaned"&&status!=="ready"))return;
+  const clean=status==="cleaned";careAlert(clean?bx("🧹 Rush room "+r.n+" is clean","🧹 Habitación urgente "+r.n+" limpia"):bx("✅ Rush room "+r.n+" is guest ready","✅ Habitación urgente "+r.n+" lista"),clean?bx("Cleaned. Waiting for inspection.","Limpia. Esperando inspección."):bx("Inspected and ready. You can check the guest in.","Inspeccionada y lista. Ya puedes registrar al huésped."),{role:"Front Desk"});
+  if(status==="ready"){r.pri="normal";if(r.rush)r.rush.done=Date.now()}save();render()}}
+function rushRow(r,open){const g=r.rush&&r.rush.guest;return `<div style="padding:8px;margin:8px 0;border:1px solid #c0262d;border-radius:10px;background:#fff7f7"><div class="row" style="margin:0"><b class="raw" style="font-size:24px;flex:0 0 58px">${r.n}</b><span style="flex:1;min-width:0"><span class="pill flow-${roomFlow(r)}">${flowLabel(roomFlow(r))}</span>${g?` <span class="pill ${g==="vip"?"VD":"OD"}">${rushG(g)}</span>`:""}${r.rush&&r.rush.ex?` <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}<br><small>${r.hk?escH(String(r.hk).split(" ")[0])+" · ":""}${rushTime(r)?"🕐 "+escH(rushTime(r))+" · ":""}<b class="raw ${rushLate(r)?"bad":""}" data-rid="${r.n}">${escH(rushCd(r))}</b></small></span></div>${r.rush&&r.rush.note?`<div class="wlnote">${escH(r.rush.note)}</div>`:""}${open&&rushCanFlag()?`<button class="btn2" onclick="rushClear(${r.n})">${bx("Remove rush","Quitar urgente")}</button>`:""}</div>`}
+function rushPinCard(){const l=rushList();if(!l.length)return "";return `<div class="card" style="border:2px solid #c0262d"><h3>⚡ ${bx("Rush rooms","Habitaciones urgentes")} (${l.length})</h3><small>${bx("Do these first. Countdown is to the guest's early check-in time.","Haz estas primero. La cuenta regresiva es a la hora de entrada temprana del huésped.")}</small>${l.map(r=>rushRow(r,false)).join("")}</div>`}
+M.rushq=["⚡","Rush Rooms"];
+V.rushq=function(){const f=rushF(),d=D(),l=rushList(),pick=d.rooms.filter(r=>roomFlow(r)!=="ready"&&roomFlow(r)!=="ooo"&&!rushIsOn(r)).slice().sort((a,b)=>a.n-b.n),doneL=d.rooms.filter(r=>r.rush&&r.rush.done&&!rushIsOn(r)).slice(0,5);
+  const form=rushCanFlag()?`<div class="card"><h3>${bx("Flag a rush room","Marcar habitación urgente")}</h3><div class="row"><select id="rfRoom" aria-label="${escH(bx("Room","Habitación"))}"><option value="">${bx("Room…","Habitación…")}</option>${pick.map(r=>`<option value="${r.n}" ${String(f.room)===String(r.n)?"selected":""}>${r.n} · ${flowLabel(roomFlow(r))}</option>`).join("")}</select><input id="rfTime" type="time" value="${escH(f.time)}" aria-label="${escH(bx("Early check-in time","Hora de entrada temprana"))}"></div><small>${bx("Early check-in time (blank = as soon as possible)","Hora de entrada temprana (vacío = lo antes posible)")}</small><div class="chips" role="group">${RUSH_G.map(g=>`<button type="button" class="chip ${f.guest===g[0]?"on":""}" aria-pressed="${f.guest===g[0]}" onclick="rushPick('${g[0]}')">${bx(g[1],g[2])}</button>`).join("")}</div><input id="rfNote" style="width:100%" placeholder="${escH(bx("Note (e.g. needs crib, quiet floor)","Nota (ej. necesita cuna, piso tranquilo)"))}" value="${escH(f.note)}"><div class="bad" id="rfErr" role="alert"></div><button class="btn" style="width:100%" onclick="rushFlag()">⚡ ${bx("Flag rush","Marcar urgente")}</button><small>${bx("Housekeeping sees it pinned first. You get an alert when the room is clean and when it is inspected.","Ama de llaves lo ve fijado primero. Recibes una alerta cuando la habitación está limpia y cuando se inspecciona.")}</small></div>`:"";
+  return `<h2>⚡ ${bx("Rush Rooms","Habitaciones Urgentes")}</h2>${form}<div class="card"><h3>${bx("Active","Activas")} (${l.length})</h3>${l.map(r=>rushRow(r,true)).join("")||`<small>${bx("No rush rooms right now.","No hay habitaciones urgentes ahora.")}</small>`}</div>${doneL.length?`<div class="card"><h3>${bx("Done","Listas")}</h3>${doneL.map(r=>`<div class="li"><b class="raw">${r.n}</b><span style="flex:1">${rushG(r.rush.guest)} · ${bx("guest ready","lista")}</span></div>`).join("")}</div>`:""}`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("rushq")&&["GM","Front Desk","Housekeeping"].includes(r))TILES[r].push("rushq")});
+// pin on the housekeeping room board and the attendant's list
+{const _rbp=roomBoardPage;roomBoardPage=function(){const h=_rbp(),i=h.indexOf("</h2>")+5;return h.slice(0,i)+rushPinCard()+h.slice(i)};
+const _bc=boardCard;boardCard=function(r){const h=_bc(r);return rushIsOn(r)&&r.rush?h.replace(/<\/div>$/,`<div class="wlnote">⏱ <b class="raw" data-rid="${r.n}">${escH(rushCd(r))}</b></div></div>`):h};
+const _mrc=myRoomCard;myRoomCard=function(x){let h=_mrc(x);if(rushIsOn(x)&&x.rush)h=h.replace('<div class="hkbig">',`<div class="wlnote"><b>⚡ ${bx("Rush","Urgente")}</b> · ${rushG(x.rush.guest)} · ${rushTime(x)?"🕐 "+escH(rushTime(x))+" · ":""}<b class="raw ${rushLate(x)?"bad":""}" data-rid="${x.n}">${escH(rushCd(x))}</b>${x.rush.note?"<br>"+escH(x.rush.note):""}</div><div class="hkbig">`);return h};
+const _mrp=myRoomsPage;myRoomsPage=function(){const h=_mrp(),me=cw(),n=(D().rooms||[]).filter(x=>x.hk===me&&rushIsOn(x)).length;return n?h.replace("</h2>",`</h2><div class="miss-banner">⚡ ${n} ${bx("rush room(s) first","habitación(es) urgente(s) primero")}</div>`):h};
+myRoomSort=function(a,b){const pr=x=>hkPri(x)==="rush"?0:hkPri(x)==="priority"?1:2,st=x=>roomFlow(x)==="cleaned"?1:0,du=x=>(x.rush&&x.rush.due)||9e15;return pr(a)-pr(b)||st(a)-st(b)||du(a)-du(b)||a.n-b.n}}
+const _homeRush=V.home;V.home=function(){const r=authRole(),l=(r==="Front Desk"||r==="GM"||r==="AGM"||r==="Housekeeping")?rushList():[];return (l.length?`<div class="card" onclick="go('rushq')" style="cursor:pointer;border:2px solid #c0262d"><b>⚡ ${bx("Rush rooms","Habitaciones urgentes")} (${l.length})</b>${l.slice(0,3).map(x=>rushRow(x,false)).join("")}<small>${rushCanFlag()?bx("Flag or review ›","Marcar o revisar ›"):bx("Open ›","Abrir ›")}</small></div>`:"")+_homeRush()};
+/*RUSH_END*/
+/*BRIEF_START*/
+// Daily briefing / morning huddle. Pulls live app data where it exists (rooms out of order, open guest issues, rush rooms, PMs due,
+// forecast occupancy/arrivals). Everything else is typed in by the GM/AGM and labeled "Manual until PMS feed is connected".
+const BR_SRC={
+  occ:["Forecast table (demo values, d.fc)","Tabla de pronóstico (valores demo, d.fc)"],
+  arr:["Forecast table, or GM entry if overridden","Tabla de pronóstico, o entrada del GM si se cambió"],
+  man:["GM entry. Manual until PMS feed is connected","Entrada del GM. Manual hasta conectar el PMS"],
+  ooo:["Room board (live)","Tablero de habitaciones (en vivo)"],
+  iss:["Guest issue log (live)","Registro de quejas (en vivo)"],
+  rush:["Rush room queue (live)","Cola de habitaciones urgentes (en vivo)"],
+  pm:["PM list (live)","Lista de PM (en vivo)"],
+  wx:["GM entry. Placeholder until a weather feed is added","Entrada del GM. Marcador hasta agregar un pronóstico del clima"]};
+function brSrc(k){return `<div class="brsrc">${bx("Source: ","Fuente: ")}${bx(BR_SRC[k][0],BR_SRC[k][1])}</div>`}
+function brCanEdit(){const r=authRole();return r==="GM"||r==="AGM"}
+function brKey(){return ld()}
+function brData(){const d=D();d.brief=d.brief||{};const k=brKey();if(!d.brief[k])d.brief[k]=k&&Object.keys(d.brief).length===0?{dep:36,arr:null,occ:null,vips:["Rm 412 · anniversary, champagne at check-in (EXAMPLE)","Rm 305 · elite member, early arrival (EXAMPLE)"],groups:["Demo Soccer Club · 12 rooms · buses at 3 PM (EXAMPLE)"],events:["Demo: school fundraiser in the ballroom at 6 PM (EXAMPLE)"],wx:"Demo: 48°F, light rain this afternoon (EXAMPLE)",note:"Demo note: smile first, then solve. Let's make today great.",by:"",at:Date.now(),ex:1}:{dep:null,arr:null,occ:null,vips:[],groups:[],events:[],wx:"",note:"",by:"",at:0};return d.brief[k]}
+function brDate(){return new Date().toLocaleDateString(localeTag(),{weekday:"long",month:"long",day:"numeric"})}
+function brOOO(){return (D().rooms||[]).filter(r=>roomFlow(r)==="ooo").map(r=>r.n)}
+function brLines(a){return (a||[]).length?`<ul style="margin:6px 0;padding-left:18px">${a.map(x=>`<li class="raw">${escH(x)}</li>`).join("")}</ul>`:`<div><small>${bx("None entered.","Nada registrado.")}</small></div>`}
+function brSave(){const b=brData(),n=id=>{const v=($(id).value||"").trim();return v===""?null:Math.max(0,Math.round(+v))},ls=id=>($(id).value||"").split("\n").map(x=>x.trim()).filter(Boolean);
+  b.arr=n("bfArr");b.dep=n("bfDep");b.occ=n("bfOcc");b.vips=ls("bfVip");b.groups=ls("bfGrp");b.events=ls("bfEv");b.wx=($("bfWx").value||"").trim();b.note=($("bfNote").value||"").trim();b.by=cw();b.at=Date.now();b.ex=0;S.brEdit=0;save();showToast(bx("Briefing saved","Informe guardado"));render()}
+function brEdit(on){S.brEdit=on?1:0;render()}
+M.brief=["☀️","Daily Briefing"];
+V.brief=function(){const d=D(),b=brData(),fc=d.fc&&d.fc[0]||{occ:0,arr:0},occ=b.occ!=null?b.occ:fc.occ,arr=b.arr!=null?b.arr:fc.arr,ooo=brOOO(),iss=giOpen(),rush=rushList(),pm=(d.pm||[]).filter(p=>!pdn(p)),edit=brCanEdit()&&S.brEdit,man=`<span class="pill OD">${bx("Manual until PMS feed is connected","Manual hasta conectar el PMS")}</span>`;
+  const f=(label,body,src)=>`<div class="card"><h3>${label}</h3>${body}${src}</div>`;
+  const form=edit?`<div class="card"><h3>${bx("Edit today's briefing","Editar el informe de hoy")}</h3>${man}<div class="row" style="margin-top:6px"><label><small>${bx("Arrivals","Llegadas")}</small><input id="bfArr" type="number" min="0" value="${b.arr!=null?b.arr:""}" placeholder="${fc.arr}"></label><label><small>${bx("Departures","Salidas")}</small><input id="bfDep" type="number" min="0" value="${b.dep!=null?b.dep:""}"></label><label><small>${bx("Occ %","Ocup. %")}</small><input id="bfOcc" type="number" min="0" max="100" value="${b.occ!=null?b.occ:""}" placeholder="${fc.occ}"></label></div><small>${bx("Arrivals and Occ % are blank to use the forecast.","Llegadas y Ocup. % vacíos usan el pronóstico.")}</small>
+    <label><small>${bx("VIPs / special occasions (one per line)","VIPs / ocasiones especiales (una por línea)")}</small><textarea id="bfVip" style="width:100%;min-height:64px">${escH(b.vips.join("\n"))}</textarea></label><label><small>${bx("Groups (one per line)","Grupos (uno por línea)")}</small><textarea id="bfGrp" style="width:100%;min-height:52px">${escH(b.groups.join("\n"))}</textarea></label><label><small>${bx("Events (one per line)","Eventos (uno por línea)")}</small><textarea id="bfEv" style="width:100%;min-height:52px">${escH(b.events.join("\n"))}</textarea></label><label><small>${bx("Weather (typed)","Clima (escrito)")}</small><input id="bfWx" style="width:100%" value="${escH(b.wx)}"></label><label><small>${bx("GM note","Nota del GM")}</small><textarea id="bfNote" style="width:100%;min-height:64px">${escH(b.note)}</textarea></label><div class="row"><button class="btn" onclick="brSave()">${bx("Save","Guardar")}</button><button class="btn2" onclick="brEdit(0)">${bx("Cancel","Cancelar")}</button></div></div>`:"";
+  const stamp=b.at&&!b.ex?`<small>${bx("Last updated by","Actualizado por")} ${escH(String(b.by||"").split(" ")[0])} · ${escH(new Date(b.at).toLocaleTimeString(localeTag(),{hour:"numeric",minute:"2-digit"}))}</small>`:b.ex?`<span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:"";
+  return `<h2>☀️ ${bx("Daily Briefing","Informe Diario")}</h2><div class="card" style="background:#fff8e6"><b>${escH(brDate())}</b> · ${escH(S.hotel)} ${stamp}<div style="margin-top:6px">${man}</div>${brCanEdit()&&!edit?`<button class="btn2" style="width:100%;margin-top:8px" onclick="brEdit(1)">✏️ ${bx("Edit manual fields","Editar campos manuales")}</button>`:""}</div>${form}
+  <div class="card"><div class="kpi"><div><b>${occ}%</b>${bx("Occupancy","Ocupación")}</div><div><b>${arr}</b>${bx("Arrivals","Llegadas")}</div><div><b>${b.dep!=null?b.dep:"—"}</b>${bx("Departures","Salidas")}</div></div>${brSrc("occ")}${brSrc("arr")}<div class="brsrc">${bx("Departures","Salidas")}: ${bx(BR_SRC.man[0],BR_SRC.man[1])}</div></div>
+  ${f("⭐ "+bx("VIPs & special occasions","VIPs y ocasiones especiales"),brLines(b.vips),brSrc("man"))}
+  ${f("👥 "+bx("Groups","Grupos"),brLines(b.groups),brSrc("man"))}
+  ${f("🚫 "+bx("Out-of-order rooms","Habitaciones fuera de servicio")+" ("+ooo.length+")",ooo.length?`<div class="chips">${ooo.map(n=>`<span class="pill OOO">${n}</span>`).join("")}</div>`:`<small>${bx("None.","Ninguna.")}</small>`,brSrc("ooo"))}
+  ${f("🛎️ "+bx("Open guest issues","Quejas abiertas")+" ("+iss.length+")",iss.slice(0,4).map(g=>`<div class="wlpos"><b>${bx("Rm","Hab.")} ${escH(g.room)}</b> · ${giCatName(g.cat)} · ${giSevName(g.sev)}${g.dep?" · "+escH(giDepLabel(g)):""}<br><small class="raw">${escH(g.note)}</small></div>`).join("")||`<small>${bx("None open.","Ninguna abierta.")}</small>`+(iss.length>4?`<small>+${iss.length-4}</small>`:""),brSrc("iss"))}
+  ${f("⚡ "+bx("Rush rooms","Habitaciones urgentes")+" ("+rush.length+")",rush.map(r=>`<div class="wlpos"><b class="raw">${r.n}</b> · ${flowLabel(roomFlow(r))}${r.rush&&r.rush.guest?" · "+rushG(r.rush.guest):""} · <b class="raw" data-rid="${r.n}">${escH(rushCd(r))}</b></div>`).join("")||`<small>${bx("None.","Ninguna.")}</small>`,brSrc("rush"))}
+  ${f("🗓️ "+bx("PMs due","PM pendientes")+" ("+pm.length+")",pm.slice(0,5).map(p=>`<div class="wlpos">${escH(bi(p.a)||p.a)} <small>· ${escH(p.f||"")} · ${escH(p.due||"")}</small></div>`).join("")||`<small>${bx("All done.","Todo listo.")}</small>`,brSrc("pm"))}
+  ${f("🌤️ "+bx("Weather","Clima"),b.wx?`<div class="raw">${escH(b.wx)}</div>`:`<small>${bx("Not entered. A weather feed would need an API key; add one later.","Sin datos. Un pronóstico requeriría una clave de API; se puede agregar después.")}</small>`,brSrc("wx"))}
+  ${f("🎉 "+bx("Events nearby / in-house","Eventos cercanos / en el hotel"),brLines(b.events),brSrc("man"))}
+  ${f("📝 "+bx("GM note","Nota del GM"),b.note?`<div class="raw">${escH(b.note)}</div>`:`<small>${bx("No note today.","Sin nota hoy.")}</small>`,brSrc("man"))}`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("brief")&&!["Shuttle Driver","House Person","Laundry Attendant"].includes(r))TILES[r].push("brief")});
+const _homeBr=V.home;V.home=function(){const r=authRole();return (["GM","AGM","Front Desk","Housekeeping","Maintenance","Above Property"].includes(r)?`<div class="card" onclick="go('brief')" style="cursor:pointer;background:#fff8e6"><b>☀️ ${bx("Morning huddle","Junta de la mañana")}</b> <small>${bx("Today's briefing ›","Informe de hoy ›")}</small></div>`:"")+_homeBr()};
+/*BRIEF_END*/
+/*NOTEREAD_START*/
+// Read receipts on Shift Notes & Handoff. Opening the notes screen records a read (user + time) for each note.
+// Only AGM, GM and corporate (Above Property) are shown who has / has not read. Everyone else gets no receipt UI, counts or data in the page.
+// Server design: supabase/migrations/20261027_shift_note_reads.sql (select limited to agm/gm/above_property, users insert only their own read).
+function nrCanSee(){const r=authRole();return r==="GM"||r==="AGM"||r==="Above Property"}
+function nrId(n,i){if(!n.id)n.id="n"+(D().notes.length-i)+"_"+String(n.at||"").replace(/\W/g,"");return n.id}
+function nrReads(){const d=D();if(!d.reads){d.reads={};const n=d.notes[0],st=ST().filter(s=>s.role!=="Above Property"&&s.role!=="GM");if(n){nrId(n,0);d.reads[n.id]=st.slice(0,2).map((s,i)=>({u:careUid(s.n),n:s.n,at:Date.now()-(40-i*15)*60000,ex:1}))}}return d.reads}
+function nrMark(){const u=meUser();if(!u||u.role==="Above Property")return;const d=D(),R=nrReads();let ch=0;d.notes.forEach((n,i)=>{const id=nrId(n,i),a=R[id]=R[id]||[];if(!a.some(x=>x.u===u.id)){a.push({u:u.id,n:u.name,at:Date.now()});ch=1}});if(ch)save()}
+function nrExpected(n){const own=String(n.by||"").split(" ")[0];return ST().filter(s=>s.role!=="Above Property"&&s.days.includes(DOW)&&String(s.n).split(" ")[0]!==own)}
+function nrTog(id){S.nro=S.nro===id?"":id;render()}
+function nrBox(n,i){if(!nrCanSee())return "";const id=nrId(n,i),R=(nrReads()[id]||[]),exp=nrExpected(n),readIds=new Set(R.map(x=>x.u)),read=R.filter(x=>exp.some(e=>careUid(e.n)===x.u)),unread=exp.filter(e=>!readIds.has(careUid(e.n))),open=S.nro===id,tm=ts=>new Date(ts).toLocaleTimeString(localeTag(),{hour:"numeric",minute:"2-digit"});
+  return `<div style="flex:1 1 100%"><button class="chip" aria-expanded="${open}" onclick="nrTog('${id}')">👁 ${bx("Read by","Leído por")} ${read.length} ${bx("of","de")} ${exp.length} ${open?"▲":"▼"}</button>${open?`<div class="card" style="background:#f4f7fb;margin:6px 0 0"><small><b>${bx("Read","Leído")}</b></small>${read.map(x=>`<div class="wlpos"><span class="raw">${escH(x.n)}</span> · ${escH(tm(x.at))}${x.ex?` <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}</div>`).join("")||`<div><small>${bx("Nobody yet.","Nadie aún.")}</small></div>`}<small><b>${bx("Not read yet (scheduled today)","Sin leer (programados hoy)")}</b></small>${unread.map(e=>`<div class="wlpos"><span class="raw">${escH(e.n)}</span> <small>${escH(shortRole(e.role))}</small></div>`).join("")||`<div><small>${bx("Everyone has read it.","Todos lo han leído.")}</small></div>`}</div>`:""}</div>`}
+V.notes=function(){const d=D();nrMark();return `<h2>Shift Notes & Handoff</h2><div class="card"><select id="ns" style="width:100%"><option>AM</option><option>PM</option><option>Night Audit</option></select><textarea id="nt" style="width:100%;min-height:90px" placeholder="Handoff notes for next shift"></textarea><button class="btn" style="width:100%" onclick="addN()">Post handoff</button></div>
+<div class="card"><h3>Log</h3>${d.notes.map((n,i)=>`<div class="li" style="flex-wrap:wrap"><div style="flex:1;min-width:0"><b>${n.sh}</b> · ${n.by} · ${n.at}<br>${noteHtml("note"+i,n,n.t)}</div>${nrBox(n,i)}</div>`).join("")}</div>`};
+/*NOTEREAD_END*/
 </script></body></html>
