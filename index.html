@@ -159,6 +159,7 @@ body.he-print .wk button{display:none}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chip{min-height:40px;border-radius:20px;padding:6px 12px;background:#e6ebf2;color:#14365d;font-weight:600;border:1px solid #d5dbe6;font-size:13px}.chip.on{background:#14365d;color:#fff;border-color:#14365d}
 .cx{border-left:4px solid #f9c74f}.cx .cm{margin:6px 0;line-height:1.4}.cx small{color:#556}
 .cxtags{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.cxtag{display:flex;align-items:center;gap:6px;background:#f4f7fb;border-radius:999px;padding:3px 10px 3px 4px;font-size:13px;font-weight:600}
+.brsrc{font-size:11px;color:#667;margin-top:6px}
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span class="hhq" style="font-weight:800;letter-spacing:.3px;white-space:nowrap">Hotel<span style="color:#f9c74f">HQ</span></span><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
@@ -3962,4 +3963,46 @@ const _mrp=myRoomsPage;myRoomsPage=function(){const h=_mrp(),me=cw(),n=(D().room
 myRoomSort=function(a,b){const pr=x=>hkPri(x)==="rush"?0:hkPri(x)==="priority"?1:2,st=x=>roomFlow(x)==="cleaned"?1:0,du=x=>(x.rush&&x.rush.due)||9e15;return pr(a)-pr(b)||st(a)-st(b)||du(a)-du(b)||a.n-b.n}}
 const _homeRush=V.home;V.home=function(){const r=authRole(),l=(r==="Front Desk"||r==="GM"||r==="AGM"||r==="Housekeeping")?rushList():[];return (l.length?`<div class="card" onclick="go('rushq')" style="cursor:pointer;border:2px solid #c0262d"><b>⚡ ${bx("Rush rooms","Habitaciones urgentes")} (${l.length})</b>${l.slice(0,3).map(x=>rushRow(x,false)).join("")}<small>${rushCanFlag()?bx("Flag or review ›","Marcar o revisar ›"):bx("Open ›","Abrir ›")}</small></div>`:"")+_homeRush()};
 /*RUSH_END*/
+/*BRIEF_START*/
+// Daily briefing / morning huddle. Pulls live app data where it exists (rooms out of order, open guest issues, rush rooms, PMs due,
+// forecast occupancy/arrivals). Everything else is typed in by the GM/AGM and labeled "Manual until PMS feed is connected".
+const BR_SRC={
+  occ:["Forecast table (demo values, d.fc)","Tabla de pronóstico (valores demo, d.fc)"],
+  arr:["Forecast table, or GM entry if overridden","Tabla de pronóstico, o entrada del GM si se cambió"],
+  man:["GM entry. Manual until PMS feed is connected","Entrada del GM. Manual hasta conectar el PMS"],
+  ooo:["Room board (live)","Tablero de habitaciones (en vivo)"],
+  iss:["Guest issue log (live)","Registro de quejas (en vivo)"],
+  rush:["Rush room queue (live)","Cola de habitaciones urgentes (en vivo)"],
+  pm:["PM list (live)","Lista de PM (en vivo)"],
+  wx:["GM entry. Placeholder until a weather feed is added","Entrada del GM. Marcador hasta agregar un pronóstico del clima"]};
+function brSrc(k){return `<div class="brsrc">${bx("Source: ","Fuente: ")}${bx(BR_SRC[k][0],BR_SRC[k][1])}</div>`}
+function brCanEdit(){const r=authRole();return r==="GM"||r==="AGM"}
+function brKey(){return ld()}
+function brData(){const d=D();d.brief=d.brief||{};const k=brKey();if(!d.brief[k])d.brief[k]=k&&Object.keys(d.brief).length===0?{dep:36,arr:null,occ:null,vips:["Rm 412 · anniversary, champagne at check-in (EXAMPLE)","Rm 305 · elite member, early arrival (EXAMPLE)"],groups:["Demo Soccer Club · 12 rooms · buses at 3 PM (EXAMPLE)"],events:["Demo: school fundraiser in the ballroom at 6 PM (EXAMPLE)"],wx:"Demo: 48°F, light rain this afternoon (EXAMPLE)",note:"Demo note: smile first, then solve. Let's make today great.",by:"",at:Date.now(),ex:1}:{dep:null,arr:null,occ:null,vips:[],groups:[],events:[],wx:"",note:"",by:"",at:0};return d.brief[k]}
+function brDate(){return new Date().toLocaleDateString(localeTag(),{weekday:"long",month:"long",day:"numeric"})}
+function brOOO(){return (D().rooms||[]).filter(r=>roomFlow(r)==="ooo").map(r=>r.n)}
+function brLines(a){return (a||[]).length?`<ul style="margin:6px 0;padding-left:18px">${a.map(x=>`<li class="raw">${escH(x)}</li>`).join("")}</ul>`:`<div><small>${bx("None entered.","Nada registrado.")}</small></div>`}
+function brSave(){const b=brData(),n=id=>{const v=($(id).value||"").trim();return v===""?null:Math.max(0,Math.round(+v))},ls=id=>($(id).value||"").split("\n").map(x=>x.trim()).filter(Boolean);
+  b.arr=n("bfArr");b.dep=n("bfDep");b.occ=n("bfOcc");b.vips=ls("bfVip");b.groups=ls("bfGrp");b.events=ls("bfEv");b.wx=($("bfWx").value||"").trim();b.note=($("bfNote").value||"").trim();b.by=cw();b.at=Date.now();b.ex=0;S.brEdit=0;save();showToast(bx("Briefing saved","Informe guardado"));render()}
+function brEdit(on){S.brEdit=on?1:0;render()}
+M.brief=["☀️","Daily Briefing"];
+V.brief=function(){const d=D(),b=brData(),fc=d.fc&&d.fc[0]||{occ:0,arr:0},occ=b.occ!=null?b.occ:fc.occ,arr=b.arr!=null?b.arr:fc.arr,ooo=brOOO(),iss=giOpen(),rush=rushList(),pm=(d.pm||[]).filter(p=>!pdn(p)),edit=brCanEdit()&&S.brEdit,man=`<span class="pill OD">${bx("Manual until PMS feed is connected","Manual hasta conectar el PMS")}</span>`;
+  const f=(label,body,src)=>`<div class="card"><h3>${label}</h3>${body}${src}</div>`;
+  const form=edit?`<div class="card"><h3>${bx("Edit today's briefing","Editar el informe de hoy")}</h3>${man}<div class="row" style="margin-top:6px"><label><small>${bx("Arrivals","Llegadas")}</small><input id="bfArr" type="number" min="0" value="${b.arr!=null?b.arr:""}" placeholder="${fc.arr}"></label><label><small>${bx("Departures","Salidas")}</small><input id="bfDep" type="number" min="0" value="${b.dep!=null?b.dep:""}"></label><label><small>${bx("Occ %","Ocup. %")}</small><input id="bfOcc" type="number" min="0" max="100" value="${b.occ!=null?b.occ:""}" placeholder="${fc.occ}"></label></div><small>${bx("Arrivals and Occ % are blank to use the forecast.","Llegadas y Ocup. % vacíos usan el pronóstico.")}</small>
+    <label><small>${bx("VIPs / special occasions (one per line)","VIPs / ocasiones especiales (una por línea)")}</small><textarea id="bfVip" style="width:100%;min-height:64px">${escH(b.vips.join("\n"))}</textarea></label><label><small>${bx("Groups (one per line)","Grupos (uno por línea)")}</small><textarea id="bfGrp" style="width:100%;min-height:52px">${escH(b.groups.join("\n"))}</textarea></label><label><small>${bx("Events (one per line)","Eventos (uno por línea)")}</small><textarea id="bfEv" style="width:100%;min-height:52px">${escH(b.events.join("\n"))}</textarea></label><label><small>${bx("Weather (typed)","Clima (escrito)")}</small><input id="bfWx" style="width:100%" value="${escH(b.wx)}"></label><label><small>${bx("GM note","Nota del GM")}</small><textarea id="bfNote" style="width:100%;min-height:64px">${escH(b.note)}</textarea></label><div class="row"><button class="btn" onclick="brSave()">${bx("Save","Guardar")}</button><button class="btn2" onclick="brEdit(0)">${bx("Cancel","Cancelar")}</button></div></div>`:"";
+  const stamp=b.at&&!b.ex?`<small>${bx("Last updated by","Actualizado por")} ${escH(String(b.by||"").split(" ")[0])} · ${escH(new Date(b.at).toLocaleTimeString(localeTag(),{hour:"numeric",minute:"2-digit"}))}</small>`:b.ex?`<span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:"";
+  return `<h2>☀️ ${bx("Daily Briefing","Informe Diario")}</h2><div class="card" style="background:#fff8e6"><b>${escH(brDate())}</b> · ${escH(S.hotel)} ${stamp}<div style="margin-top:6px">${man}</div>${brCanEdit()&&!edit?`<button class="btn2" style="width:100%;margin-top:8px" onclick="brEdit(1)">✏️ ${bx("Edit manual fields","Editar campos manuales")}</button>`:""}</div>${form}
+  <div class="card"><div class="kpi"><div><b>${occ}%</b>${bx("Occupancy","Ocupación")}</div><div><b>${arr}</b>${bx("Arrivals","Llegadas")}</div><div><b>${b.dep!=null?b.dep:"—"}</b>${bx("Departures","Salidas")}</div></div>${brSrc("occ")}${brSrc("arr")}<div class="brsrc">${bx("Departures","Salidas")}: ${bx(BR_SRC.man[0],BR_SRC.man[1])}</div></div>
+  ${f("⭐ "+bx("VIPs & special occasions","VIPs y ocasiones especiales"),brLines(b.vips),brSrc("man"))}
+  ${f("👥 "+bx("Groups","Grupos"),brLines(b.groups),brSrc("man"))}
+  ${f("🚫 "+bx("Out-of-order rooms","Habitaciones fuera de servicio")+" ("+ooo.length+")",ooo.length?`<div class="chips">${ooo.map(n=>`<span class="pill OOO">${n}</span>`).join("")}</div>`:`<small>${bx("None.","Ninguna.")}</small>`,brSrc("ooo"))}
+  ${f("🛎️ "+bx("Open guest issues","Quejas abiertas")+" ("+iss.length+")",iss.slice(0,4).map(g=>`<div class="wlpos"><b>${bx("Rm","Hab.")} ${escH(g.room)}</b> · ${giCatName(g.cat)} · ${giSevName(g.sev)}${g.dep?" · "+escH(giDepLabel(g)):""}<br><small class="raw">${escH(g.note)}</small></div>`).join("")||`<small>${bx("None open.","Ninguna abierta.")}</small>`+(iss.length>4?`<small>+${iss.length-4}</small>`:""),brSrc("iss"))}
+  ${f("⚡ "+bx("Rush rooms","Habitaciones urgentes")+" ("+rush.length+")",rush.map(r=>`<div class="wlpos"><b class="raw">${r.n}</b> · ${flowLabel(roomFlow(r))}${r.rush&&r.rush.guest?" · "+rushG(r.rush.guest):""} · <b class="raw" data-rid="${r.n}">${escH(rushCd(r))}</b></div>`).join("")||`<small>${bx("None.","Ninguna.")}</small>`,brSrc("rush"))}
+  ${f("🗓️ "+bx("PMs due","PM pendientes")+" ("+pm.length+")",pm.slice(0,5).map(p=>`<div class="wlpos">${escH(bi(p.a)||p.a)} <small>· ${escH(p.f||"")} · ${escH(p.due||"")}</small></div>`).join("")||`<small>${bx("All done.","Todo listo.")}</small>`,brSrc("pm"))}
+  ${f("🌤️ "+bx("Weather","Clima"),b.wx?`<div class="raw">${escH(b.wx)}</div>`:`<small>${bx("Not entered. A weather feed would need an API key; add one later.","Sin datos. Un pronóstico requeriría una clave de API; se puede agregar después.")}</small>`,brSrc("wx"))}
+  ${f("🎉 "+bx("Events nearby / in-house","Eventos cercanos / en el hotel"),brLines(b.events),brSrc("man"))}
+  ${f("📝 "+bx("GM note","Nota del GM"),b.note?`<div class="raw">${escH(b.note)}</div>`:`<small>${bx("No note today.","Sin nota hoy.")}</small>`,brSrc("man"))}`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("brief")&&!["Shuttle Driver","House Person","Laundry Attendant"].includes(r))TILES[r].push("brief")});
+const _homeBr=V.home;V.home=function(){const r=authRole();return (["GM","AGM","Front Desk","Housekeeping","Maintenance","Above Property"].includes(r)?`<div class="card" onclick="go('brief')" style="cursor:pointer;background:#fff8e6"><b>☀️ ${bx("Morning huddle","Junta de la mañana")}</b> <small>${bx("Today's briefing ›","Informe de hoy ›")}</small></div>`:"")+_homeBr()};
+/*BRIEF_END*/
 </script></body></html>
