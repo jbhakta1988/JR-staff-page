@@ -1223,7 +1223,7 @@ const save=()=>{sset(KEY,JSON.stringify(S));if(sbPush)queuePush()};const D=()=>S
 function go(t){if(meUser()&&t!="home"&&!navFor(S.role).includes(t)&&!tilesFor(S.role).includes(t)&&!(canSeeReports()&&(t==="health"||t==="score")))return;S.tab=t;save();render();scrollTo(0,0)}
 const V={
 home(){const d=D(),r=S.role,ow=d.wo.filter(w=>w.s!="Done").length,dirty=d.rooms.filter(x=>x.s.endsWith("D")).length,low=d.inv.filter(x=>x.oh<x.par*.5).length;
-let k=(r=="GM"&&leader())?`<div class="card"><h3>GM Dashboard</h3><div class="kpi"><div><b>${ow}</b>Open WOs</div><div><b>${dirty}</b>Dirty rooms</div><div><b>${low}</b>Low stock</div><div><b>${d.pm.filter(p=>!pdn(p)).length}</b>PMs due</div><div><b class="${lv()>0?'bad':'good'}">${lv()>0?'+':''}${lv()}</b>Labor var hrs</div><div><b>${d.fc[0].occ}%</b>Occ today</div></div><div class="kpi" style="margin-top:8px" onclick="go('gmc')">${["Daily","Weekly","Monthly"].map(x=>`<div><b>${gpct(x)}%</b>GM ${x}</div>`).join("")}</div></div>${typeof fdCoverageCard==="function"?fdCoverageCard(S.hotel):""}
+let k=(r=="GM"&&leader())?`<div class="card"><h3>GM Dashboard</h3><div class="kpi"><div><b>${ow}</b>Open WOs</div><div><b>${dirty}</b>Dirty rooms</div><div><b>${low}</b>Low stock</div><div><b>${d.pm.filter(p=>!pdn(p)).length}</b>PMs due</div><div><b class="${lv()>0?'bad':'good'}">${lv()>0?'+':''}${lv()}</b>Labor var hrs</div><div><b>${d.fc[0].occ}%</b>Occ today</div><div onclick="go('gi')" style="cursor:pointer"><b class="${typeof giOpen==='function'&&giOpen().length?'bad':'good'}">${typeof giOpen==='function'?giOpen().length:0}</b>${LANG==='es'?'Quejas abiertas':'Guest issues'}</div></div><div class="kpi" style="margin-top:8px" onclick="go('gmc')">${["Daily","Weekly","Monthly"].map(x=>`<div><b>${gpct(x)}%</b>GM ${x}</div>`).join("")}</div></div>${typeof fdCoverageCard==="function"?fdCoverageCard(S.hotel):""}
 ${reportHomeCards()}${missingDataPanel()}
 <div class="card"><h3>Open issues</h3>${d.wo.filter(w=>w.s!="Done").map(w=>`<div class="li" style="flex-wrap:wrap"><span class="pill ${w.p=='High'?'VD':'OD'}">${w.p}</span><span style="flex:1;min-width:0">${w.room}: ${noteHtml("home-"+w.id,w,w.t)}</span></div>`).join("")}</div>`:
 r=="Housekeeping"?hkLeadHome():r=="Housekeeper"?`<div class="card"><h3>${t("Today")} · ${escH(cw())}</h3>${hkProg(cw())}</div>`:LINE.includes(r)?(r=="Shuttle Driver"&&!SHH.includes(S.hotel)?'<div class="card">No shuttle at this property.</div>':`<div class="card"><h3>${t("Today")} · ${roleName(r)}</h3><div class="kpi"><div><b>${r=="Shuttle Driver"?SH().runs.filter(x=>x.st!="Complete").length:myReqs().filter(x=>x.st!="Done").length}</b>${r=="Shuttle Driver"?"Runs left":"Open requests"}</div><div><b>${lpct(r)}%</b>Checklist</div><div><b>${now()}</b>Now</div></div></div>`):`<div class="card"><h3>${t("Today")} · ${roleName(r)}</h3><div class="kpi"><div><b>${d.fc[0].arr}</b>Arrivals</div><div><b>${dirty}</b>Dirty</div><div><b>${ow}</b>Open WOs</div></div></div>`;
@@ -3753,4 +3753,75 @@ ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("comp"))TILES[r].p
 const _homeComp=V.home;V.home=function(){return compHomeCard()+_homeComp()};
 const _funComp=V.fun;V.fun=function(){const L2=compList().slice(0,2);return `<div class="card" onclick="go('comp')" style="cursor:pointer"><b>💌 ${bx("Guest compliments","Cumplidos de huéspedes")}</b>${L2.map(c=>compItem(c).replace('class="card cx"','class="cx" style="margin-top:8px;padding-left:10px"')).join("")}<small>${bx("See the wall ›","Ver el muro ›")}</small></div>`+_funComp()};
 /*COMP_END*/
+/*GI_START*/
+// Guest issue log: front desk logs in ~10 s, routes to the owning department queue, maintenance also becomes a work order.
+const GI_CATS=[["room","Room","Habitación","Housekeeping"],["clean","Cleanliness","Limpieza","Housekeeping"],["noise","Noise","Ruido","Front Desk"],["maint","Maintenance","Mantenimiento","Maintenance"],["bfast","Breakfast","Desayuno","Breakfast"],["staff","Staff","Personal","GM"],["bill","Billing","Facturación","GM"],["other","Other","Otro","Front Desk"]];
+const GI_SEV=[["low","Low","Baja"],["med","Medium","Media"],["high","High","Alta"]];
+const GI_ST=[["open","Open","Abierta"],["prog","In progress","En proceso"],["done","Resolved","Resuelta"]];
+const GI_REC=[["none","None yet","Ninguna aún"],["apology","Apology","Disculpa"],["amenity","Amenity / snack","Cortesía / bocadillo"],["points","Points / loyalty","Puntos / lealtad"],["discount","Discount","Descuento"],["comp","Room comped","Habitación de cortesía"],["other","Other","Otro"]];
+const GI_DEPT={"Housekeeping":["Housekeeping","Ama de llaves"],"Maintenance":["Maintenance","Mantenimiento"],"Breakfast":["Breakfast","Desayuno"],"Front Desk":["Front Desk","Recepción"],"GM":["Management","Gerencia"]};
+const GI_ROLEOF={Housekeeping:"Housekeeping",Maintenance:"Maintenance",Breakfast:"Breakfast Attendant",GM:"GM","Front Desk":"Front Desk"};
+function giFind(a,k){return a.find(x=>x[0]===k)||a[0]}
+function giCatName(k){const x=giFind(GI_CATS,k);return bx(x[1],x[2])}
+function giSevName(k){const x=giFind(GI_SEV,k);return bx(x[1],x[2])}
+function giStName(k){const x=giFind(GI_ST,k);return bx(x[1],x[2])}
+function giRecName(k){const x=giFind(GI_REC,k);return bx(x[1],x[2])}
+function giDeptName(k){const x=GI_DEPT[k]||GI_DEPT["Front Desk"];return bx(x[0],x[1])}
+function giYmd(n){const d=new Date(Date.now()+(n||0)*864e5),p=x=>String(x).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}
+function giMyDept(){const r=S.role;return r==="Housekeeping"||r==="Housekeeper"?"Housekeeping":r==="Maintenance"?"Maintenance":r==="Breakfast Attendant"?"Breakfast":r==="Front Desk"?"Front Desk":""}
+function giCanLog(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"}
+function giCanWork(){return authRole()!=="Above Property"}
+function giList(){const d=D();if(!d.gi){d.gi=[];
+  const wid=careNextId(d.wo||[]);d.wo=d.wo||[];d.wo.push({id:wid,room:"108",t:"Guest issue: AC is loud and not cooling (guest reported at desk)",p:"Med",s:"In Progress",photo:"",comments:[],gi:2});
+  d.gi=[{id:1,room:"214",cat:"noise",sev:"high",note:"Loud party next door after 11 PM, guest could not sleep.",st:"open",rec:"none",dep:giYmd(1),dept:"Front Desk",at:careAgo(0.2),by:"",ex:1},
+  {id:2,room:"108",cat:"maint",sev:"med",note:"AC is loud and not cooling.",st:"prog",rec:"amenity",dep:giYmd(0),dept:"Maintenance",at:careAgo(0.4),by:"",wo:wid,ex:1},
+  {id:3,room:"305",cat:"bfast",sev:"low",note:"Waffle station was out of batter at 8:30.",st:"done",rec:"apology",dep:giYmd(-1),dept:"Breakfast",at:careAgo(1.5),by:"",ex:1}]}return d.gi}
+function giForm(){S.gif=S.gif||{room:"",cat:"room",sev:"med",note:"",dep:"",rec:"none"};return S.gif}
+function giSet(k,v){giForm()[k]=v;render()}
+function giSync(){const f=giForm();["gRoom","gNote","gDep"].forEach(id=>{const e=$(id);if(e)f[id==="gRoom"?"room":id==="gNote"?"note":"dep"]=e.value})}
+function giPick(k,v){giSync();giForm()[k]=v;render()}
+function giPost(){giSync();const f=giForm();
+  if(!f.room.trim()||!f.note.trim()){const e=$("gErr");if(e)e.textContent=bx("Add the room and a short note.","Agrega la habitación y una nota corta.");return}
+  const d=D(),list=giList(),cat=giFind(GI_CATS,f.cat),id=careNextId(list),row={id,room:f.room.trim(),cat:f.cat,sev:f.sev,note:f.note.trim(),st:"open",rec:f.rec,dep:f.dep||"",dept:cat[3],at:new Date().toISOString(),by:cw(),photo:ph||""};
+  if(f.cat==="maint"){const wid=careNextId(d.wo);d.wo.unshift({id:wid,room:row.room,t:"Guest issue: "+row.note+" (logged by "+cw()+")",p:f.sev==="high"?"High":f.sev==="low"?"Low":"Med",s:"Open",photo:ph||"",comments:[],gi:id});row.wo=wid}
+  list.unshift(row);
+  const to=GI_ROLEOF[row.dept];if(to&&to!==authRole())careAlert(bx("🛎️ New guest issue · Rm "+row.room,"🛎️ Nueva queja de huésped · Hab. "+row.room),giCatName(row.cat)+" · "+giSevName(row.sev)+": "+row.note,{role:to});
+  S.gif={room:"",cat:"room",sev:"med",note:"",dep:"",rec:"none"};ph="";phFile=null;save();showToast(bx("Issue logged and sent to "+giDeptName(row.dept),"Queja registrada y enviada a "+giDeptName(row.dept)));render()}
+function giStatus(id,st){const g=giList().find(x=>x.id===id);if(!g)return;g.st=st;if(st==="done")g.doneAt=new Date().toISOString();save();render()}
+function giRecSet(id,v){const g=giList().find(x=>x.id===id);if(!g)return;g.rec=v;save();render()}
+function giDepDay(g){if(!g.dep)return 99;const a=new Date(g.dep+"T00:00:00"),b=new Date(giYmd(0)+"T00:00:00");return Math.round((a-b)/864e5)}
+function giOpen(){return giList().filter(g=>g.st!=="done")}
+function giDue(){return giOpen().filter(g=>giDepDay(g)<=1&&giDepDay(g)>=0).sort((a,b)=>giDepDay(a)-giDepDay(b))}
+function giDepLabel(g){const n=giDepDay(g);return n===99?"":n===0?bx("departs today","sale hoy"):n===1?bx("departs tomorrow","sale mañana"):n<0?bx("departed","ya salió"):bx("departs "+g.dep.slice(5),"sale "+g.dep.slice(5))}
+const GI_SEVC={low:"VC",med:"OD",high:"VD"};
+function giCard(g){const rem=g.st!=="done"&&giDepDay(g)<=1&&giDepDay(g)>=0,wo=g.wo&&(D().wo||[]).find(w=>w.id===g.wo),can=giCanWork();
+  return `<div class="card ${rem?"miss-red":""}" style="${rem?"":"border-left:4px solid #c0262d"}"><div class="row" style="margin:0"><b style="flex:0 0 auto">🛏️ ${bx("Rm","Hab.")} ${escH(g.room)}</b><span class="pill ${GI_SEVC[g.sev]}" style="flex:0 0 auto">${giSevName(g.sev)}</span><span class="pill ${g.st==="done"?"VC":g.st==="prog"?"OC":"VD"}" style="flex:0 0 auto">${giStName(g.st)}</span>${g.ex?`<span class="pill OD" style="flex:0 0 auto">${bx("EXAMPLE","EJEMPLO")}</span>`:""}</div>
+  <div style="margin:6px 0"><span class="pill RFI">${giCatName(g.cat)}</span> <small>→ ${giDeptName(g.dept)}</small></div><div class="raw">${escH(g.note)}</div>${g.photo?`<img class="prev" alt="" src="${g.photo}">`:""}
+  <small>${escH(careDate(g.at))}${g.by?" · "+escH(String(g.by).split(" ")[0]):""}${g.dep?" · 🧳 "+escH(giDepLabel(g)):""}</small>
+  ${rem?`<div class="bad" style="margin-top:4px">⏰ ${bx("Follow up with this guest before they check out.","Da seguimiento a este huésped antes de que salga.")}</div>`:""}
+  ${wo?`<div style="margin-top:6px"><button class="btn2" onclick="go('wo')">🔧 ${bx("Work order","Orden de trabajo")} #${wo.id} · ${escH(wo.s)} ›</button></div>`:""}
+  <div class="row" style="margin-top:6px"><label style="flex:0 0 auto"><small>${bx("Recovery offered","Compensación ofrecida")}</small></label><select ${can?"":"disabled"} aria-label="${escH(bx("Recovery offered","Compensación ofrecida"))}" onchange="giRecSet(${g.id},this.value)">${GI_REC.map(r=>`<option value="${r[0]}" ${g.rec===r[0]?"selected":""}>${bx(r[1],r[2])}</option>`).join("")}</select></div>
+  ${can?`<div class="chips">${GI_ST.map(s=>`<button class="chip ${g.st===s[0]?"on":""}" aria-pressed="${g.st===s[0]}" onclick="giStatus(${g.id},'${s[0]}')">${bx(s[1],s[2])}</button>`).join("")}</div>`:""}</div>`}
+M.gi=["🛎️","Guest Issues"];
+V.gi=function(){const f=giForm(),all=giList(),mine=giMyDept(),lead=careLead(),sel=S.giv||(lead?"all":"mine");
+  const form=giCanLog()?`<div class="card"><h3>${bx("Log a guest issue","Registrar queja de huésped")}</h3><div class="row"><input id="gRoom" inputmode="numeric" placeholder="${escH(bx("Room #","Hab. #"))}" value="${escH(f.room)}" aria-label="${escH(bx("Room number","Número de habitación"))}"><input id="gDep" type="date" value="${escH(f.dep)}" aria-label="${escH(bx("Guest departure date (optional)","Fecha de salida (opcional)"))}"></div><small>${bx("Departure date is optional; it powers the follow-up reminder.","La fecha de salida es opcional; activa el recordatorio de seguimiento.")}</small>
+  <div class="chips" role="group">${GI_CATS.map(c=>`<button type="button" class="chip ${f.cat===c[0]?"on":""}" aria-pressed="${f.cat===c[0]}" onclick="giPick('cat','${c[0]}')">${bx(c[1],c[2])}</button>`).join("")}</div>
+  <div class="chips" role="group">${GI_SEV.map(c=>`<button type="button" class="chip ${f.sev===c[0]?"on":""}" aria-pressed="${f.sev===c[0]}" onclick="giPick('sev','${c[0]}')">${bx(c[1],c[2])}</button>`).join("")}</div>
+  <textarea id="gNote" style="width:100%;min-height:64px" placeholder="${escH(bx("Short note","Nota corta"))}">${escH(f.note)}</textarea>
+  <div class="row"><select id="gRec" onchange="giPick('rec',this.value)" aria-label="${escH(bx("Recovery offered","Compensación ofrecida"))}">${GI_REC.map(r=>`<option value="${r[0]}" ${f.rec===r[0]?"selected":""}>${bx("Recovery: ","Compensación: ")}${bx(r[1],r[2])}</option>`).join("")}</select></div>
+  <div class="row">${photoField()}</div>${photoPrev()}<small>${bx("Goes to","Va a")}: <b>${giDeptName(giFind(GI_CATS,f.cat)[3])}</b>${f.cat==="maint"?" + "+bx("work order","orden de trabajo"):""}</small>
+  <div class="bad" id="gErr" role="alert"></div><button class="btn" style="width:100%" onclick="giPost()">${bx("Log issue","Registrar queja")}</button></div>`:"";
+  const rows=sel==="mine"&&mine?all.filter(g=>g.dept===mine):sel!=="all"&&sel!=="mine"?all.filter(g=>g.dept===sel):all,open=rows.filter(g=>g.st!=="done"),done=rows.filter(g=>g.st==="done");
+  const tabs=`<div class="chips">${mine&&!lead?`<button class="chip ${sel==="mine"?"on":""}" onclick="S.giv='mine';render()">${bx("My queue","Mi cola")} (${all.filter(g=>g.dept===mine&&g.st!=="done").length})</button>`:""}<button class="chip ${sel==="all"?"on":""}" onclick="S.giv='all';render()">${bx("All","Todas")} (${giOpen().length})</button>${Object.keys(GI_DEPT).map(k=>`<button class="chip ${sel===k?"on":""}" onclick="S.giv='${k}';render()">${giDeptName(k)} (${all.filter(g=>g.dept===k&&g.st!=="done").length})</button>`).join("")}</div>`;
+  const due=giDue();
+  return `<h2>🛎️ ${bx("Guest Issues","Quejas de Huéspedes")}</h2>${due.length&&giCanWork()?`<div class="miss-banner">⏰ ${due.length} ${bx("guest(s) with open issues leave today/tomorrow — follow up","huésped(es) con quejas abiertas salen hoy/mañana — dar seguimiento")}</div>`:""}${form}<div class="card"><h3>${bx("Department queues","Colas por departamento")}</h3>${tabs}</div>${open.map(giCard).join("")||`<div class="card"><small>${bx("No open issues here. 🎉","Sin quejas abiertas aquí. 🎉")}</small></div>`}${done.length?`<div class="card"><h3>${bx("Resolved","Resueltas")} (${done.length})</h3></div>${done.map(giCard).join("")}`:""}`};
+function giHomeCard(){const r=S.role,due=giDue(),mine=giMyDept(),n=mine?giList().filter(g=>g.dept===mine&&g.st!=="done").length:0;
+  if(!(giCanWork()&&(authRole()==="GM"||authRole()==="AGM"||authRole()==="Front Desk"||n)))return "";
+  const lines=[];if(due.length)lines.push(`<div class="miss-banner" style="margin:6px 0 0">⏰ ${due.length} ${bx("guest(s) with open issues depart soon — follow up","huésped(es) con quejas abiertas salen pronto — dar seguimiento")}</div>`);
+  if(authRole()==="Front Desk"||authRole()==="GM"||authRole()==="AGM"){}else if(n)lines.push(`<div style="margin-top:6px">${n} ${bx("open in your queue","abiertas en tu cola")}</div>`);
+  if(!lines.length&&!(authRole()==="Front Desk"))return "";
+  return `<div class="card" onclick="go('gi')" style="cursor:pointer"><b>🛎️ ${bx("Guest issues","Quejas de huéspedes")}</b> <span class="badge ${giOpen().length?"":"zero"}">${giOpen().length}</span>${lines.join("")}<br><small>${giCanLog()?bx("Log or review ›","Registrar o revisar ›"):bx("Open my queue ›","Abrir mi cola ›")}</small></div>`}
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("gi")&&!["Shuttle Driver","House Person","Laundry Attendant"].includes(r))TILES[r].push("gi")});
+const _homeGi=V.home;V.home=function(){return giHomeCard()+_homeGi()};
+/*GI_END*/
 </script></body></html>
