@@ -3311,12 +3311,13 @@ function sv(s){try{localStorage.setItem(K(),JSON.stringify(s))}catch(e){}}
 function retired(){try{return JSON.parse(localStorage.getItem("jrqotd_retired")||"[]")}catch(e){return []}}
 function pick(){if(!BANK)return null;const s=st(),d=today();if(s.h[d])return s.h[d];const b=BR[S.hotel],g=grp(authRole()||S.role),rt=retired();
   // only questions tagged for this exact role; ~80% own-role, ~20% shared; light brand question max once per 7 days
-  const ok=BANK.filter(q=>(q[1]=="all"||q[1]==b)&&(q[13]||[]).includes(g)&&!rt.includes(q[0])&&q[12]!==false);
+  const md=d.slice(5),live=q=>(!q[15]||q[15]===S.hotel)&&(!q[17]||q[17]>=d)&&(!q[16]||(q[16][0]<=q[16][1]?md>=q[16][0]&&md<=q[16][1]:md>=q[16][0]||md<=q[16][1]));
+  const ok=BANK.filter(q=>(q[1]=="all"||q[1]==b)&&(q[13]||[]).includes(g)&&!rt.includes(q[0])&&q[12]!==false&&live(q));
   const wk=Object.entries(s.h).filter(([k])=>k>new Date(Date.now()-7*864e5).toLocaleDateString("en-CA",{timeZone:"America/Chicago"})).map(([,v])=>v.id);
   const lightOk=!ok.some(q=>q[14]==="brand_light"&&wk.includes(q[0]));
   let id=Object.keys(s.rev).map(Number).find(i=>s.rev[i]<=d&&ok.some(q=>q[0]==i)),review=!!id;
   if(!id){const seen=new Set(Object.values(s.h).map(x=>x.id));let pool=ok.filter(q=>!seen.has(q[0])&&(q[14]!=="brand_light"||lightOk));if(!pool.length)pool=ok.filter(q=>q[14]!=="brand_light");
-    const want=Math.random()<.8?"role":"shared";const pref=pool.filter(q=>want==="role"?q[14]==="role":q[14]!=="role");const use=pref.length?pref:pool;
+    const want=Math.random()<.8?"role":"shared";const pref=pool.filter(q=>want==="role"?q[14]==="role":q[14]!=="role");const seas=pool.filter(q=>q[16]&&Math.random()<.5),use=seas.length?seas:(pref.length?pref:pool);
     id=(use[Math.floor(Math.random()*use.length)]||[])[0]}
   if(!id)return null;s.h[d]={id,review,role:g};sv(s);return s.h[d]}
 const L=()=>S.qlang||LANG;
