@@ -3915,4 +3915,51 @@ V.recs=function(){const c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM"
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("recs"))TILES[r].push("recs")});
 const _homeRc=V.home;V.home=function(){const r=authRole();return (r==="Front Desk"||r==="Shuttle Driver"?`<div class="card" onclick="go('recs')" style="cursor:pointer"><b>📍 ${bx("Local tips","Tips locales")}</b> <small>${bx("food · MSP/MOA directions · attractions ›","comida · rutas MSP/MOA · atracciones ›")}</small></div>`:"")+_homeRc()};
 /*RECS_END*/
+/*RUSH_START*/
+// Rush room queue: front desk flags a room (early check-in time, guest priority, note). Pins to the top of the room board and the
+// attendant's list with a countdown, and notifies the front desk in-app when the room is cleaned and when it is inspected (guest ready).
+// Reuses the existing "rush" housekeeping priority (r.pri) and adds r.rush metadata.
+const RUSH_G=[["vip","VIP","VIP"],["elite","Elite member","Miembro elite"],["standard","Standard","Estándar"]];
+function rushG(k){const x=RUSH_G.find(y=>y[0]===k)||RUSH_G[2];return bx(x[1],x[2])}
+function rushCanFlag(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"}
+function rushIsOn(r){return hkPri(r)==="rush"&&roomFlow(r)!=="ready"&&roomFlow(r)!=="ooo"}
+function rushDemo(){const d=D();if(d.rushDemo||!d.rooms)return;d.rushDemo=1;const r=d.rooms.find(x=>x.n==101);if(r&&hkPri(r)==="rush"&&!r.rush)r.rush={by:"",at:Date.now()-10*60000,due:Date.now()+45*60000,guest:"vip",note:"Guest landed early and is coming straight from the airport.",ex:1}}
+function rushList(){rushDemo();return (D().rooms||[]).filter(rushIsOn).sort((a,b)=>((a.rush&&a.rush.due)||9e15)-((b.rush&&b.rush.due)||9e15)||a.n-b.n)}
+function rushCd(r){if(!r.rush||!r.rush.due)return bx("ASAP","Lo antes posible");const m=Math.round((r.rush.due-Date.now())/60000);if(m>=60)return bx(Math.floor(m/60)+"h "+(m%60)+"m left","faltan "+Math.floor(m/60)+"h "+(m%60)+"m");return m>=0?bx(m+" min left","faltan "+m+" min"):bx("OVERDUE "+(-m)+" min","ATRASADO "+(-m)+" min")}
+function rushTime(r){return r.rush&&r.rush.due?new Date(r.rush.due).toLocaleTimeString(localeTag(),{hour:"numeric",minute:"2-digit"}):""}
+function rushLate(r){return r.rush&&r.rush.due&&r.rush.due<Date.now()}
+function rushTick(){document.querySelectorAll("[data-rid]").forEach(e=>{const r=(D().rooms||[]).find(x=>x.n==e.dataset.rid);if(r){e.textContent=rushCd(r);e.classList.toggle("bad",!!rushLate(r))}})}
+setInterval(rushTick,15000);
+function rushF(){S.rf=S.rf||{room:"",time:"",guest:"vip",note:""};return S.rf}
+function rushSync(){const f=rushF();[["rfRoom","room"],["rfTime","time"],["rfNote","note"]].forEach(([i,k])=>{const e=$(i);if(e)f[k]=e.value})}
+function rushPick(v){rushSync();rushF().guest=v;render()}
+function rushFlag(){rushSync();const f=rushF(),d=D(),e=$("rfErr"),r=d.rooms.find(x=>x.n==f.room);
+  if(!r){e.textContent=bx("Pick a room.","Elige una habitación.");return}
+  if(roomFlow(r)==="ready"){e.textContent=bx("That room is already guest ready.","Esa habitación ya está lista para el huésped.");return}
+  let due=0;if(f.time){const [h,m]=f.time.split(":").map(Number),t0=new Date();t0.setHours(h,m,0,0);due=t0.getTime()}
+  r.pri="rush";r.rush={by:cw(),at:Date.now(),due,guest:f.guest,note:f.note.trim(),done:0};
+  const hk=r.hk&&USERS.find(u=>u.name===r.hk&&u.hotel===S.hotel);
+  careAlert(bx("⚡ Rush room "+r.n,"⚡ Habitación urgente "+r.n),bx("Early check-in"+(due?" at "+rushTime(r):"")+" · "+rushG(f.guest)+(r.rush.note?" · "+r.rush.note:""),"Entrada temprana"+(due?" a las "+rushTime(r):"")+" · "+rushG(f.guest)+(r.rush.note?" · "+r.rush.note:"")),hk?{uid:hk.id}:{role:"Housekeeping"});
+  S.rf={room:"",time:"",guest:"vip",note:""};save();showToast(bx("Room "+r.n+" flagged rush","Habitación "+r.n+" marcada urgente"));render()}
+function rushClear(n){const r=D().rooms.find(x=>x.n==n);if(!r)return;r.pri="normal";if(r.rush)r.rush.done=Date.now();save();render()}
+// notify the front desk when a rush room is cleaned / inspected
+{const _srf=setRoomFlow;setRoomFlow=function(n,status,extra){const r0=(D().rooms||[]).find(x=>x.n==n),was=!!(r0&&hkPri(r0)==="rush"&&roomFlow(r0)!=="ready");_srf.apply(this,arguments);
+  const r=(D().rooms||[]).find(x=>x.n==n);if(!r||!was||(status!=="cleaned"&&status!=="ready"))return;
+  const clean=status==="cleaned";careAlert(clean?bx("🧹 Rush room "+r.n+" is clean","🧹 Habitación urgente "+r.n+" limpia"):bx("✅ Rush room "+r.n+" is guest ready","✅ Habitación urgente "+r.n+" lista"),clean?bx("Cleaned. Waiting for inspection.","Limpia. Esperando inspección."):bx("Inspected and ready. You can check the guest in.","Inspeccionada y lista. Ya puedes registrar al huésped."),{role:"Front Desk"});
+  if(status==="ready"){r.pri="normal";if(r.rush)r.rush.done=Date.now()}save();render()}}
+function rushRow(r,open){const g=r.rush&&r.rush.guest;return `<div style="padding:8px;margin:8px 0;border:1px solid #c0262d;border-radius:10px;background:#fff7f7"><div class="row" style="margin:0"><b class="raw" style="font-size:24px;flex:0 0 58px">${r.n}</b><span style="flex:1;min-width:0"><span class="pill flow-${roomFlow(r)}">${flowLabel(roomFlow(r))}</span>${g?` <span class="pill ${g==="vip"?"VD":"OD"}">${rushG(g)}</span>`:""}${r.rush&&r.rush.ex?` <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}<br><small>${r.hk?escH(String(r.hk).split(" ")[0])+" · ":""}${rushTime(r)?"🕐 "+escH(rushTime(r))+" · ":""}<b class="raw ${rushLate(r)?"bad":""}" data-rid="${r.n}">${escH(rushCd(r))}</b></small></span></div>${r.rush&&r.rush.note?`<div class="wlnote">${escH(r.rush.note)}</div>`:""}${open&&rushCanFlag()?`<button class="btn2" onclick="rushClear(${r.n})">${bx("Remove rush","Quitar urgente")}</button>`:""}</div>`}
+function rushPinCard(){const l=rushList();if(!l.length)return "";return `<div class="card" style="border:2px solid #c0262d"><h3>⚡ ${bx("Rush rooms","Habitaciones urgentes")} (${l.length})</h3><small>${bx("Do these first. Countdown is to the guest's early check-in time.","Haz estas primero. La cuenta regresiva es a la hora de entrada temprana del huésped.")}</small>${l.map(r=>rushRow(r,false)).join("")}</div>`}
+M.rushq=["⚡","Rush Rooms"];
+V.rushq=function(){const f=rushF(),d=D(),l=rushList(),pick=d.rooms.filter(r=>roomFlow(r)!=="ready"&&roomFlow(r)!=="ooo"&&!rushIsOn(r)).slice().sort((a,b)=>a.n-b.n),doneL=d.rooms.filter(r=>r.rush&&r.rush.done&&!rushIsOn(r)).slice(0,5);
+  const form=rushCanFlag()?`<div class="card"><h3>${bx("Flag a rush room","Marcar habitación urgente")}</h3><div class="row"><select id="rfRoom" aria-label="${escH(bx("Room","Habitación"))}"><option value="">${bx("Room…","Habitación…")}</option>${pick.map(r=>`<option value="${r.n}" ${String(f.room)===String(r.n)?"selected":""}>${r.n} · ${flowLabel(roomFlow(r))}</option>`).join("")}</select><input id="rfTime" type="time" value="${escH(f.time)}" aria-label="${escH(bx("Early check-in time","Hora de entrada temprana"))}"></div><small>${bx("Early check-in time (blank = as soon as possible)","Hora de entrada temprana (vacío = lo antes posible)")}</small><div class="chips" role="group">${RUSH_G.map(g=>`<button type="button" class="chip ${f.guest===g[0]?"on":""}" aria-pressed="${f.guest===g[0]}" onclick="rushPick('${g[0]}')">${bx(g[1],g[2])}</button>`).join("")}</div><input id="rfNote" style="width:100%" placeholder="${escH(bx("Note (e.g. needs crib, quiet floor)","Nota (ej. necesita cuna, piso tranquilo)"))}" value="${escH(f.note)}"><div class="bad" id="rfErr" role="alert"></div><button class="btn" style="width:100%" onclick="rushFlag()">⚡ ${bx("Flag rush","Marcar urgente")}</button><small>${bx("Housekeeping sees it pinned first. You get an alert when the room is clean and when it is inspected.","Ama de llaves lo ve fijado primero. Recibes una alerta cuando la habitación está limpia y cuando se inspecciona.")}</small></div>`:"";
+  return `<h2>⚡ ${bx("Rush Rooms","Habitaciones Urgentes")}</h2>${form}<div class="card"><h3>${bx("Active","Activas")} (${l.length})</h3>${l.map(r=>rushRow(r,true)).join("")||`<small>${bx("No rush rooms right now.","No hay habitaciones urgentes ahora.")}</small>`}</div>${doneL.length?`<div class="card"><h3>${bx("Done","Listas")}</h3>${doneL.map(r=>`<div class="li"><b class="raw">${r.n}</b><span style="flex:1">${rushG(r.rush.guest)} · ${bx("guest ready","lista")}</span></div>`).join("")}</div>`:""}`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("rushq")&&["GM","Front Desk","Housekeeping"].includes(r))TILES[r].push("rushq")});
+// pin on the housekeeping room board and the attendant's list
+{const _rbp=roomBoardPage;roomBoardPage=function(){const h=_rbp(),i=h.indexOf("</h2>")+5;return h.slice(0,i)+rushPinCard()+h.slice(i)};
+const _bc=boardCard;boardCard=function(r){const h=_bc(r);return rushIsOn(r)&&r.rush?h.replace(/<\/div>$/,`<div class="wlnote">⏱ <b class="raw" data-rid="${r.n}">${escH(rushCd(r))}</b></div></div>`):h};
+const _mrc=myRoomCard;myRoomCard=function(x){let h=_mrc(x);if(rushIsOn(x)&&x.rush)h=h.replace('<div class="hkbig">',`<div class="wlnote"><b>⚡ ${bx("Rush","Urgente")}</b> · ${rushG(x.rush.guest)} · ${rushTime(x)?"🕐 "+escH(rushTime(x))+" · ":""}<b class="raw ${rushLate(x)?"bad":""}" data-rid="${x.n}">${escH(rushCd(x))}</b>${x.rush.note?"<br>"+escH(x.rush.note):""}</div><div class="hkbig">`);return h};
+const _mrp=myRoomsPage;myRoomsPage=function(){const h=_mrp(),me=cw(),n=(D().rooms||[]).filter(x=>x.hk===me&&rushIsOn(x)).length;return n?h.replace("</h2>",`</h2><div class="miss-banner">⚡ ${n} ${bx("rush room(s) first","habitación(es) urgente(s) primero")}</div>`):h};
+myRoomSort=function(a,b){const pr=x=>hkPri(x)==="rush"?0:hkPri(x)==="priority"?1:2,st=x=>roomFlow(x)==="cleaned"?1:0,du=x=>(x.rush&&x.rush.due)||9e15;return pr(a)-pr(b)||st(a)-st(b)||du(a)-du(b)||a.n-b.n}}
+const _homeRush=V.home;V.home=function(){const r=authRole(),l=(r==="Front Desk"||r==="GM"||r==="AGM"||r==="Housekeeping")?rushList():[];return (l.length?`<div class="card" onclick="go('rushq')" style="cursor:pointer;border:2px solid #c0262d"><b>⚡ ${bx("Rush rooms","Habitaciones urgentes")} (${l.length})</b>${l.slice(0,3).map(x=>rushRow(x,false)).join("")}<small>${rushCanFlag()?bx("Flag or review ›","Marcar o revisar ›"):bx("Open ›","Abrir ›")}</small></div>`:"")+_homeRush()};
+/*RUSH_END*/
 </script></body></html>
