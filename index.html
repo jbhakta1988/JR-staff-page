@@ -4445,14 +4445,84 @@ function drawToast(){let el=document.getElementById("lpToast");if(!el){el=docume
  el.innerHTML=LP.toast?`<span>${E(LP.toast.msg)}</span>${LP.toast.undoFn?`<button type=button onclick="LPX.toastUndo()">${B("Undo","Deshacer")}</button>`:""}`:"";el.hidden=!LP.toast}
 function hotelPick(){return isCorp()?`<div class="lp-seg" role="tablist">${Object.keys(HOTELS).map(k=>`<button type=button class="${k===hotel()?"on":""}" onclick="LPX.setHotel('${k}')">${k}${pending(k).length?` <span class=lp-badge>${pending(k).length}</span>`:""}</button>`).join("")}</div>`:""}
 function weekPick(w,fn){return `<div class="lp-wk"><button type=button aria-label="${B("Previous week","Semana anterior")}" onclick="LPX.${fn}(-1)">‹</button><b>${E(wkLabel(w))}</b>${w===CUR?`<span class="pill">${B("This week","Esta semana")}</span>`:""}<button type=button aria-label="${B("Next week","Semana siguiente")}" onclick="LPX.${fn}(1)">›</button></div>`}
+// ---------- OCCUPANCY-DRIVEN PLAN (corporate edits; GM/AGM view) ----------
+const STK="jrportal_lstd_v1",OVK="jrportal_occov_v1",CLK="jrportal_occcalc_v1";
+const OPOS=["Front Desk","HK Lead","Housekeeper","Maintenance","House Person","Laundry Attendant","Breakfast Attendant"];
+// EXAMPLE standards. fixed = hrs/day regardless of occupancy; per = hrs per occupied room (Housekeeper uses MPR minutes); min/max clamp per day.
+const OTDEF={co:30,so:20,oth:25,brk:30,side:20,lbsCO:12,lbsSO:5,lbsLoad:50,minLoad:20,sup:3,t_pub:45,t_trash:20,t_linen:30,t_rest:20};
+const DEFROOMS={MSPWE:105,MSPAM:117,MSPMS:113};
+function defStd(h){return {rooms:DEFROOMS[h]||100,auto:false,ex:true,wkStart:1,pos:{
+ "Front Desk":{fixed:24,per:0.02,min:24,max:34},"HK Lead":{fixed:8,per:0,min:8,max:8},"Housekeeper":{fixed:0,mprCO:30,mprSO:20,min:0,max:80},
+ "Maintenance":{fixed:8,per:0,min:8,max:10},"House Person":{fixed:4,per:0.03,min:4,max:10},"Laundry Attendant":{fixed:2,mpc:5.5,min:4,max:12},
+ "Breakfast Attendant":{fixed:5.5,dow:[5.5,5.5,5.5,5.5,5.5,8.5,8.5],per:0,min:5,max:10}},ot:Object.assign({},OTDEF)}}
+function stdAll(){return jget(STK,{})}
+// Effective-dated standards: STK[h] = {v:[{eff:"YYYY-MM-DD",data}], hist:[{who,at,eff,what}]}
+function stdVer(h,date){const a=stdAll()[h];if(!a)return null;if(!a.v)return a;const d=date||iso(new Date());const l=a.v.filter(x=>x.eff<=d).sort((x,y)=>x.eff<y.eff?-1:1);return l.length?l[l.length-1].data:null}
+function stdHist(h){const a=stdAll()[h];return (a&&a.hist)||[]}
+function std(h,date){const s=stdVer(h,date);if(!s)return defStd(h);const d=defStd(h);d.rooms=s.rooms;d.auto=!!s.auto;d.ex=false;if(s.wkStart!=null)d.wkStart=s.wkStart;if(s.ot)Object.assign(d.ot,s.ot);Object.keys(d.pos).forEach(p=>{if(s.pos&&s.pos[p]){Object.assign(d.pos[p],s.pos[p]);if(!("dow" in s.pos[p]))delete d.pos[p].dow}});return d}
+function stdSave(h,s,what,eff){const a=stdAll();let o=a[h];if(!o||!o.v)o={v:o?[{eff:"2000-01-01",data:o}]:[],hist:[]};eff=eff||LP.eff||iso(new Date());
+ const data={rooms:s.rooms,auto:s.auto,wkStart:s.wkStart,pos:s.pos,ot:s.ot};const ex=o.v.find(x=>x.eff===eff);if(ex)ex.data=data;else o.v.push({eff,data});
+ if(what){o.hist.unshift({who:(meUser()||{}).name||"",at:Date.now(),eff,what});o.hist=o.hist.slice(0,200)}a[h]=o;sset(STK,JSON.stringify(a))}
+const OTF=[["co","HK checkout min","HK salida min"],["so","HK stayover min","HK continuación min"],["oth","HK other/deep min","HK otro/profundo min"],["brk","Break min","Descanso min"],["side","Side work min","Trabajo extra min"],["lbsCO","Laundry lbs / checkout","Lavandería lbs / salida"],["lbsSO","Laundry lbs / stayover","Lavandería lbs / continuación"],["lbsLoad","Lbs per load","Lbs por carga"],["minLoad","Min per load","Min por carga"],["sup","Houseperson min / room","Min de houseperson / cuarto"],["t_pub","Public areas min","Áreas públicas min"],["t_trash","Trash run min","Recorrido de basura min"],["t_linen","Linen runs min","Recorridos de blancos min"],["t_rest","Lobby restrooms min","Baños del lobby min"]];
+const r4=n=>Math.round(n*4)/4;
+
+function dayDate(w,i){const d=new Date(w+"T12:00:00");d.setDate(d.getDate()+i);return d}
+// forecast: S.h[h].fc[k] = today+k; occ is % (values >100 treated as rooms)
+function fcDay(h,w,i){const fc=((S.h||{})[h]||{}).fc||[],st=std(h);const t=new Date();t.setHours(12,0,0,0);const k=Math.round((dayDate(w,i)-t)/864e5);
+ if(!fc.length)return {rooms:(((laborPlan.rooms||{})[h])||[])[i]||0,pct:null,src:"plan"};
+ const e=k>=0&&k<fc.length?fc[k]:fc[((k%fc.length)+fc.length)%fc.length],est=!(k>=0&&k<fc.length);const v=+e.occ||0;
+ const rooms=v>100?v:Math.round(v/100*st.rooms);return {rooms,pct:Math.round(rooms/st.rooms*100),src:est?"est":"fc"}}
+function cleansDay(h,w,i,occ){const c=(window.LCMD&&LCMD.cleansFor)?LCMD.cleansFor(h,iso(dayDate(w,i))):null;if(c)return c;const f=((S.h||{})[h]||{}).fc||[];const t=new Date();t.setHours(12,0,0,0);const k=Math.round((dayDate(w,i)-t)/864e5);const e=f.length?(k>=0&&k<f.length?f[k]:f[((k%f.length)+f.length)%f.length]):null;
+ const co=Math.min(occ,Math.round(e&&e.arr!=null?(+e.arr)*0.9:occ*0.45));return {co,so:Math.max(0,occ-co),src:"fc"}}
+function ovAll(){return jget(OVK,{})}
+function ov(h,w){return ovAll()[key(h,w)]||[null,null,null,null,null,null,null]}
+function occRooms(h,w){const o=ov(h,w);return [0,1,2,3,4,5,6].map(i=>o[i]!=null&&o[i]!==""?+o[i]:fcDay(h,w,i).rooms)}
+function calcHours(h,w){const occ=occRooms(h,w),out={};OPOS.forEach(p=>{out[p]=occ.map((n,i)=>{const s=std(h,iso(dayDate(w,i))),c=s.pos[p],cl=cleansDay(h,w,i,n);
+ const fx=Array.isArray(c.dow)?(+c.dow[i]||0):(+c.fixed||0);let v=fx+(p==="Housekeeper"?(cl.co*(+c.mprCO||0)+cl.so*(+c.mprSO||0))/60:p==="Laundry Attendant"?(cl.co+cl.so)*(+c.mpc||0)/60:(+c.per||0)*n);if(c.min!=null&&c.min!=="")v=Math.max(+c.min,v);if(c.max!=null&&c.max!==""&&+c.max>0)v=Math.min(+c.max,v);return r4(Math.max(0,v))})});return {hours:out,occ}}
+function calcSnap(h,w){return jget(CLK,{})[key(h,w)]||null}
+function moved(h,w){const sn=calcSnap(h,w);if(!sn)return [];const occ=occRooms(h,w);return occ.map((n,i)=>{const d=n-(sn.occ[i]||0);return Math.abs(d)>=Math.max(5,0.05*std(h).rooms)?d:0})}
+function occPanel(h,w,ed){const s=std(h),occ=occRooms(h,w),o=ov(h,w),mv=moved(h,w),sn=calcSnap(h,w),open=LP.stdOpen;
+ const cells=[0,1,2,3,4,5,6].map(i=>{const f=fcDay(h,w,i),isO=o[i]!=null&&o[i]!=="",pct=Math.round(occ[i]/s.rooms*100);
+  return `<div class="oc-d ${mv[i]?"oc-mv":""}"><b>${B(DN[i][0],DN[i][1])}</b><small>${dayDate(w,i).getDate()}</small>
+  <small class=oc-f>${B("Fcst","Pron")} ${f.rooms}${f.src==="est"?"*":""}</small>
+  ${ed?`<input class="lp-in ${isO?"oc-ov":""}" inputmode=numeric aria-label="${B("Occupied rooms","Cuartos ocupados")} ${DN[i][0]}" value="${occ[i]}" onchange="LPX.ov(${i},this.value)">`:`<b class=oc-n>${occ[i]}</b>`}
+  <small>${pct}%</small>${isO?`<small class=oc-tag>${B("override","ajuste")}${ed?` <a href="#" onclick="LPX.ov(${i},'');return false">×</a>`:""}</small>`:""}${mv[i]?`<small class=oc-flag>⚠ ${mv[i]>0?"+":""}${mv[i]}</small>`:""}</div>`}).join("");
+ const flagN=mv.filter(Boolean).length;
+ let html=`<div class="card oc" id=occPanel><div class=oc-h><h3>📈 ${B("Plan from occupancy","Plan según ocupación")}</h3>${s.ex?`<span class="pill warnp">${B("EXAMPLE standards","Estándares de EJEMPLO")}</span>`:""}</div>
+ <small>${B("Occupied rooms per day (forecast, editable by corporate). Hours = fixed + per occupied room, rounded to ¼ hr.","Cuartos ocupados por día (pronóstico, editable por corporativo). Horas = fijas + por cuarto ocupado, redondeado a ¼ hr.")} ${B("* = estimated from last forecast pattern.","* = estimado del último patrón de pronóstico.")}</small>
+ <div class=oc-days>${cells}</div>
+ ${flagN?`<div class=oc-warn>⚠ ${B(`Forecast moved on ${flagN} day(s) since the plan was calculated.`,`El pronóstico cambió en ${flagN} día(s) desde que se calculó el plan.`)}${ed?` <button type=button onclick="LPX.calc()">${B("Recalculate","Recalcular")}</button>`:""}</div>`:""}
+ <small>${sn?B("Last calculated","Último cálculo")+" "+E(new Date(sn.at).toLocaleString(LANG==="es"?"es-US":"en-US",{dateStyle:"medium",timeStyle:"short"})):B("Not calculated from occupancy yet for this week.","Aún no calculado por ocupación esta semana.")}</small>
+ ${ed?`<div class=oc-act><button type=button class=primary onclick="LPX.calc()">🧮 ${B("Calculate plan","Calcular plan")}</button><label class=oc-auto><input type=checkbox ${s.auto?"checked":""} onchange="LPX.auto(this.checked)"> ${B("Auto-recalculate when forecast moves","Recalcular automáticamente si cambia el pronóstico")}</label></div>`:""}
+ <button type=button class=lp-link onclick="LPX.stdT()">⚙️ ${B("Labor standards","Estándares de labor")} · ${E(h)} ${open?"▴":"▾"}</button>`;
+ if(open)html+=stdTable(h,s,ed);
+ if(LP.prev&&LP.prev.k===key(h,w))html+=prevTable();
+ return html+"</div>"}
+function stdTable(h,s,ed){const inp=(p,f,v)=>ed?`<input class=lp-in inputmode=decimal aria-label="${E(p)} ${f}" value="${v==null?"":v}" onchange="LPX.std('${E(p)}','${f}',this.value)">`:`<span>${v==null||v===""?"—":v}</span>`;
+ const hist=stdHist(h);return `<div class=oc-std><div class=oc-eff><label>${B("Effective from","Vigente desde")} ${ed?`<input type=date value="${LP.eff||iso(new Date())}" onchange="LPX.eff(this.value)">`:`<b>${E(LP.eff||iso(new Date()))}</b>`}</label><label>${B("Week starts","Semana inicia")} ${ed?`<select onchange="LPX.std('','wkStart',this.value)">${[[1,"Mon–Sun","Lun–Dom"],[6,"Sat–Fri (HE)","Sáb–Vie (HE)"],[5,"Fri–Thu (payroll)","Vie–Jue (nómina)"]].map(o=>`<option value="${o[0]}" ${+s.wkStart===o[0]?"selected":""}>${B(o[1],o[2])}</option>`).join("")}</select>`:`<b>${({1:B("Mon–Sun","Lun–Dom"),6:B("Sat–Fri","Sáb–Vie"),5:B("Fri–Thu","Vie–Jue")})[s.wkStart]||""}</b>`}</label></div><label class=oc-rm>${B("Total rooms","Cuartos totales")} ${ed?`<input class=lp-in inputmode=numeric value="${s.rooms}" onchange="LPX.std('','rooms',this.value)">`:`<b>${s.rooms}</b>`}</label>
+ <div class=lp-wrap><table class=lp-t><thead><tr><th>${B("Position","Puesto")}</th><th>${B("Fixed hrs/day","Hrs fijas/día")}</th><th>${B("Per occ. room","Por cuarto ocup.")}</th><th>${B("Min/day","Mín/día")}</th><th>${B("Max/day","Máx/día")}</th></tr></thead><tbody>
+ ${OPOS.map(p=>{const c=s.pos[p];return `<tr><th scope=row>${E(roleName(p)||p)}</th><td>${Array.isArray(c.dow)?`<div class=oc-dow>${c.dow.map((v,i)=>`<label><small>${B(DN[i][0],DN[i][1])}</small>${ed?`<input class=lp-in inputmode=decimal aria-label="${E(p)} ${DN[i][0]}" value="${v}" onchange="LPX.std('${E(p)}','dow.${i}',this.value)">`:`<b>${v}</b>`}</label>`).join("")}</div>`:inp(p,"fixed",c.fixed)}${ed?`<button type=button class=oc-mini onclick="LPX.std('${E(p)}','dowT',1)">${Array.isArray(c.dow)?B("Same every day","Igual cada día"):B("By weekday","Por día")}</button>`:""}</td><td>${p==="Housekeeper"?`${inp(p,"mprCO",c.mprCO)} <small>CO MPR</small><br>${inp(p,"mprSO",c.mprSO)} <small>SO MPR</small><br><small>${B("× cleans","× limpiezas")}</small>`:p==="Laundry Attendant"?`${inp(p,"mpc",c.mpc)} <small>${B("min/clean","min/limpieza")}</small>`:`${inp(p,"per",c.per)} <small>${B("hrs","hrs")}</small>`}</td><td>${inp(p,"min",c.min)}</td><td>${inp(p,"max",c.max)}</td></tr>`}).join("")}
+ </tbody></table></div>
+ <h4>${B("Out-time standards (minutes)","Estándares de hora de salida (minutos)")}</h4><div class=oc-ot>${OTF.map(f=>`<label>${B(f[1],f[2])}${ed?`<input class=lp-in inputmode=decimal value="${s.ot[f[0]]}" onchange="LPX.std('','ot.${f[0]}',this.value)">`:`<b>${s.ot[f[0]]}</b>`}</label>`).join("")}</div>${ed?"":`<div class=lp-ro>🔒 ${B("View only. Only JR Corporate can change labor standards.","Solo lectura. Solo JR Corporativo puede cambiar los estándares.")}</div>`}<details class=oc-hist><summary>🕘 ${B("Change history","Historial de cambios")} (${hist.length})</summary>${hist.length?hist.slice(0,30).map(x=>`<div><small>${E(new Date(x.at).toLocaleString(LANG==="es"?"es-US":"en-US",{dateStyle:"short",timeStyle:"short"}))} · <b>${E(x.who)}</b> · ${B("eff.","vig.")} ${E(x.eff)}</small><div>${E(x.what)}</div></div>`).join(""):`<small>${B("No changes yet.","Sin cambios aún.")}</small>`}</details>
+ ${s.ex?`<small>${B("Example defaults — corporate should replace with brand/JR standards.","Valores de ejemplo — corporativo debe reemplazarlos con los estándares de la marca/JR.")}</small>`:""}</div>`}
+function prevTable(){const pv=LP.prev,cur=LP.draft.hours;let dt=0;
+ const rows=OPOS.map(p=>{const a=cur[p]||[0,0,0,0,0,0,0],b=pv.hours[p];dt+=sum(b)-sum(a);return `<tr><th scope=row>${E(roleName(p)||p)}</th>${b.map((v,i)=>{const c=+a[i]||0;return `<td class="${v!==c?(v>c?"oc-up":"oc-dn"):""}">${v!==c?`<s>${c}</s> `:""}<b>${v}</b></td>`}).join("")}<td><b>${sum(b)}</b> <small>(${sum(b)-sum(a)>=0?"+":""}${sum(b)-sum(a)})</small></td></tr>`}).join("");
+ return `<div class=oc-prev id=occPrev><h3>${B("Preview: new plan vs current","Vista previa: plan nuevo vs actual")}</h3><div class=lp-wrap><table class=lp-t><thead><tr><th>${B("Position","Puesto")}</th>${DN.map(d=>`<th>${B(d[0],d[1])}</th>`).join("")}<th>${B("Week","Semana")}</th></tr></thead><tbody>${rows}</tbody></table></div>
+ ${(()=>{const z=[];OPOS.forEach(p=>pv.hours[p].forEach((v,i)=>{if(!v)z.push(`${roleName(p)||p} ${B(DN[i][0],DN[i][1])}`)}));return z.length?`<div class=oc-warn>⚠ ${B("Zero hours planned for","Cero horas planeadas para")}: ${E(z.join(", "))}</div>`:""})()}<div class=oc-act><b>${B("Week change","Cambio semanal")}: ${dt>=0?"+":""}${dt} ${B("hrs","hrs")}</b><button type=button class=primary onclick="LPX.apply()">✔ ${B("Apply to plan","Aplicar al plan")}</button><button type=button class=lp-no onclick="LPX.cancelPrev()">${B("Cancel","Cancelar")}</button></div><small>${B("After applying you can still tweak any cell, Undo, then Save.","Después de aplicar puede ajustar cualquier celda, Deshacer y luego Guardar.")}</small></div>`}
+function autoCheck(h,w){if(!isCorp()||!std(h).auto||!LP.draft||LP.prev)return;if(!moved(h,w).some(Boolean))return;const c=calcHours(h,w);push();Object.assign(LP.draft.hours,c.hours);LP.draft.rooms=c.occ.slice();snapCalc(h,w,c.occ);toast(B("Forecast moved — plan auto-recalculated. Review, then Save.","El pronóstico cambió — plan recalculado. Revise y guarde."),()=>{LPX.undo()})}
+function snapCalc(h,w,occ){const a=jget(CLK,{});a[key(h,w)]={occ:occ.slice(),at:Date.now()};sset(CLK,JSON.stringify(a))}
+// public helpers for Schedule
+function planWeek(h,w){const p=planFor(h,w),tr=trainingRows(h,w),trp={};tr.forEach(r=>{trp[r.pos]=trp[r.pos]||[0,0,0,0,0,0,0];trHours(r).forEach((v,i)=>trp[r.pos][i]+=v)});return {hours:p.hours,training:trp}}
+
 // ---------- LABOR PLAN ----------
 function viewPlan(){const h=hotel(),w=LP.week,ed=isCorp();
  if(ed&&(!LP.draft||LP.draft._k!==key(h,w))){LP.draft=planFor(h,w);LP.draft._k=key(h,w);LP.undo=[];LP.note=""}
+ try{autoCheck(h,w)}catch(e){}
  const p=ed?LP.draft:planFor(h,w),tr=trainingRows(h,w),m=mode();
  const rowsObj=LP.assoc?p.assoc:p.hours,names=Object.keys(rowsObj);
  const dayT=[0,1,2,3,4,5,6].map(i=>sum(Object.values(p.hours).map(a=>a[i]))), trT=[0,1,2,3,4,5,6].map(i=>sum(tr.map(r=>trHours(r)[i])));
  const dirty=ed&&saved(h,w)?JSON.stringify(strip(LP.draft))!==JSON.stringify(strip(saved(h,w))):ed&&JSON.stringify(strip(LP.draft))!==JSON.stringify(strip(Object.assign(basePlan(h),{by:null,at:null,note:""})));
- let html=`<div id=lpRoot class="lp ${m}"><h2>${B("Labor Plan","Plan de labor")}</h2>${hotelPick()}${weekPick(w,"wk")}
+ let html=`<div id=lpRoot class="lp ${m}"><h2>${B("Labor Plan","Plan de labor")}</h2>${hotelPick()}${weekPick(w,"wk")}${occPanel(h,w,ed)}
  <div class="card lp-meta"><small>${stamp(saved(h,w))}</small>${ed?"":`<div class=lp-ro>🔒 ${B("View only. Only JR Corporate can change labor plans.","Solo lectura. Solo JR Corporativo puede cambiar los planes de labor.")}</div>`}</div>
  <div class="lp-seg sm"><button type=button class="${!LP.assoc?"on":""}" onclick="LPX.mode(false)">${B("By position","Por puesto")}</button><button type=button class="${LP.assoc?"on":""}" onclick="LPX.mode(true)">${B("By associate","Por asociado")}</button></div>`;
  if(ed)html+=`<div class=lp-tools><button type=button onclick="LPX.copyLast()">📋 ${B("Copy last week","Copiar semana pasada")}</button><button type=button ${LP.undo.length?"":"disabled"} onclick="LPX.undo()">↶ ${B("Undo","Deshacer")}</button><button type=button onclick="LPX.reset()">${B("Reset to saved","Volver a lo guardado")}</button></div>`;
@@ -4505,6 +4575,22 @@ function queue(h){const q=pending(h);
 function decideMany(ids,st){const l=trList(),prev=JSON.stringify(l),me=meUser().name;l.forEach(r=>{if(ids.includes(r.id)){r.st=st;r.comment=r.cdraft||"";delete r.cdraft;r.dby=me;r.dat=Date.now()}});trSave(l);
  toast(st==="Approved"?B(`Approved ${ids.length} — training added to the plan`,`${ids.length} aprobada(s) — entrenamiento agregado al plan`):B("Request denied","Solicitud negada"),()=>{trSave(JSON.parse(prev))});render()}
 window.LPX={
+ ov(i,v){if(!isCorp())return;const a=ovAll(),k=key(hotel(),LP.week),o=a[k]||[null,null,null,null,null,null,null];o[i]=v===""?null:Math.max(0,parseInt(v)||0);a[k]=o;sset(OVK,JSON.stringify(a));LP.prev=null;rr()},
+ calc(){if(!isCorp())return;const h=hotel(),c=calcHours(h,LP.week);LP.prev={k:key(h,LP.week),hours:c.hours,occ:c.occ};rr();setTimeout(()=>{const e=document.getElementById("occPrev");if(e)e.scrollIntoView({block:"nearest"})},50)},
+ apply(){if(!isCorp()||!LP.prev)return;const h=hotel();{const z=[];OPOS.forEach(p=>LP.prev.hours[p].forEach((v,i)=>{if(!v)z.push((roleName(p)||p)+" "+DN[i][0])}));if(z.length&&!confirm(B("Zero hours planned for: ","Cero horas planeadas para: ")+z.join(", ")+"\n"+B("Apply anyway?","¿Aplicar de todos modos?")))return}push();Object.keys(LP.prev.hours).forEach(p=>LP.draft.hours[p]=LP.prev.hours[p].slice());LP.draft.rooms=LP.prev.occ.slice();snapCalc(h,LP.week,LP.prev.occ);if(!LP.note)LP.note=B("Calculated from occupancy","Calculado por ocupación");LP.prev=null;toast(B("Plan calculated from occupancy. Tweak cells if needed, then Save.","Plan calculado por ocupación. Ajuste celdas si hace falta y guarde."),()=>{LPX.undo()});rr()},
+ cancelPrev(){LP.prev=null;rr()},
+ auto(on){if(!isCorp())return;const h=hotel(),s=std(h);s.auto=!!on;stdSave(h,s);rr()},
+ stdT(){LP.stdOpen=!LP.stdOpen;rr()},
+ std(p,f,v){if(!isCorp())return;const h=hotel(),s=std(h,LP.eff||iso(new Date()));const n=Math.max(0,parseFloat(v)||0);let what="";
+  if(f==="rooms"){what=`${B("Total rooms","Cuartos totales")} ${s.rooms}→${Math.max(1,Math.round(n))}`;s.rooms=Math.max(1,Math.round(n))}
+  else if(f==="wkStart"){s.wkStart=+v;what=`${B("Week start","Inicio de semana")} → ${v}`}
+  else if(f.startsWith("ot.")){what=`${f.slice(3)} ${s.ot[f.slice(3)]}→${n}`;s.ot[f.slice(3)]=n}
+  else if(f==="dowT"){const c=s.pos[p];if(Array.isArray(c.dow)){c.fixed=c.dow[0];delete c.dow;what=`${p}: ${B("same fixed hours every day","mismas horas fijas cada día")}`}else{c.dow=[0,1,2,3,4,5,6].map(()=>+c.fixed||0);what=`${p}: ${B("fixed hours by weekday","horas fijas por día")}`}}
+  else if(f.startsWith("dow.")){const i=+f.slice(4);what=`${p} ${DN[i][0]} ${B("fixed","fijas")} ${s.pos[p].dow[i]}→${n}`;s.pos[p].dow[i]=n}
+  else{what=`${p} ${f} ${s.pos[p][f]}→${n}`;s.pos[p][f]=n}
+  stdSave(h,s,what);LP.prev=null;rr()},
+ eff(v){LP.eff=v||null;rr()},
+ planWeek, std_:std,
  setHotel(k){LP.hotel=k;LP.draft=null;if(isCorp()){S.hotel=k;save()}render()},
  wk(n){LP.week=addW(LP.week,n);render()}, twk(n){LP.tf.week=addW(LP.tf.week,n);render()},
  day(i){LP.day=i;render()}, mode(a){LP.assoc=a;render()}, note(v){LP.note=v;const b=document.querySelector(".lp-save .primary");},
@@ -4513,7 +4599,7 @@ window.LPX={
  all(nm,i){if(!isCorp())return;push();const v=rows()[nm][i];rows()[nm]=[v,v,v,v,v,v,v];if(LP.assoc)resum();rr()},
  rooms(i,v){if(!isCorp())return;push();LP.draft.rooms[i]=Math.max(0,parseInt(v)||0);rr()},
  copyLast(){if(!isCorp())return;push();const p=planFor(hotel(),addW(LP.week,-1));Object.assign(LP.draft,strip(JSON.parse(JSON.stringify(p))));toast(B("Copied last week's plan. Review, then Save.","Plan de la semana pasada copiado. Revise y guarde."));rr()},
- undo(){const s=LP.undo.pop();if(s)Object.assign(LP.draft,JSON.parse(s));rr()},
+ undo(){const s=LP.undo.pop();if(s)Object.assign(LP.draft,JSON.parse(s));LP.prev=null;rr()},
  reset(){LP.draft=null;render()},
  save(){if(!isCorp())return;if(!LP.note.trim()){toast(B("Add a change note first.","Primero agregue una nota del cambio."));const n=document.getElementById("lpNote");if(n)n.focus();return}
   const st=store(),k=key(hotel(),LP.week),prev=st[k]?JSON.stringify(st[k]):null;st[k]=Object.assign(strip(JSON.parse(JSON.stringify(LP.draft))),{by:meUser().name,at:Date.now(),note:LP.note.trim()});sset(LPK,JSON.stringify(st));LP.draft=null;applyLive();
@@ -4534,12 +4620,12 @@ Object.assign(I18N.es,{"Labor Plan":"Plan de labor","Training Hours":"Horas de e
 V.lplan=viewPlan;V.trreq=viewTr;
 try{NOCOLS.push("lplan","trreq")}catch(e){}
 TILES.GM=(TILES.GM||[]).concat(["lplan","trreq"]);
-if(TILES.Housekeeping)TILES.Housekeeping=TILES.Housekeeping.concat(["lplan"]);
-const _lab=V.labor;V.labor=function(){return `<button type=button class=lp-link onclick="go('lplan')">🗓️ ${B("Labor plan","Plan de labor")} ${isCorp()?B("(edit)","(editar)"):B("(view)","(ver)")}</button>`+_lab()};
+// Labor Plan setup: corporate edits, GM/AGM view. No other role (incl. HK lead) sees it.
+const _lab=V.labor;V.labor=function(){if(!(isCorp()||isGMA()))return _lab();return `<button type=button class=lp-link onclick="go('lplan')">🗓️ ${B("Labor plan","Plan de labor")} ${isCorp()?B("(edit)","(editar)"):B("(view)","(ver)")}</button>`+_lab()};
 const _render=render;
 render=function(){const u=meUser();
  if(u&&S&&S.tab==="trreq"&&!(isCorp()||isGMA()))S.tab="home";
- if(u&&S&&S.tab==="lplan"&&!(leader()||(TILES[S.role]||[]).includes("lplan")))S.tab="home";
+ if(u&&S&&S.tab==="lplan"&&!(isCorp()||isGMA()))S.tab="home";
  try{chk()}catch(e){}
  _render();
  if(!u)return;
@@ -4547,10 +4633,22 @@ render=function(){const u=meUser();
  const n=isCorp()?pending().length:0;
  document.querySelectorAll("[onclick*=\"go('trreq')\"]").forEach(b=>{if(n&&!b.querySelector(".lp-badge"))b.insertAdjacentHTML("beforeend",` <span class=lp-badge>${n}</span>`)});
  if(isCorp()&&n&&S.tab==="home"){const a=$("app");a.insertAdjacentHTML("afterbegin",`<button type=button class="lp-alert" onclick="go('trreq')">🎓 ${B(`${n} training hour request${n>1?"s":""} waiting for approval`,`${n} solicitud(es) de horas de entrenamiento esperando aprobación`)} <span class=lp-badge>${n}</span> ›</button>`)}
- if(!isCorp()&&!isGMA())document.querySelectorAll("[onclick*=\"go('trreq')\"]").forEach(b=>b.remove());
+ if(!isCorp()&&!isGMA())document.querySelectorAll("[onclick*=\"go('trreq')\"],[onclick*=\"go('lplan')\"]").forEach(b=>b.remove());
+ if((isCorp()||isGMA())&&S.tab==="home"){const a=$("app");if(a&&!a.querySelector(".lp-home"))a.insertAdjacentHTML("afterbegin",`<button type=button class="lp-home" onclick="go('lplan')">🗓️ <span><b>${B("Labor Plan","Plan de labor")}</b><small>${isCorp()?B("Plan from occupancy · edit standards & hours","Plan según ocupación · editar estándares y horas"):B("View plan from occupancy (read-only)","Ver plan según ocupación (solo lectura)")}</small></span> ›</button>`)}
 };
 let lastM=mode();addEventListener("resize",()=>{const m=mode();if(m!==lastM){lastM=m;if(S&&(S.tab==="lplan"||S.tab==="trreq"))render()}});
 const st=document.createElement("style");st.textContent=`
+.lp-home{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 10px;padding:14px;border-radius:14px;border:2px solid #1f2a44;background:#eef3ff;font:inherit;text-align:left;cursor:pointer;font-size:22px}.lp-home span{flex:1;display:flex;flex-direction:column;font-size:15px}.lp-home small{font-weight:400;opacity:.8}
+.oc-dow{display:grid;grid-template-columns:repeat(7,minmax(38px,1fr));gap:2px}.oc-dow label{display:flex;flex-direction:column;align-items:center}.oc-dow .lp-in{width:100%;min-width:36px;box-sizing:border-box}.oc-mini{margin-top:4px;border:1px solid #c9d2e0;background:#fff;border-radius:8px;padding:3px 8px;font-size:12px;cursor:pointer}
+.oc-eff{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}.oc-eff label{display:flex;gap:6px;align-items:center;font-weight:600}.oc-eff input,.oc-eff select{height:36px;font:inherit;border:1px solid #c9d2e0;border-radius:8px;padding:0 6px}.oc-hist{margin:8px 0}.oc-hist>div{border-bottom:1px solid #eef1f5;padding:4px 0}
+.oc{border:2px solid #2b6cb0}.oc-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.oc-h h3{margin:0}
+.oc-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0}.oc-d{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px solid #e3e8f0;border-radius:10px;font-size:13px;min-width:0}.oc-d .lp-in{width:100%;max-width:58px;box-sizing:border-box}.oc-mv{border-color:#d69e2e;background:#fffaf0}
+.oc-ov{background:#eef5ff;border-color:#2b6cb0}.oc-tag{color:#2b6cb0}.oc-flag{color:#b7791f;font-weight:700}.oc-f{opacity:.7}.oc-n{font-size:16px}
+.oc-warn{background:#fff4d6;color:#5c3d00;padding:8px;border-radius:8px;margin:6px 0;font-weight:600}.oc-warn button{margin-left:6px;border:1px solid #b7791f;background:#fff;border-radius:8px;padding:4px 10px;font:inherit}
+.oc-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}.oc-act .primary{flex:1;min-width:180px;width:auto}.oc-auto{display:flex;gap:6px;align-items:center;font-size:14px}
+.oc-std h4{margin:10px 0 4px}.oc-rm{display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:600}.oc-ot{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}.oc-ot label{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13px;border:1px solid #eef1f5;border-radius:8px;padding:4px 6px}
+.oc-prev{margin-top:10px;border-top:2px dashed #c9d2e0;padding-top:8px}.oc-up{background:#e6f4ea}.oc-dn{background:#fde2e1}.oc-prev s{opacity:.55;font-size:12px}
+@media(max-width:767px){.oc-d{font-size:11px}.oc-d .lp-in{height:32px;font-size:13px}}
 .lp-badge{display:inline-block;min-width:20px;padding:1px 6px;border-radius:10px;background:#d93025;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:18px}
 .lp-seg{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.lp-seg button,.lp-chips button,.lp-days button,.lp-tools button,.lp-wk button{border:1px solid #c9d2e0;background:#fff;border-radius:10px;padding:8px 12px;font:inherit;min-height:40px;cursor:pointer}
 .lp-seg button.on,.lp-chips button.on,.lp-days button.on{background:#1f2a44;color:#fff;border-color:#1f2a44}
@@ -4581,4 +4679,226 @@ const st=document.createElement("style");st.textContent=`
 `;document.head.appendChild(st);
 })();
 /*LPLAN_END*/
+/*OCCSCHED_START*/
+// Schedule: Plan vs Scheduled bar + Projected out times (HK / Laundry / House Person) + on-time bonus.
+(function(){
+const B=(e,s)=>LANG==="es"?s:e,E=x=>escH(String(x==null?"":x)),sum=a=>a.reduce((s,n)=>s+(+n||0),0);
+const DN=[["Mon","Lun"],["Tue","Mar"],["Wed","Mié"],["Thu","Jue"],["Fri","Vie"],["Sat","Sáb"],["Sun","Dom"]];
+const jget=(k,d)=>{try{return JSON.parse(sget(k)||"null")||d}catch(e){return d}};
+const f1=n=>{const r=Math.round(n*4)/4;return String(r)};
+const role=()=>authRole(),isCorp=()=>role()==="Above Property",isMgr=()=>["GM","AGM","Above Property"].includes(role());
+function cls(plan,sch){if(sch<=plan+0.01)return "pv-g";if(sch<=plan*1.05)return "pv-a";return "pv-r"}
+// ---------- Plan vs Scheduled ----------
+function pvBar(){if(!canEditSched()||!window.LPX||!LPX.planWeek)return "";const days=weekDates(S.wk||0),wk=ymd(days[0]),h=S.hotel;
+ const pw=LPX.planWeek(h,wk),pos=schedPos().filter(p=>p!=="Shuttle Driver");
+ const rows=pos.map(p=>{const pl=(pw.hours[p]||[0,0,0,0,0,0,0]).map(Number),tr=pw.training[p]||[0,0,0,0,0,0,0],sc=days.map(d=>sumHrs(shiftTimes(p,ymd(d))));return {p,pl,tr,sc}});
+ const P=sum(rows.map(r=>sum(r.pl))),T=sum(rows.map(r=>sum(r.tr))),SC=sum(rows.map(r=>sum(r.sc))),R=P+T-SC;
+ const open=S.pvOpen!==false;
+ const cell=(pl,tr,sc)=>{const tot=pl+tr,rem=tot-sc;return `<td class="${cls(tot,sc)}"><b>${f1(sc)}</b>/<span>${f1(tot)}</span><small>${rem>=0?"":"+"}${f1(Math.abs(rem))} ${rem>=0?B("left","rest."):B("over","exc.")}</small></td>`};
+ const tbl=`<div class="pv-wrap"><table class="pv-t"><thead><tr><th>${B("Position","Puesto")}</th>${DN.map((d,i)=>`<th>${B(d[0],d[1])} ${days[i].getDate()}</th>`).join("")}<th>${B("Week","Semana")}</th></tr></thead><tbody>
+ ${rows.map(r=>`<tr><th scope=row>${E(roleName(r.p)||r.p)}${sum(r.tr)?` <small class=pv-tr>🎓 +${f1(sum(r.tr))}</small>`:""}</th>${r.pl.map((v,i)=>cell(v,r.tr[i],r.sc[i])).join("")}${cell(sum(r.pl),sum(r.tr),sum(r.sc))}</tr>`).join("")}
+ <tr class=pv-tot><th>${B("Total","Total")}</th>${days.map((d,i)=>cell(sum(rows.map(r=>r.pl[i])),sum(rows.map(r=>r.tr[i])),sum(rows.map(r=>r.sc[i])))).join("")}${cell(P,T,SC)}</tr></tbody></table></div>
+ <small>${B("Scheduled / Plan (plan includes approved 🎓 training). Green = at or under plan · Amber = up to 5% over · Red = more than 5% over.","Programado / Plan (el plan incluye 🎓 entrenamiento aprobado). Verde = en o bajo el plan · Ámbar = hasta 5% sobre · Rojo = más de 5% sobre.")} ${isCorp()?"":B("Plan numbers are set by JR Corporate (read-only).","El plan lo fija JR Corporativo (solo lectura).")}</small>`;
+ return `<div class="card pv noprint" id=pvBar><div class=pv-sum>
+ <div><small>${B("Plan","Plan")}</small><b>${f1(P)}</b></div><div><small>🎓 ${B("Training","Entren.")}</small><b>${f1(T)}</b></div><div><small>${B("Scheduled","Programado")}</small><b>${f1(SC)}</b></div><div class="${cls(P+T,SC)}"><small>${R>=0?B("Remaining","Restante"):B("Over plan","Sobre plan")}</small><b>${f1(Math.abs(R))}</b></div>
+ ${(()=>{try{const o=LCMD.otRisk(h);return `<div class="${o.list.length?"pv-r":""}"><small>OT %</small><b>${o.pct}</b></div>`}catch(e){return ""}})()}<button type=button class=pv-tg onclick="S.pvOpen=${!open};render()" aria-expanded="${open}">${open?B("Hide by day","Ocultar por día")+" ▴":B("By position & day","Por puesto y día")+" ▾"}</button></div>${open?tbl:""}${(()=>{try{const o=LCMD.otRisk(h);return o.list.length?`<div class=oc-warn>⏱️ ${B("Overtime risk (projected > 40 hrs this week)","Riesgo de horas extra (proyectado > 40 hrs esta semana)")}: ${o.list.map(x=>E(x.n)+" "+f1(x.h)+"h").join(", ")}</div>`:""}catch(e){return ""}})()}</div>`}
+const _sched=V.sched;V.sched=function(){const html=_sched();if(!canEditSched()||S.sv==="win"||S.sv==="clock")return html;const bar=pvBar();const i=html.indexOf("</h2>");return i>0?html.slice(0,i+5)+bar+html.slice(i+5):bar+html};
+// ---------- Projected out times ----------
+const OTR=["Housekeeper","Laundry Attendant","House Person"];
+const st=()=>{try{return LPX.std_(S.hotel).ot}catch(e){return {co:30,so:20,oth:25,brk:30,side:20,lbsCO:12,lbsSO:5,lbsLoad:50,minLoad:20,sup:3,t_pub:45,t_trash:20,t_linen:30,t_rest:20}}};
+const TASKS=[["t_pub","Public areas","Áreas públicas"],["t_trash","Trash run","Recorrido de basura"],["t_linen","Linen runs","Recorridos de blancos"],["t_rest","Lobby restrooms","Baños del lobby"]];
+const DK="jrportal_otday_v1",BK="jrportal_otbonus_v1",RK="jrportal_otrec_v1";
+const today=()=>ld(),dayKey=()=>S.hotel+"|"+today();
+function dayS(){const a=jget(DK,{});return a[dayKey()]||{loads:0,carry:0,tasks:{},lock:{},out:{}}}
+function daySave(v){const a=jget(DK,{});a[dayKey()]=v;sset(DK,JSON.stringify(a))}
+function bonusCfg(){const a=jget(BK,{});return Object.assign({on:10,early:15,earlyMin:15},a[S.hotel]||{})}
+const hm=s=>{const[a,b]=String(s).split(":").map(Number);return a*60+(b||0)},nowM=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
+const fmtM=m=>{const d=new Date();d.setHours(0,0,0,0);d.setMinutes(Math.round(m));return d.toLocaleTimeString(LANG==="es"?"es-US":"en-US",{hour:"numeric",minute:"2-digit"})};
+function shiftOf(u){const t=today(),sh=(S.shifts||[]).find(s=>s.who===u.name&&s.date===t&&s.scope===S.hotel);const pat=HE_PAT[u.role]||{a:"08:00",b:"16:00"};
+ const di=(new Date().getDay()+6)%7,pun=((timePunches[S.hotel]||{})[u.name]||[])[di];const start=pun&&pun[0]?pun[0]:(sh?sh.start:pat.a);return {start:hm(start),end:hm(sh?sh.end:pat.b),clocked:!!(pun&&pun[0])}}
+const REM=["dirty","progress","reclean"];
+function roomsToday(){return (D().rooms||[]).filter(r=>["dirty","progress","reclean","cleaned"].includes(roomFlow(r))||(r.cleanedAt&&new Date(r.cleanedAt).toDateString()===new Date().toDateString()))}
+function proj(u){const o=st(),ds=dayS(),sh=shiftOf(u),base=Math.max(nowM(),sh.start);let work=0,label="",done=false,sig="";
+ if(u.role==="Housekeeper"){const mine=(D().rooms||[]).filter(r=>r.hk===u.name),rem=mine.filter(r=>REM.includes(roomFlow(r)));
+  work=sum(rem.map(r=>{const m=r.ty==="other"?o.oth:r.occ?o.so:o.co;return roomFlow(r)==="progress"?m/2:m}));
+  const co=rem.filter(r=>!r.occ).length,so=rem.length-co;label=`${rem.length} ${B("rooms left","cuartos rest.")} (${co} CO · ${so} SO)`;done=!rem.length;sig=mine.map(r=>r.n).sort().join(",")}
+ else if(u.role==="Laundry Attendant"){const rt=roomsToday(),co=rt.filter(r=>!r.occ).length,so=rt.length-co;const tot=Math.ceil((co*o.lbsCO+so*o.lbsSO)/Math.max(1,o.lbsLoad))+(+ds.carry||0),left=Math.max(0,tot-(+ds.loads||0));
+  work=left*o.minLoad;label=`${left}/${tot} ${B("loads left","cargas rest.")}`;done=!left;sig="L"+tot}
+ else{const rem=(D().rooms||[]).filter(r=>REM.includes(roomFlow(r))).length,tl=TASKS.filter(t=>!(ds.tasks[u.name]||{})[t[0]]);
+  work=rem*o.sup+sum(tl.map(t=>o[t[0]]));label=`${tl.length} ${B("tasks","tareas")} · ${rem} ${B("rooms to support","cuartos a apoyar")}`;done=!tl.length;sig="H"+TASKS.length}
+ const out=base+work+(+o.brk||0)+(+o.side||0);
+ const flag=out>sh.end+30?"red":out>sh.end?"amber":"ok";
+ return {out,work,hrs:(out-sh.start)/60,label,done,sig,sh,flag}}
+function locked(u,p){const ds=dayS();const L=ds.lock[u.name];if(!L||L.sig!==p.sig){ds.lock[u.name]={sig:p.sig,out:p.out};daySave(ds);return p.out}return L.out}
+function flagTxt(f){return f==="red"?`<span class="pill bad">${B("Overtime risk","Riesgo de horas extra")}</span>`:f==="amber"?`<span class="pill warnp">${B("Past scheduled end","Después del fin de turno")}</span>`:`<span class="pill ok">${B("On track","A tiempo")}</span>`}
+function people(){return USERS.filter(u=>u.hotel===S.hotel&&u.active!==false&&OTR.includes(u.role))}
+function canBoard(){return ["Housekeeping","GM","AGM","Above Property"].includes(role())}
+function weekPct(name){const rec=jget(RK,{}),m=mon(new Date());let n=0,ok=0;Object.keys(rec).forEach(k=>{const[h,d,nm]=k.split("|");if(h!==S.hotel||nm!==name)return;if(new Date(d+"T12:00:00")>=m){n++;if(rec[k].ok)ok++}});return n?Math.round(ok/n*100)+"% ("+ok+"/"+n+")":"—"}
+const mon=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
+function boardCard(){const ps=people();if(!ps.length)return "";const mgr=["GM","AGM","Above Property"].includes(role());
+ return `<div class="card ot" id=otBoard><h3>⏱️ ${B("Projected out times","Horas de salida estimadas")}</h3><div class=ot-list>${ps.map(u=>{const p=proj(u);locked(u,p);const out=dayS().out[u.name];
+ return `<div class="ot-p ot-${p.flag}"><div><b>${E(u.name)}</b> <small>${E(roleName(u.role)||u.role)}</small></div><small>${E(p.label)}</small><div class=ot-row><span>${B("Work","Trabajo")} ${Math.round(p.work)} ${B("min","min")}</span><span>${B("Est.","Est.")} ${f1(p.hrs)} ${B("hrs","hrs")}</span><span>${B("Shift ends","Fin de turno")} ${fmtM(p.sh.end)}</span></div><div class=ot-row><b class=ot-out>${out?B("Clocked out","Salió")+" "+fmtM(out.at):B("Out","Salida")+" "+fmtM(p.out)}</b>${flagTxt(p.flag)}</div>${mgr?`<small>${B("On-time this week","A tiempo esta semana")}: <b>${weekPct(u.name)}</b></small>`:""}</div>`}).join("")}</div>
+ <small>${B("Out = start (or clock-in) / now + remaining work + break + side work. Updates live as rooms are assigned and cleaned. Standards set by JR Corporate.","Salida = inicio (o entrada) / ahora + trabajo restante + descanso + trabajo extra. Se actualiza al asignar y limpiar cuartos. Estándares de JR Corporativo.")}</small>
+ ${mgr?bonusCfgCard():""}</div>`}
+function bonusCfgCard(){const c=bonusCfg(),ed=["GM","AGM"].includes(role());return `<details class=ot-cfg><summary>🏅 ${B("Out-time bonus points","Puntos por salir a tiempo")}: +${c.on} / +${c.early} (${c.earlyMin}+ ${B("min early","min antes")})</summary>${ed?`<div class=oc-ot>${[["on",B("On time","A tiempo")],["early",B("Early","Temprano")],["earlyMin",B("Early = min before","Temprano = min antes")]].map(f=>`<label>${f[1]}<input class=lp-in inputmode=numeric value="${c[f[0]]}" onchange="OTX.cfg('${f[0]}',this.value)"></label>`).join("")}</div>`:`<small>${B("GM/AGM can adjust.","El GM/AGM puede ajustar.")}</small>`}<small>${B("Awarded only if all work is done and no failed inspection/reclean that day. Out time locks at the last assignment change.","Solo si todo el trabajo está hecho y sin inspección fallida/relimpieza ese día. La hora se fija con el último cambio de asignación.")}</small></details>`}
+function myCard(){const u=meUser();if(!u||!OTR.includes(u.role))return "";const p=proj(u),L=locked(u,p),ds=dayS(),out=ds.out[u.name],o=st();
+ let extra="";if(u.role==="Laundry Attendant")extra=`<div class=ot-row><button type=button class=btn2 onclick="OTX.load(-1)">− ${B("load","carga")}</button><b>${+ds.loads||0} ${B("loads done","cargas hechas")}</b><button type=button class=btn onclick="OTX.load(1)">+ ${B("Load done","Carga hecha")}</button></div><label class=ot-row>${B("Carryover loads","Cargas pendientes de ayer")}<input class=lp-in inputmode=numeric value="${+ds.carry||0}" onchange="OTX.carry(this.value)"></label>`;
+ if(u.role==="House Person")extra=`<div class=ot-tasks>${TASKS.map(t=>`<label><input type=checkbox ${(ds.tasks[u.name]||{})[t[0]]?"checked":""} onchange="OTX.task('${t[0]}',this.checked)"> ${B(t[1],t[2])} <small>${o[t[0]]} ${B("min","min")}</small></label>`).join("")}</div>`;
+ const res=out?`<div class="ot-win ${out.pts?"":"ot-miss"}">${out.pts?`🎉 ${B("Beat your out time!","¡Superaste tu hora de salida!")} <b>+${out.pts}</b> ${B("pts","pts")}${out.streak>1?` · 🔥 ${out.streak} ${B("day streak","días seguidos")}`:""}`:E(out.why||"")}</div>`:"";
+ return `<div class="card ot ot-me ot-${p.flag}" id=otMe><small>${B("Your estimated out time","Tu hora de salida estimada")}</small><div class=ot-big>${fmtM(p.out)}</div>
+ <div class=ot-row><span>${E(p.label)}</span>${flagTxt(p.flag)}</div><small>${B("Shift","Turno")} ${fmtM(p.sh.start)}–${fmtM(p.sh.end)} · ${B("Beat","Supera")} ${fmtM(L)} ${B("for bonus points","para puntos extra")}${gamifyOff()?"":` (+${bonusCfg().on})`}</small>${extra}${res}
+ ${out?"":`<button type=button class=btn style="width:100%;margin-top:8px" onclick="OTX.clockOut()">${B("Clock out (demo until Hotel Effectiveness punches connect)","Marcar salida (demo hasta conectar Hotel Effectiveness)")}</button>`}</div>`}
+window.OTX={
+ load(n){const d=dayS();d.loads=Math.max(0,(+d.loads||0)+n);daySave(d);render()},
+ carry(v){const d=dayS();d.carry=Math.max(0,parseInt(v)||0);daySave(d);render()},
+ task(k,on){const u=meUser(),d=dayS();d.tasks[u.name]=d.tasks[u.name]||{};d.tasks[u.name][k]=on;daySave(d);render()},
+ cfg(k,v){if(!["GM","AGM"].includes(role()))return;const a=jget(BK,{});a[S.hotel]=Object.assign(bonusCfg(),{[k]:Math.max(0,parseInt(v)||0)});sset(BK,JSON.stringify(a));render()},
+ clockOut(at){const u=meUser();if(!u)return;const p=proj(u),L=locked(u,p),d=dayS(),c=bonusCfg(),now=at!=null?at:nowM();
+  const mine=(D().rooms||[]).filter(r=>r.hk===u.name),fail=u.role==="Housekeeper"&&mine.some(r=>roomFlow(r)==="reclean"||r.failNote);
+  let pts=0,why="";if(!p.done)why=B("Out-time bonus needs all assigned work done.","El bono requiere todo el trabajo asignado terminado.");else if(fail)why=B("No bonus today: a room failed inspection or needed a reclean.","Sin bono hoy: un cuarto falló la inspección o necesitó relimpieza.");else if(now>L)why=B("Clocked out after your projected time — try again tomorrow!","Saliste después de tu hora estimada — ¡mañana otra vez!");else pts=L-now>=c.earlyMin?c.early:c.on;
+  const rec=jget(RK,{});const y=new Date();y.setDate(y.getDate()-1);const yk=S.hotel+"|"+ymd(y)+"|"+u.name;const streak=pts?((rec[yk]&&rec[yk].ok?(rec[yk].streak||1):0)+1):0;
+  rec[S.hotel+"|"+today()+"|"+u.name]={ok:!!pts,lock:L,at:now,streak};sset(RK,JSON.stringify(rec));
+  d.out[u.name]={at:now,pts,why,streak};daySave(d);
+  if(pts&&!gamifyOff()&&window.ptsAward)ptsAward(pts,"Beat your out time!","¡Superaste tu hora de salida!",true);render()}
+};
+const _home=V.home;V.home=function(){return myCard()+_home()};
+const _rooms=V.rooms;V.rooms=function(){return (canBoard()?boardCard():"")+_rooms()};
+const css=document.createElement("style");css.textContent=`
+.pv{border:2px solid #1f2a44}.pv-sum{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}.pv-sum>div{flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center;padding:6px;border-radius:10px;background:#f7f9fc}.pv-sum b{font-size:20px}.pv-tg{border:1px solid #c9d2e0;background:#fff;border-radius:10px;padding:6px 10px;font:inherit;cursor:pointer}
+.pv-wrap{overflow-x:auto;margin-top:8px}.pv-t{border-collapse:collapse;width:100%;font-size:13px}.pv-t th,.pv-t td{padding:4px 6px;text-align:center;border-bottom:1px solid #eef1f5;white-space:nowrap}.pv-t th[scope=row],.pv-tot th{text-align:left}.pv-t td small{display:block;font-size:11px}.pv-tot td,.pv-tot th{font-weight:700;background:#f7f9fc}
+.pv-g{background:#e6f4ea!important;color:#14532d}.pv-a{background:#fff4d6!important;color:#5c3d00}.pv-r{background:#fde2e1!important;color:#7f1d1d}.pv-tr{color:#8a5a00}
+.ot-list{display:grid;grid-template-columns:1fr;gap:8px}.ot-p{border:1px solid #e3e8f0;border-left:6px solid #1a7f37;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:4px}.ot-amber{border-left-color:#d69e2e}.ot-red{border-left-color:#d93025}
+.ot-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}.ot-out{font-size:17px}.ot-me{border-left:6px solid #1a7f37}.ot-me.ot-amber{border-left-color:#d69e2e}.ot-me.ot-red{border-left-color:#d93025}.ot-big{font-size:34px;font-weight:800;line-height:1.1}
+.ot-tasks{display:flex;flex-direction:column;gap:6px;margin-top:6px}.ot-tasks label{display:flex;gap:8px;align-items:center;min-height:36px}.ot-win{margin-top:8px;padding:12px;border-radius:12px;background:#e6f4ea;color:#14532d;font-weight:700;font-size:17px}.ot-miss{background:#f1f3f7;color:#333;font-weight:600;font-size:14px}
+.ot-cfg{margin-top:8px}.ot-cfg summary{cursor:pointer;font-weight:600}
+@media(min-width:768px){.ot-list{grid-template-columns:1fr 1fr}}@media(min-width:1200px){.ot-list{grid-template-columns:1fr 1fr 1fr}}`;document.head.appendChild(css);
+})();
+/*OCCSCHED_END*/
+/*LCMD_START*/
+// Labor Win/Loss, 5-minute daily check-in, alerts, and actuals importer (HE CSV/XLSX). Corporate + GM/AGM.
+// Data source is pluggable: imported HE rows (browser only) > timePunches example data. Nothing leaves the browser.
+(function(){
+const B=(e,s)=>LANG==="es"?s:e,E=x=>escH(String(x==null?"":x)),sum=a=>a.reduce((s,n)=>s+(+n||0),0),f1=n=>String(Math.round((+n||0)*4)/4);
+const jget=(k,d)=>{try{return JSON.parse(sget(k)||"null")||d}catch(e){return d}},jset=(k,v)=>sset(k,JSON.stringify(v));
+const CK="jrportal_cleans_v1",HK="jrportal_lchk_v1",AK="jrportal_lact_v1",PF="jrportal_pfix_v1",IA="jrportal_impassoc_v1",IW="jrportal_impweek_v1";
+const RC=[["group","Group / high occupancy","Grupo / alta ocupación"],["callout","Call-out / no-show","Ausencia / no se presentó"],["training","Training","Entrenamiento"],["dnd","DND / deep clean","No molestar / limpieza profunda"],["vip","VIP / special request","VIP / solicitud especial"],["sched","Over-scheduled","Sobre-programado"],["punch","Punch error","Error de marcaje"],["other","Other","Otro"]];
+const DEPT=[["FD","Front Desk","Recepción",["Front Desk"]],["HK","Housekeeping","Limpieza",["HK Lead","Housekeeper","House Person","Laundry Attendant"]],["BF","Breakfast","Desayuno",["Breakfast Attendant"]],["MT","Maintenance","Mantenimiento",["Maintenance"]]];
+const DN=[["Mon","Lun"],["Tue","Mar"],["Wed","Mié"],["Thu","Jue"],["Fri","Vie"],["Sat","Sáb"],["Sun","Dom"]];
+const role=()=>authRole(),isCorp=()=>role()==="Above Property",ok=()=>["GM","AGM","Above Property"].includes(role());
+const iso=d=>ymd(d),dt=s=>new Date(s+"T12:00:00"),addD=(s,n)=>{const d=dt(s);d.setDate(d.getDate()+n);return iso(d)};
+const monOf=s=>{const d=dt(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)},di=s=>(dt(s).getDay()+6)%7;
+const yday=()=>ld(-1);
+function wkStart(h){try{return +LPX.std_(h).wkStart||1}catch(e){return 1}}
+function weekOf(h,s){const ws=wkStart(h),d=dt(s);const back=(d.getDay()-ws+7)%7;const st=addD(s,-back);return [0,1,2,3,4,5,6].map(i=>addD(st,i))}
+const posOf=u=>u.role==="Housekeeping"?"HK Lead":u.role;
+// ---- data source ----
+function cleansFor(h,date){const c=jget(CK,{})[h+"|"+date];return c?{co:+c.co||0,so:+c.so||0,sold:+c.sold||0,src:"entered"}:null}
+function plan(h,date,pos){const w=monOf(date),i=di(date);try{const pw=LPX.planWeek(h,w);return {p:+((pw.hours[pos]||[])[i]||0),t:+((pw.training[pos]||[])[i]||0)}}catch(e){return {p:0,t:0}}}
+function sched(h,date,pos,who){return sumHrs((S.shifts||[]).filter(x=>x.scope===h&&x.pos===pos&&x.date===date&&(who==null||x.who===who)))}
+function actuals(h,date){const imp=jget(IA,{})[h+"|"+date];if(imp)return imp.map(r=>Object.assign({src:"import"},r));
+ const curW=monOf(ld());if(monOf(date)!==curW||date>ld())return [];const i=di(date),fx=jget(PF,{}),out=[];
+ USERS.filter(u=>u.hotel===h&&u.active!==false&&!["GM","AGM","Above Property","Shuttle Driver"].includes(u.role)).forEach(u=>{let pn=((timePunches[h]||{})[u.name]||[])[i];const f=fx[h+"|"+date+"|"+u.name];if(f)pn=f;
+  if(pn&&pn[0])out.push({name:u.name,pos:posOf(u),in:pn[0],out:pn[1]||"",hrs:pn[1]?shHrs(pn[0],pn[1]):0,src:f?"fixed":"example"})});return out}
+function missing(h,date){if(date>ld())return [];const act=actuals(h,date),res=[];(S.shifts||[]).filter(x=>x.scope===h&&x.date===date&&x.who&&x.pos!=="Shuttle Driver").forEach(x=>{const a=act.find(r=>r.name===x.who);if(!a)res.push({name:x.who,pos:x.pos,why:"no punch",sch:x.start+"–"+x.end});else if(!a.out&&date<ld())res.push({name:x.who,pos:x.pos,why:"no out",sch:x.start+"–"+x.end})});return res}
+function rowFor(h,dates,pos){let A=0,P=0,T=0,SC=0;dates.forEach(d=>{A+=sum(actuals(h,d).filter(r=>r.pos===pos).map(r=>r.hrs));const p=plan(h,d,pos);P+=p.p;T+=p.t;SC+=sched(h,d,pos)});return {A,P,T,SC,V:P+T-A}}
+function assocRows(h,dates,pos){const names=new Set();dates.forEach(d=>{actuals(h,d).filter(r=>r.pos===pos).forEach(r=>names.add(r.name));(S.shifts||[]).filter(x=>x.scope===h&&x.pos===pos&&x.date===d&&x.who).forEach(x=>names.add(x.who))});
+ return [...names].map(n=>{let A=0,P=0,SC=0;dates.forEach(d=>{A+=sum(actuals(h,d).filter(r=>r.pos===pos&&r.name===n).map(r=>r.hrs));const sp=sched(h,d,pos),sa=sched(h,d,pos,n),pl=plan(h,d,pos).p;P+=sp?pl*sa/sp:0;SC+=sa});return {n,A,P,SC,V:P-A}})}
+function wl(v,p){return Math.abs(v)<0.25?`<span class="pill">${B("Even","Igual")}</span>`:v>0?`<span class="pill ok">${B("Win","Gana")} ${f1(v)}</span>`:`<span class="pill bad">${B("Loss","Pierde")} ${f1(-v)}</span>`}
+function mprRow(h,dates){let hrs=0,cl=0,tgt=0,n=0;dates.forEach(d=>{hrs+=sum(actuals(h,d).filter(r=>r.pos==="Housekeeper").map(r=>r.hrs));const c=cleansFor(h,d);if(c){cl+=c.co+c.so;try{const s=LPX.std_(h).pos.Housekeeper;tgt+=c.co*s.mprCO+c.so*s.mprSO;n+=c.co+c.so}catch(e){}}});
+ return {mpr:cl?hrs*60/cl:null,tgt:n?tgt/n:null,cl}}
+// ---- alerts ----
+function alerts(h){const y=yday(),out=[];if(!cleansFor(h,y))out.push(["cleans",B(`Cleans not entered for ${y}`,`Limpiezas no ingresadas para ${y}`)]);
+ const hk=sum(actuals(h,y).filter(r=>DEPT[1][3].includes(r.pos)).map(r=>r.hrs)),c=cleansFor(h,y);if(hk>0&&(!c||c.co+c.so===0))out.push(["zero",B(`${f1(hk)} HK hours with 0 cleans (${y})`,`${f1(hk)} horas de limpieza con 0 limpiezas (${y})`)]);
+ const m=missing(h,y).length;if(m)out.push(["punch",B(`${m} missing punch(es) ${y}`,`${m} marcaje(s) faltante(s) ${y}`)]);return out}
+// ---- views ----
+function hotelSeg(){return isCorp()?`<div class="lp-seg">${Object.keys(HOTELS).map(k=>`<button type=button class="${k===S.hotel?"on":""}" onclick="setHotel('${k}')">${k}</button>`).join("")}</div>`:""}
+function tabs(){const t=S.lct||"wl";return `<div class="lp-seg">${[["wl","📊 Win/Loss","📊 Gana/Pierde"],["chk","✅ "+B("Daily check-in","Revisión diaria"),"✅ Revisión diaria"],["alerts","🚨 "+B("Alerts","Alertas"),"🚨 Alertas"],["imp","⬆️ "+B("Import","Importar"),"⬆️ Importar"]].map(x=>`<button type=button class="${t===x[0]?"on":""}" onclick="LCMD.tab('${x[0]}')">${x[0]==="wl"?B(x[1],x[2]):x[1]}</button>`).join("")}</div>`}
+function srcNote(h,dates){const imp=dates.some(d=>jget(IA,{})[h+"|"+d]);return `<small class=lc-src>${B("Actuals source","Fuente de reales")}: <b>${imp?B("Imported HE export","Exportación HE importada"):B("EXAMPLE data (Hotel Effectiveness feed not connected)","Datos de EJEMPLO (sin conexión con Hotel Effectiveness)")}</b></small>`}
+function vWL(h){const per=S.lcp||"day",base=S.lcd||yday(),dates=per==="day"?[base]:weekOf(h,base),act=jget(AK,[]).filter(a=>a.h===h&&!a.done);
+ let tA=0,tP=0,tT=0,tS=0;const body=DEPT.map(d=>{const rows=d[3].map(p=>Object.assign({p},rowFor(h,dates,p)));const A=sum(rows.map(r=>r.A)),P=sum(rows.map(r=>r.P)),T=sum(rows.map(r=>r.T)),SC=sum(rows.map(r=>r.SC)),V=P+T-A;tA+=A;tP+=P;tT+=T;tS+=SC;
+  return `<details class=lc-d ${V<-0.25?"open":""}><summary><b>${B(d[1],d[2])}</b><span>${f1(A)} / ${f1(P+T)} / ${f1(SC)}</span>${wl(V)}</summary>${rows.map(r=>`<details class=lc-p><summary>${E(roleName(r.p)||r.p)}<span>${f1(r.A)} / ${f1(r.P+r.T)}${r.T?` (🎓${f1(r.T)})`:""} / ${f1(r.SC)}</span>${wl(r.V)}</summary>${assocRows(h,dates,r.p).map(a=>`<div class=lc-a><span>${E(a.n)}</span><span>${f1(a.A)} / ${f1(a.P)} / ${f1(a.SC)}</span>${wl(a.V)}</div>`).join("")||`<small>${B("No associates.","Sin asociados.")}</small>`}</details>`).join("")}</details>`}).join("");
+ const m=mprRow(h,dates),T=tP+tT-tA;
+ const auto=DEPT.map(d=>{const V=sum(d[3].map(p=>{const r=rowFor(h,dates,p);return r.V}));return V<-1?B(`${d[1]}: ${f1(-V)} hrs over plan — review schedule & cut where possible`,`${d[2]}: ${f1(-V)} hrs sobre el plan — revisar horario y recortar`):null}).filter(Boolean);
+ return `<div class="card lc-top"><div class=lp-seg><button type=button class="${per==="day"?"on":""}" onclick="LCMD.per('day')">${B("Day","Día")}</button><button type=button class="${per==="week"?"on":""}" onclick="LCMD.per('week')">${B("Week","Semana")}</button><input type=date value="${base}" onchange="LCMD.date(this.value)" aria-label="${B("Date","Fecha")}"></div>
+ <small>${per==="week"?E(dates[0]+" → "+dates[6]):E(base)}</small>
+ <div class=pv-sum><div><small>${B("Actual","Real")}</small><b>${f1(tA)}</b></div><div><small>${B("Plan","Plan")}</small><b>${f1(tP+tT)}</b></div><div><small>${B("Scheduled","Programado")}</small><b>${f1(tS)}</b></div><div class="${T>=0?"pv-g":"pv-r"}"><small>${T>=0?B("Win","Gana"):B("Loss","Pierde")}</small><b>${f1(Math.abs(T))}</b></div></div>
+ ${m.mpr!=null?`<div class=lc-mpr>🧹 ${B("RA MPR","MPR camaristas")} <b>${m.mpr.toFixed(1)}</b> ${B("vs target","vs meta")} <b>${m.tgt?m.tgt.toFixed(1):"—"}</b> · ${m.cl} ${B("cleans","limpiezas")}</div>`:`<div class=lc-mpr>🧹 ${B("Enter cleans in the daily check-in to see MPR.","Ingrese limpiezas en la revisión diaria para ver MPR.")}</div>`}
+ ${srcNote(h,dates)}</div>
+ <div class=card><div class=lc-hd><span>${B("Dept / position / associate","Depto / puesto / asociado")}</span><span>${B("Actual / Plan / Sched","Real / Plan / Prog")}</span><span></span></div>${body}<small>${B("Win = under plan (plan − actual). Associate plan = position plan × share of scheduled hours.","Gana = bajo el plan (plan − real). Plan por asociado = plan del puesto × parte de horas programadas.")}</small></div>
+ <div class=card><h3>📌 ${B("Action items","Acciones")}</h3>${auto.map(t=>`<div class=lc-ai>⚡ ${E(t)} <button type=button class=oc-mini onclick="LCMD.addAct(${JSON.stringify(t).replace(/"/g,"&quot;")})">+ ${B("Add","Agregar")}</button></div>`).join("")}
+ ${act.map(a=>`<label class=lc-ai><input type=checkbox onchange="LCMD.done('${a.id}')"> ${E(a.text)} <small>· ${E(a.owner||"GM")} · ${B("due","vence")} ${E(a.due)}</small></label>`).join("")||`<small>${B("No open action items.","Sin acciones abiertas.")}</small>`}
+ <div class=lc-add><input id=lcAct placeholder="${B("New action item","Nueva acción")}"><input id=lcOwn placeholder="${B("Owner","Responsable")}"><input id=lcDue type=date value="${ld(2)}"><button type=button class=btn onclick="LCMD.addAct()">${B("Add","Agregar")}</button></div></div>
+ ${weeklyImp(h)}`}
+function weeklyImp(h){const w=jget(IW,{}),k=Object.keys(w).filter(x=>x.startsWith(h+"|")).sort().pop();if(!k)return "";const r=w[k];const row=(n,a,p)=>`<tr><th>${n}</th><td>${f1(a)}</td><td>${f1(p)}</td><td>${wl(p-a)}</td></tr>`;
+ return `<div class=card><h3>${B("Imported HE weekly report","Reporte semanal HE importado")} · ${E(k.split("|")[1])}</h3><table class=lp-t><tr><th></th><th>${B("Actual","Real")}</th><th>${B("Plan","Plan")}</th><th></th></tr>${row("FD/NA",r.fd.a,r.fd.p)}${row(B("Breakfast","Desayuno"),r.bf.a,r.bf.p)}${row(B("Housekeeping","Limpieza"),r.hk.a,r.hk.p)}</table><small>${B("Cleans","Limpiezas")} ${r.cleans} · ${B("Rooms sold","Vendidas")} ${r.sold} · ${B("Cleans/sold","Limpiezas/vendidas")} ${r.sold?Math.round(r.cleans/r.sold*100):"—"}% · MPR ${r.mpr?(+r.mpr).toFixed(1):"—"}</small></div>`}
+function vChk(h){const y=S.lcd&&S.lcp!=="week"?S.lcd:yday(),k=h+"|"+y,ch=jget(HK,{})[k],c=cleansFor(h,y)||{co:"",so:"",sold:""},step=S.lcs||1,mp=missing(h,y),gm=["GM","AGM"].includes(role());
+ const st=(n,t)=>`<button type=button class="lc-st ${step===n?"on":""} ${n<step||ch?"dn":""}" onclick="LCMD.step(${n})">${n}. ${t}</button>`;
+ const losers=DEPT.map(d=>({d,V:sum(d[3].map(p=>rowFor(h,[y],p).V))})).filter(x=>x.V<-0.25);
+ const rs=(ch&&ch.reasons)||S.lcr||{};
+ let body="";
+ if(step===1)body=`<h3>${B("Enter yesterday's cleans & rooms sold","Ingrese limpiezas y cuartos vendidos de ayer")}</h3><div class=lc-in><label>${B("Checkout cleans","Limpiezas de salida")}<input id=lcCO inputmode=numeric value="${c.co}"></label><label>${B("Stayover cleans","Limpiezas de continuación")}<input id=lcSO inputmode=numeric value="${c.so}"></label><label>${B("Rooms sold","Cuartos vendidos")}<input id=lcSold inputmode=numeric value="${c.sold}"></label></div>${gm||isCorp()?`<button type=button class="btn" style="width:100%" onclick="LCMD.saveCleans('${y}')">${B("Save & next","Guardar y seguir")} ›</button>`:""}`;
+ if(step===2)body=`<h3>${B("Review yesterday's variance","Revisar variación de ayer")}</h3>${DEPT.map(d=>{const V=sum(d[3].map(p=>rowFor(h,[y],p).V)),A=sum(d[3].map(p=>rowFor(h,[y],p).A)),P=sum(d[3].map(p=>{const r=rowFor(h,[y],p);return r.P+r.T}));return `<div class=lc-a><b>${B(d[1],d[2])}</b><span>${f1(A)} / ${f1(P)}</span>${wl(V)}</div>`}).join("")}<button type=button class=btn style="width:100%" onclick="LCMD.step(3)">${B("Next","Siguiente")} ›</button>`;
+ if(step===3)body=`<h3>${B("Fix missing punches","Corregir marcajes faltantes")}</h3>${mp.map(m=>`<div class=lc-a><span>${E(m.name)} <small>${E(roleName(m.pos)||m.pos)} · ${B("sched","prog")} ${E(m.sch)} · ${m.why==="no out"?B("no clock-out","sin salida"):B("no punch","sin marcaje")}</small></span><span class=lc-fx><input type=time aria-label="in" id="fi-${E(m.name).replace(/\W/g,"")}" value="${m.sch.split("–")[0]}"><input type=time aria-label="out" id="fo-${E(m.name).replace(/\W/g,"")}" value="${m.sch.split("–")[1]}"><button type=button class=oc-mini onclick="LCMD.fix('${y}',${JSON.stringify(m.name).replace(/"/g,"&quot;")})">${B("Fix","Corregir")}</button></span></div>`).join("")||`<small>✅ ${B("No missing punches.","Sin marcajes faltantes.")}</small>`}<small>${B("Fixes are saved here for review; still correct the punch in Hotel Effectiveness.","Las correcciones se guardan aquí; también corrija el marcaje en Hotel Effectiveness.")}</small><button type=button class=btn style="width:100%" onclick="LCMD.step(4)">${B("Next","Siguiente")} ›</button>`;
+ if(step===4)body=`<h3>${B("Variance reasons","Razones de variación")}</h3>${losers.map(x=>`<div class=lc-rs><b>${B(x.d[1],x.d[2])}</b> ${wl(x.V)}<div class=lp-chips>${RC.map(r=>`<button type=button class="${(rs[x.d[0]]||{}).code===r[0]?"on":""}" onclick="LCMD.rc('${x.d[0]}','${r[0]}')">${B(r[1],r[2])}</button>`).join("")}</div><input placeholder="${B("Note (what happened / what we'll change)","Nota (qué pasó / qué cambiaremos)")}" value="${E((rs[x.d[0]]||{}).note||"")}" onchange="LCMD.rn('${x.d[0]}',this.value)"></div>`).join("")||`<small>🎉 ${B("No losses yesterday — nothing to explain.","Sin pérdidas ayer — nada que explicar.")}</small>`}<button type=button class=btn style="width:100%" onclick="LCMD.step(5)">${B("Next","Siguiente")} ›</button>`;
+ if(step===5){const ot=otRisk(h);body=`<h3>${B("Overtime risk & finish","Riesgo de horas extra y terminar")}</h3>${ot.list.map(o=>`<div class=lc-a><span>${E(o.n)}</span><span>${f1(o.h)} ${B("hrs proj.","hrs proy.")}</span><span class="pill bad">+${f1(o.h-40)} OT</span></div>`).join("")||`<small>✅ ${B("No one projected over 40 hrs.","Nadie proyectado sobre 40 hrs.")}</small>`}<div class=lc-mpr>OT % ${B("(projected)","(proyectado)")}: <b>${ot.pct}%</b></div>${gm||isCorp()?`<button type=button class="btn" style="width:100%" onclick="LCMD.finish('${y}')">✔ ${B("Finish check-in","Terminar revisión")}</button>`:""}`}
+ return `<div class="card lc-chk"><div class=lc-sth>${st(1,B("Cleans","Limpiezas"))}${st(2,B("Variance","Variación"))}${st(3,B("Punches","Marcajes"))}${st(4,B("Reasons","Razones"))}${st(5,B("OT & finish","HE y fin"))}</div>
+ ${ch?`<div class=ot-win>✅ ${B("Check-in done","Revisión hecha")} · ${E(ch.by)} · ${E(new Date(ch.at).toLocaleString(LANG==="es"?"es-US":"en-US",{dateStyle:"short",timeStyle:"short"}))}</div>`:""}<small>${B("For","Para")} ${E(y)} · ${B("about 5 minutes","unos 5 minutos")}</small>${body}</div>${isCorp()?compGrid():""}`}
+function compGrid(){const ch=jget(HK,{}),ds=[7,6,5,4,3,2,1].map(n=>ld(-n));return `<div class=card><h3>${B("Check-in completion (all hotels)","Revisiones completadas (todos los hoteles)")}</h3><div class=lp-wrap><table class=lp-t><tr><th></th>${ds.map(d=>`<th>${E(d.slice(5))}</th>`).join("")}<th>%</th></tr>${Object.keys(HOTELS).map(h=>{const n=ds.filter(d=>ch[h+"|"+d]).length;return `<tr><th>${h}</th>${ds.map(d=>`<td>${ch[h+"|"+d]?"✅":"—"}</td>`).join("")}<td><b>${Math.round(n/7*100)}%</b></td></tr>`}).join("")}</table></div></div>`}
+function otRisk(h){const w=weekDates(S.wk||0).map(ymd),t=ld(),by={};USERS.filter(u=>u.hotel===h).forEach(u=>{let hrs=0;w.forEach(d=>{if(d<t){const a=actuals(h,d).find(r=>r.name===u.name);hrs+=a?a.hrs:0}else hrs+=sumHrs((S.shifts||[]).filter(x=>x.who===u.name&&x.date===d))});if(hrs)by[u.name]=hrs});
+ const list=Object.keys(by).filter(n=>by[n]>40).map(n=>({n,h:by[n]})),tot=sum(Object.values(by)),ot=sum(Object.values(by).map(v=>Math.max(0,v-40)));return {list,pct:tot?(ot/tot*100).toFixed(1):"0.0",by}}
+function vAlerts(h){const al=alerts(h);return `<div class=card><h3>🚨 ${B("Data alerts","Alertas de datos")} · ${h}</h3>${al.map(a=>`<div class="lc-al lc-${a[0]}">${a[0]==="cleans"?"🧹":a[0]==="zero"?"⚠️":"⏱️"} ${E(a[1])} <button type=button class=oc-mini onclick="LCMD.tab('chk');LCMD.step(${a[0]==="punch"?3:1})">${B("Fix","Corregir")} ›</button></div>`).join("")||`<small>✅ ${B("All clear.","Todo en orden.")}</small>`}</div>${isCorp()?`<div class=card><h3>${B("All hotels","Todos los hoteles")}</h3>${Object.keys(HOTELS).map(k=>`<div class=lc-a><b>${k}</b><span>${alerts(k).length} ${B("alert(s)","alerta(s)")}</span></div>`).join("")}</div>`:""}`}
+function vImp(){return `<div class=card><h3>⬆️ ${B("Import Hotel Effectiveness export","Importar exportación de Hotel Effectiveness")}</h3><p><small>${B("Accepted: (1) Weekly Labor Report .xlsx/.csv (columns Code, Actual Hours, Plan Hours by FD/NA, Breakfast, HK, Total Cleans, Rooms Sold); (2) Punch export .csv/.xlsx with Date, Employee, Position, In, Out (or Hours). Data stays in this browser only.","Acepta: (1) Reporte semanal .xlsx/.csv (Code, Actual Hours, Plan Hours por FD/NA, Desayuno, HK, Total Cleans, Rooms Sold); (2) Exportación de marcajes .csv/.xlsx con Date, Employee, Position, In, Out (o Hours). Los datos quedan solo en este navegador.")}</small></p>
+ <input type=file id=lcFile accept=".csv,.xlsx" onchange="LCMD.imp(this.files[0])"><div id=lcImpMsg>${E(S.lcmsg||"")}</div>
+ ${isCorp()?`<button type=button class=oc-mini onclick="LCMD.clearImp()">${B("Clear imported data","Borrar datos importados")}</button>`:""}</div>`}
+V.lcmd=function(){const h=S.hotel,t=S.lct||"wl";if(!ok())return "";const al=alerts(h);
+ return `<div id=lcRoot class="lp ${innerWidth<768?"phone":innerWidth<1200?"tab":"desk"}"><h2>📊 ${B("Labor Win/Loss","Labor Gana/Pierde")}</h2>${hotelSeg()}${tabs()}${al.length&&t!=="alerts"?`<button type=button class=lp-alert onclick="LCMD.tab('alerts')">🚨 ${al.length} ${B("data alert(s)","alerta(s) de datos")} ›</button>`:""}${t==="wl"?vWL(h):t==="chk"?vChk(h):t==="alerts"?vAlerts(h):vImp()}<button type=button class=lp-link onclick="go('lplan')">🗓️ ${B("Labor Plan & standards","Plan de labor y estándares")} ›</button></div>`};
+// ---- importer ----
+async function unzip(buf){const dv=new DataView(buf),u8=new Uint8Array(buf);let e=u8.length-22;while(e>0&&dv.getUint32(e,true)!==0x06054b50)e--;const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const files={};
+ for(let i=0;i<n;i++){const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),fl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);const name=new TextDecoder().decode(u8.slice(p+46,p+46+fl));files[name]={m,cs,off};p+=46+fl+xl+cl}
+ return async name=>{const f=files[name];if(!f)return null;const lf=dv.getUint16(f.off+26,true),lx=dv.getUint16(f.off+28,true),st=f.off+30+lf+lx,data=u8.slice(st,st+f.cs);if(f.m===0)return new TextDecoder().decode(data);const ds=new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return await new Response(ds).text()}}
+const colN=r=>{let n=0;for(const ch of r.replace(/\d+/g,""))n=n*26+ch.charCodeAt(0)-64;return n-1};
+async function xlsxRows(buf){const get=await unzip(buf),ss=[],P=new DOMParser();const sx=await get("xl/sharedStrings.xml");if(sx){P.parseFromString(sx,"application/xml").querySelectorAll("si").forEach(si=>ss.push([...si.querySelectorAll("t")].map(t=>t.textContent).join("")))}
+ const sh=await get("xl/worksheets/sheet1.xml");const doc=P.parseFromString(sh,"application/xml"),rows=[];doc.querySelectorAll("sheetData row").forEach(r=>{const a=[];r.querySelectorAll("c").forEach(c=>{const t=c.getAttribute("t"),v=c.querySelector("v"),is=c.querySelector("is t");let val=v?v.textContent:is?is.textContent:"";if(t==="s")val=ss[+val]||"";a[colN(c.getAttribute("r"))]=val});rows.push(a)});return rows}
+function csvRows(t){const out=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c==='"'&&t[i+1]==='"'){f+='"';i++}else if(c==='"')q=false;else f+=c}else if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n")i++;row.push(f);out.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);out.push(row)}return out}
+function ingest(rows){const low=r=>(r||[]).map(x=>String(x==null?"":x).trim().toLowerCase());let hi=rows.findIndex(r=>low(r).includes("code")&&low(r).includes("actual hours"));
+ if(hi>=0){const H=low(rows[hi]),idx=(name,k)=>{let c=-1,n=0;for(let i=0;i<H.length;i++)if(H[i]===name){if(n===k){c=i;break}n++}return c};const per=String((rows[1]||[]).filter(Boolean)[0]||"").trim()||ld();
+  const ci=H.indexOf("code"),aF=idx("actual hours",0),pF=idx("plan hours",0),aB=idx("actual hours",1),pB=idx("plan hours",1),aH=idx("actual hours",2),pH=idx("plan hours",2),cl=H.indexOf("total cleans"),so=H.indexOf("rooms sold"),mp=H.indexOf("cleans mpr");
+  const w=jget(IW,{});let n=0;rows.slice(hi+1).forEach(r=>{const code=String(r[ci]||"").trim().toUpperCase();if(!HOTELS[code])return;w[code+"|"+per]={fd:{a:+r[aF]||0,p:+r[pF]||0},bf:{a:+r[aB]||0,p:+r[pB]||0},hk:{a:+r[aH]||0,p:+r[pH]||0},cleans:+r[cl]||0,sold:+r[so]||0,mpr:+r[mp]||0};n++});jset(IW,w);
+  return B(`Weekly report: ${n} JR hotel row(s) imported (${per}). Rows for other hotels were skipped.`,`Reporte semanal: ${n} fila(s) de hoteles JR importadas (${per}). Se omitieron otros hoteles.`)}
+ hi=rows.findIndex(r=>{const l=low(r);return l.includes("date")&&(l.includes("employee")||l.includes("name"))});
+ if(hi>=0){const H=low(rows[hi]),c=k=>H.findIndex(x=>x===k||x.startsWith(k)),cd=c("date"),cn=H.includes("employee")?c("employee"):c("name"),cp=c("position"),cin=c("in"),cout=c("out"),ch=c("hours"),a=jget(IA,{});let n=0;
+  rows.slice(hi+1).forEach(r=>{if(!r[cd]||!r[cn])return;let d=String(r[cd]).trim();if(/^\d{4,5}(\.\d+)?$/.test(d)){const x=new Date(Date.UTC(1899,11,30)+(+d)*864e5);d=x.toISOString().slice(0,10)}else{const x=new Date(d);if(!isNaN(x))d=iso(x)}
+   const k=S.hotel+"|"+d;a[k]=a[k]||[];const hrs=ch>=0&&r[ch]!==""?+r[ch]:shHrs(String(r[cin]||""),String(r[cout]||""));a[k].push({name:String(r[cn]).trim(),pos:String(r[cp]||"").trim()||"Front Desk",in:String(r[cin]||""),out:String(r[cout]||""),hrs});n++});jset(IA,a);
+  return B(`Punches: ${n} row(s) imported for ${S.hotel}.`,`Marcajes: ${n} fila(s) importadas para ${S.hotel}.`)}
+ return B("Couldn't recognize the columns. See accepted formats above.","No se reconocieron las columnas. Vea los formatos aceptados.")}
+window.LCMD={cleansFor,alerts,ingest,
+ tab(t){S.lct=t;render()},per(p){S.lcp=p;render()},date(v){S.lcd=v;render()},step(n){S.lcs=n;render()},
+ saveCleans(d){if(!ok())return;const v=id=>Math.max(0,parseInt(($(id)||{}).value)||0),a=jget(CK,{});a[S.hotel+"|"+d]={co:v("lcCO"),so:v("lcSO"),sold:v("lcSold"),by:meUser().name,at:Date.now()};jset(CK,a);S.lcs=2;render()},
+ fix(d,n){const k=n.replace(/[^\w]/g,""),fi=$("fi-"+k),fo=$("fo-"+k);const a=jget(PF,{});a[S.hotel+"|"+d+"|"+n]=[fi?fi.value:"",fo?fo.value:""];jset(PF,a);render()},
+ rc(dp,c){S.lcr=S.lcr||{};S.lcr[dp]=Object.assign(S.lcr[dp]||{},{code:c});render()},rn(dp,v){S.lcr=S.lcr||{};S.lcr[dp]=Object.assign(S.lcr[dp]||{},{note:v})},
+ finish(d){if(!ok())return;const a=jget(HK,{});a[S.hotel+"|"+d]={by:meUser().name+" ("+role()+")",at:Date.now(),reasons:S.lcr||{}};jset(HK,a);S.lcr=null;S.lcs=1;window.ptsToast&&ptsToast("✅ "+B("Daily check-in done","Revisión diaria hecha"));render()},
+ addAct(t){const x=t||(($("lcAct")||{}).value||"").trim();if(!x)return;const l=jget(AK,[]);l.push({id:"a"+Date.now().toString(36),h:S.hotel,text:x,owner:t?"GM":(($("lcOwn")||{}).value||"GM"),due:t?ld(2):(($("lcDue")||{}).value||ld(2)),done:false,at:Date.now()});jset(AK,l);render()},
+ done(id){const l=jget(AK,[]),a=l.find(x=>x.id===id);if(a)a.done=true;jset(AK,l);render()},
+ async imp(f){if(!f)return;try{const rows=/\.xlsx$/i.test(f.name)?await xlsxRows(await f.arrayBuffer()):csvRows(await f.text());S.lcmsg=ingest(rows)}catch(e){S.lcmsg=B("Import failed: ","Falló la importación: ")+e.message}render()},
+ clearImp(){if(!isCorp())return;[IA,IW].forEach(k=>sset(k,"{}"));S.lcmsg="";render()},otRisk};
+M.lcmd=["📊","Labor Win/Loss"];Object.assign(I18N.es,{"Labor Win/Loss":"Labor Gana/Pierde"});
+try{NOCOLS.push("lcmd")}catch(e){}
+TILES.GM=(TILES.GM||[]).concat(["lcmd"]);
+const _r=render;render=function(){const u=meUser();if(u&&S&&S.tab==="lcmd"&&!ok())S.tab="home";_r();if(!u)return;
+ if(S.tab==="lcmd"){$("app").classList.add("wide");$("app").classList.remove("cols")}
+ if(ok()&&S.tab==="home"){const a=$("app"),al=alerts(S.hotel),ch=jget(HK,{})[S.hotel+"|"+yday()];if(a&&!a.querySelector(".lc-home"))a.insertAdjacentHTML("afterbegin",`<button type=button class="lp-home lc-home" onclick="go('lcmd')">📊 <span><b>${B("Labor Win/Loss & daily check-in","Labor Gana/Pierde y revisión diaria")}</b><small>${ch?"✅ "+B("Check-in done","Revisión hecha"):"⏳ "+B("Yesterday's check-in not done","Revisión de ayer pendiente")}${al.length?` · 🚨 ${al.length} ${B("alert(s)","alerta(s)")}`:""}</small></span> ›</button>`)}};
+// publish guard: zero-hour position-days and OT risk
+const _pub=window.publishWeek;if(_pub)window.publishWeek=function(){try{const days=weekDates(S.wk||0).map(ymd),z=[];schedPos().filter(p=>p!=="Shuttle Driver").forEach(p=>days.forEach((d,i)=>{if(!sched(S.hotel,d,p))z.push((roleName(p)||p)+" "+B(DN[i][0],DN[i][1]))}));const ot=otRisk(S.hotel);
+ const msg=[z.length?B("No one scheduled for: ","Nadie programado para: ")+z.join(", "):"",ot.list.length?B("Overtime risk: ","Riesgo de horas extra: ")+ot.list.map(o=>o.n+" "+f1(o.h)+"h").join(", "):""].filter(Boolean).join("\n\n");if(msg&&!confirm(msg+"\n\n"+B("Publish anyway?","¿Publicar de todos modos?")))return}catch(e){}return _pub.apply(this,arguments)};
+const css=document.createElement("style");css.textContent=`
+.lc-d,.lc-p{border-bottom:1px solid #eef1f5}.lc-d>summary,.lc-p>summary,.lc-a,.lc-hd{display:grid;grid-template-columns:1.4fr 1.2fr auto;gap:8px;align-items:center;padding:8px 4px;cursor:pointer}.lc-p>summary{padding-left:18px;font-size:14px}.lc-a{padding-left:32px;font-size:13px;cursor:default}.lc-hd{font-size:12px;opacity:.7;cursor:default}
+.lc-mpr{margin-top:8px;padding:8px;border-radius:8px;background:#f1f3f7}.lc-src{display:block;margin-top:6px}.lc-top input[type=date]{height:40px;font:inherit;border:1px solid #c9d2e0;border-radius:10px;padding:0 8px}
+.lc-ai{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eef1f5;flex-wrap:wrap}.lc-add{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}.lc-add input,.lc-in input,.lc-rs input{height:42px;font:inherit;border:1px solid #c9d2e0;border-radius:8px;padding:0 10px;box-sizing:border-box;width:100%}
+.lc-sth{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}.lc-st{flex:1;min-width:90px;border:1px solid #c9d2e0;background:#fff;border-radius:10px;padding:8px 4px;font:inherit;font-size:13px;cursor:pointer}.lc-st.on{background:#1f2a44;color:#fff}.lc-st.dn:not(.on){background:#e6f4ea}
+.lc-in{display:grid;grid-template-columns:1fr;gap:8px;margin:8px 0}.lc-in label{display:flex;flex-direction:column;font-weight:600;gap:4px}.lc-rs{border:1px solid #e3e8f0;border-radius:10px;padding:8px;margin:6px 0}.lc-fx{display:flex;gap:4px;align-items:center;flex-wrap:wrap}.lc-fx input{height:34px}
+.lc-al{padding:10px;border-radius:10px;background:#fff4d6;margin:6px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}
+@media(min-width:768px){.lc-in{grid-template-columns:1fr 1fr 1fr}.lc-add{grid-template-columns:2fr 1fr 1fr auto}}
+@media(min-width:1200px){#lcRoot.desk .card{max-width:none}}`;document.head.appendChild(css);
+})();
+/*LCMD_END*/
 </script></body></html>
