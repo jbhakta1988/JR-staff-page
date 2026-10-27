@@ -9,7 +9,7 @@ from restaurants_data import HOTELS
 CACHE = os.path.join(HERE, "places-geocache.json")
 cache = json.load(open(CACHE)) if os.path.exists(CACHE) else {"geo": {}, "route": {}}
 old = json.load(open(os.path.join(HERE, "restaurants-geocache.json")))
-UA = "HotelHQ-staff-portal/1.0 (jbhakta1988@users.noreply.github.com)"
+UA = "HotelHQ-staff-portal/1.0 (local directory build)"
 def get(url):
     return json.load(urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=30))
 # Nominatim-friendly fallbacks for addresses it cannot resolve (approximate pin = the named landmark).
