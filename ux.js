@@ -9,6 +9,7 @@ M.onb=["🎓","Onboarding"];
 const OB_ROLES=["Housekeeper","House Person","Laundry Attendant","Front Desk","Maintenance","Breakfast Attendant","GM","AGM","Housekeeping","Shuttle Driver"];
 Object.keys(TILES).forEach(r=>{if(!TILES[r].includes("onb"))TILES[r].push("onb")});
 ["Housekeeper","Shuttle Driver","House Person","Laundry Attendant","Breakfast Attendant","Front Desk","Housekeeping","Maintenance","GM"].forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("onb"))TILES[r].push("onb")});
+if(TILES["Shuttle Driver"]&&!TILES["Shuttle Driver"].includes("my"))TILES["Shuttle Driver"].push("my");
 const POL=[["handbook","Employee handbook","Manual del empleado"],["safety","Safety & chemicals (SDS)","Seguridad y químicos (SDS)"],["keys","Key control","Control de llaves"],["brand","Brand standards","Estándares de la marca"]];
 const Q=(k,en,es,qen,qes,opts,a)=>({k,en,es,q:[qen,qes],opts,a});
 const COMMON=[["tour","Take the HotelHQ tour","Hacer el recorrido de HotelHQ"],["login","Log in within 30 min of shift start","Entrar a HotelHQ 30 min después de iniciar turno"],["emerg","Know fire exits & emergency plan","Conocer salidas y plan de emergencia"]];
