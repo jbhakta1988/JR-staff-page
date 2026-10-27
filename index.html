@@ -156,6 +156,9 @@ body.he-print .wk button{display:none}
 #welcome .wl-go:focus-visible,#welcome .wl-lang:focus-visible{outline:3px solid #fff;outline-offset:2px}
 #welcome .wl-lang{position:absolute;right:0;top:-8px;min-width:44px;min-height:44px;border:1px solid #ffffff80;border-radius:999px;background:transparent;color:#fff;font-weight:700;cursor:pointer}
 @keyframes wlfade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:reduce){#welcome{animation:none}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chip{min-height:40px;border-radius:20px;padding:6px 12px;background:#e6ebf2;color:#14365d;font-weight:600;border:1px solid #d5dbe6;font-size:13px}.chip.on{background:#14365d;color:#fff;border-color:#14365d}
+.cx{border-left:4px solid #f9c74f}.cx .cm{margin:6px 0;line-height:1.4}.cx small{color:#556}
+.cxtags{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.cxtag{display:flex;align-items:center;gap:6px;background:#f4f7fb;border-radius:999px;padding:3px 10px 3px 4px;font-size:13px;font-weight:600}
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span class="hhq" style="font-weight:800;letter-spacing:.3px;white-space:nowrap">Hotel<span style="color:#f9c74f">HQ</span></span><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
@@ -1136,7 +1139,7 @@ function ensureDemoAlerts(){
 }
 function alertsCard(){
   ensureDemoAlerts();
-  const rows=(S.alerts||[]).filter(a=>a&&!a.acknowledged_at);
+  const rows=(S.alerts||[]).filter(a=>a&&!a.acknowledged_at&&(!a.hotel||a.hotel===S.hotel||authRole()==="Above Property")&&(!a.role||a.role===authRole()||leader())&&(!a.uid||a.uid===S.uid));
   const focus=String(ackParam());
   const list=rows.length?rows.map(a=>{
     const id=String(a.id);
@@ -3268,13 +3271,14 @@ loadLang();document.getElementById("app").innerHTML='<div class="card">'+t("Load
 const ES={"Points":"Puntos","My Points":"Mis Puntos","Level":"Nivel","This week":"Esta semana","This month":"Este mes","Leaderboard":"Clasificación","Badges":"Insignias","Streaks":"Rachas","How to earn":"Cómo ganar","Rewards":"Premios","Redeem":"Canjear","Needs GM approval":"Requiere aprobación del GM","Requested":"Solicitado","All departments":"Todos los departamentos","My department":"Mi departamento","Level up!":"¡Subiste de nivel!","Checklist complete!":"¡Lista completada!","pts":"pts","to next level":"para el siguiente nivel","On-time checklists":"Listas a tiempo","On-time clock-in":"Entrada a tiempo","Clean punches":"Marcajes perfectos","App days":"Días en la app","Recent":"Recientes","You":"Tú","Not enough points":"No tienes suficientes puntos","Ticket closed fast!":"¡Orden cerrada rápido!","Delivered by Tremendous":"Entregado por Tremendous","You pick the brand: Amazon, Target, Walmart, restaurants, prepaid Visa and more":"Tú eliges la marca: Amazon, Target, Walmart, restaurantes, Visa prepagada y más","Sent to your email or phone on file":"Se envía a tu correo o teléfono registrado"};
 Object.assign(I18N.es,ES);
 const LV=[[0,"Rookie","Novato"],[250,"Team Member","Miembro del Equipo"],[750,"Pro","Profesional"],[1500,"Star","Estrella"],[3000,"All-Star","Súper Estrella"],[5000,"Captain","Capitán"],[8000,"Legend","Leyenda"]];
-const BADGES=[["On-Time Streak","Racha a Tiempo","🗓️",[5,10,30],"ck"],["Punctual","Puntual","⏰",[5,10,30],"ci"],["Clean Punches","Marcajes Perfectos","✅",[5,10,30],"pu"],["Perfect Week","Semana Perfecta","🌟",[1,4,12],"pw"],["Perfect Month","Mes Perfecto","🏆",[1,3,6],"pm"],["Team Player","Compañero de Equipo","🤝",[5,25,75],"hp"],["Fast Fixer","Reparador Rápido","⚡",[10,50,150],"ft"],["Spotless","Impecable","✨",[10,50,150],"ip"]];
+const BADGES=[["On-Time Streak","Racha a Tiempo","🗓️",[5,10,30],"ck"],["Punctual","Puntual","⏰",[5,10,30],"ci"],["Clean Punches","Marcajes Perfectos","✅",[5,10,30],"pu"],["Perfect Week","Semana Perfecta","🌟",[1,4,12],"pw"],["Perfect Month","Mes Perfecto","🏆",[1,3,6],"pm"],["Team Player","Compañero de Equipo","🤝",[5,25,75],"hp"],["Fast Fixer","Reparador Rápido","⚡",[10,50,150],"ft"],["Spotless","Impecable","✨",[10,50,150],"ip"],["Guest Favorite","Favorito de los Huéspedes","💌",[1,3,10],"gc"]];
 const TIER=["🥉","🥈","🥇"];
-const RULES=[["Checklist completed","Lista completada",10],["…on time","…a tiempo",5],["…all items done","…todos los puntos",5],["Urgent ticket ≤1h / ≤4h","Urgente ≤1h / ≤4h","25 / 10"],["High ≤4h / ≤24h","Alta ≤4h / ≤24h","20 / 10"],["Normal ≤24h / ≤72h","Normal ≤24h / ≤72h","15 / 5"],["Photo on ticket","Foto en la orden",2],["Room passed inspection","Habitación aprobada",5],["Room failed inspection","Habitación reprobada",-5],["Daily check-in / 7-day streak","Entrada diaria / racha 7 días","2 / 15"],["Shift note","Nota de turno",3],["Extra room helped","Habitación extra",5],["Guest cleanliness 10","Limpieza 10 del huésped",25],["Perfect week / month","Semana / mes perfecto","50 / 200"]];
+const RULES=[["Checklist completed","Lista completada",10],["…on time","…a tiempo",5],["…all items done","…todos los puntos",5],["Urgent ticket ≤1h / ≤4h","Urgente ≤1h / ≤4h","25 / 10"],["High ≤4h / ≤24h","Alta ≤4h / ≤24h","20 / 10"],["Normal ≤24h / ≤72h","Normal ≤24h / ≤72h","15 / 5"],["Photo on ticket","Foto en la orden",2],["Room passed inspection","Habitación aprobada",5],["Room failed inspection","Habitación reprobada",-5],["Daily check-in / 7-day streak","Entrada diaria / racha 7 días","2 / 15"],["Shift note","Nota de turno",3],["Tagged on a guest compliment","Etiquetado en un cumplido de huésped","50 (GM sets)"],["Extra room helped","Habitación extra",5],["Guest cleanliness 10","Limpieza 10 del huésped",25],["Perfect week / month","Semana / mes perfecto","50 / 200"]];
 const FIRST=["Ana","Luis","Maria","Kevin","Rosa","Jose","Tina","Omar","Sofia","Marcus","Lupe","Dev"];
 const REWARDS=[5,10,25,50].map(d=>["$"+d+" gift card","Tarjeta de regalo $"+d,d*50]);
 function KEY(){return "jrpts_"+S.hotel+"_"+((meUser()||{}).id||"x")}
-function P(){let p;try{p=JSON.parse(localStorage.getItem(KEY()))}catch(e){}if(!p){const r=(s=>()=>(s=(s*9301+49297)%233280)/233280)(KEY().length*77+S.hotel.charCodeAt(3));p={xp:600+Math.floor(r()*900),wk:40+Math.floor(r()*80),mo:180+Math.floor(r()*200),st:{ck:7,ci:4,pu:12,pw:1,pm:0,hp:6,ft:3,ip:14,app:5},log:[],red:[],last:"",ckd:{},woc:0}}return p}
+function Pfor(key,hotel){let p;try{p=JSON.parse(localStorage.getItem(key))}catch(e){}if(!p){const r=(s=>()=>(s=(s*9301+49297)%233280)/233280)(key.length*77+hotel.charCodeAt(3));p={xp:600+Math.floor(r()*900),wk:40+Math.floor(r()*80),mo:180+Math.floor(r()*200),st:{ck:7,ci:4,pu:12,pw:1,pm:0,hp:6,ft:3,ip:14,app:5},log:[],red:[],last:"",ckd:{},woc:0}}return p}
+function P(){return Pfor(KEY(),S.hotel)}
 function SV(p){try{localStorage.setItem(KEY(),JSON.stringify(p))}catch(e){}}
 function lvl(xp){let i=0;LV.forEach((l,j)=>{if(xp>=l[0])i=j});return i}
 function nm(l){return LANG==="es"?l[2]:l[1]}
@@ -3283,6 +3287,8 @@ window.ptsAward=function(n,en,es,big){if(gamifyOff())return;const p=P(),before=l
   if(after>before){p.xp+=LV.length*0+25*after;SV(p);setTimeout(()=>{confetti();window.avLevelUp&&avLevelUp();ptsToast("🎉 "+t("Level up!")+" "+t("Level")+" "+(after+1)+" · "+nm(LV[after]),3500)},900)}};
 function ptsToast(msg,ms){if(gamifyOff())return;let el=document.getElementById("ptsToast");if(!el){el=document.createElement("div");el.id="ptsToast";el.style.cssText="position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);pointer-events:none;background:#1f2a44;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;z-index:9999;box-shadow:0 4px 14px #0004;transition:opacity .3s;max-width:92vw;text-align:center";document.body.appendChild(el)}el.textContent=msg;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,ms||2200)}
 function confetti(){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;if(window.funBurst){window.funBurst();return}const c=document.createElement("canvas");c.style.cssText="position:fixed;inset:0;pointer-events:none;z-index:9998";c.width=innerWidth;c.height=innerHeight;document.body.appendChild(c);const x=c.getContext("2d"),cols=["#f94144","#f8961e","#f9c74f","#90be6d","#43aa8b","#577590"],ps=Array.from({length:140},()=>({x:c.width/2,y:c.height/3,vx:(Math.random()-.5)*12,vy:Math.random()*-12-3,s:4+Math.random()*5,c:cols[Math.floor(Math.random()*6)],r:Math.random()*6}));let f=0;(function a(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.35;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});if(++f<110)requestAnimationFrame(a);else c.remove()})()}
+// Credit points/stat to another associate (e.g. tagged on a guest compliment). Works for any hotel's demo store; no toast for the giver.
+window.ptsAwardTo=function(uid,hotel,n,en,es,stat){if(!uid||!hotel)return;const key="jrpts_"+hotel+"_"+uid,p=Pfor(key,hotel),before=lvl(p.xp);p.xp+=n;p.wk+=n;p.mo+=n;if(stat)for(const k in stat)p.st[k]=(p.st[k]||0)+stat[k];p.log.unshift([new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),en,es,n]);p.log=p.log.slice(0,15);const after=lvl(p.xp);if(after>before)p.xp+=25*after;try{localStorage.setItem(key,JSON.stringify(p))}catch(e){}};
 window.ptsToast=ptsToast;window.ptsLevel=()=>lvl(P().xp);window.ptsStats=()=>P().st;
 window.ptsCard=function(){if(gamifyOff())return "";const p=P(),i=lvl(p.xp),nx=LV[i+1],pct=nx?Math.round((p.xp-LV[i][0])/(nx[0]-LV[i][0])*100):100;
   return `<div class=card onclick="go('pts')" style="cursor:pointer;background:linear-gradient(135deg,#fff7e0,#e8f0ff)"><div style="display:flex;justify-content:space-between;align-items:center"><b>⭐ ${t("My Points")}</b><span style="background:#1f2a44;color:#fff;border-radius:999px;padding:2px 10px;font-size:13px">${t("Level")} ${i+1} · ${escH(nm(LV[i]))}</span></div>
@@ -3695,4 +3701,56 @@ const _hm=V.home;V.home=function(){const u=meUser()||{};if(gamifyOff())return `<
 window.avGrid=function(){return Object.keys(CRED).map(s=>avHTML(null,72,{...rnd("grid"+s,s),frame:["","gold","silver","neon","rainbow","double"][hash(s)%6],pin:"",role:ROLEB[hash(s)%ROLEB.length][0]})).join("")};
 })();
 /*AVATAR_END*/
+/*CARE_CORE_START*/
+// Shared helpers for the guest-care features (compliments, issues, lost & found, local tips, rush rooms, daily briefing).
+// Demo data lives in localStorage with the rest of the app state; everything is per hotel (S.h[hotel]). Live tables are a TODO.
+function bx(en,es){return LANG==="es"?es:en}
+function careLead(){const r=authRole();return r==="GM"||r==="AGM"||r==="Above Property"}
+function careStaff(){return ST().filter(s=>s.role!=="Above Property")}
+function careUid(name){const u=USERS.find(x=>x.name===name&&x.hotel===S.hotel);return u?u.id:""}
+function careNextId(a){return (a||[]).reduce((m,x)=>Math.max(m,+x.id||0),0)+1}
+function careDate(iso){const d=new Date(iso);return isNaN(d)?"":d.toLocaleDateString(localeTag(),{month:"short",day:"numeric"})}
+function careMonth(iso){const d=new Date(iso),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)}
+function careAgo(n){return new Date(Date.now()-n*864e5).toISOString()}
+function careAlert(title,body,o){ensureDemoAlerts();o=o||{};S.alerts.unshift(Object.assign({id:"c"+Date.now().toString(36)+Math.floor(Math.random()*1e4),title,body,hotel:S.hotel},o))}
+function careSet(k,v){S.care=S.care||{};S.care[k]=v}
+function careGet(k,def){return (S.care&&S.care[k]!=null)?S.care[k]:def}
+function careAv(name,sz){return window.avHTML?avHTML(name,sz):""}
+/*CARE_CORE_END*/
+/*COMP_START*/
+// Guest compliments wall. Logged by GM / front desk; tagged associates get bonus points (GM-set, default 50) and the Guest Favorite badge.
+const COMP_SRC=[["survey","Survey","Encuesta"],["review","Online review","Reseña en línea"],["person","In person","En persona"],["email","Email","Correo"]];
+function compSrcName(k){const x=COMP_SRC.find(y=>y[0]===k)||COMP_SRC[2];return bx(x[1],x[2])}
+function compList(){const d=D();if(!d.comp){const st=careStaff().filter(s=>s.role==="Front Desk"||s.role==="Housekeeper"||s.role==="Breakfast Attendant");const nm=i=>(st[i%Math.max(1,st.length)]||{n:"Team"}).n;d.comp=[{id:1,at:careAgo(1),src:"survey",txt:"The front desk remembered our names and had our room ready early. We felt so welcome.",txtEs:"La recepción recordó nuestros nombres y tuvo la habitación lista temprano. Nos sentimos muy bienvenidos.",tags:[nm(0)],by:"",ex:1},{id:2,at:careAgo(3),src:"review",txt:"Spotless room and a thoughtful note on the pillow. Best night's sleep of our trip.",txtEs:"Habitación impecable y una nota amable en la almohada. La mejor noche de sueño del viaje.",tags:[nm(1)],by:"",ex:1},{id:3,at:careAgo(6),src:"person",txt:"Breakfast was hot and fresh, and she made my daughter's day with a smile.",txtEs:"El desayuno estuvo caliente y fresco, y ella alegró el día de mi hija con una sonrisa.",tags:[nm(2),nm(0)],by:"",ex:1}]}return d.comp}
+function compPts(){const d=D();return d.compPts==null?50:d.compPts}
+function compCanLog(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"}
+function compForm(){S.cmp=S.cmp||{src:"survey",txt:"",tags:[]};return S.cmp}
+function compSrcSet(k){compForm().src=k;render()}
+function compTagTog(n){const f=compForm(),i=f.tags.indexOf(n);if(i<0)f.tags.push(n);else f.tags.splice(i,1);render()}
+function compPtsSet(v){const n=Math.max(0,Math.min(500,Math.round(+v||0)));D().compPts=n;save();render()}
+function compPost(){const f=compForm(),txt=($("cmTxt")&&$("cmTxt").value||f.txt||"").trim();f.txt=txt;
+  if(!txt){const e=$("cmErr");if(e)e.textContent=bx("Add what the guest said.","Escribe lo que dijo el huésped.");return}
+  if(!f.tags.length){const e=$("cmErr");if(e)e.textContent=bx("Tag at least one associate.","Etiqueta al menos a un asociado.");return}
+  const d=D(),pts=compPts(),tags=f.tags.slice();
+  compList().unshift({id:careNextId(d.comp),at:new Date().toISOString(),src:f.src,txt,tags,by:cw(),pts});
+  tags.forEach(n=>{const u=careUid(n);if(window.ptsAwardTo)ptsAwardTo(u,S.hotel,pts,"Guest compliment","Cumplido de huésped",{gc:1});
+    if(u)careAlert(bx("💌 A guest complimented you!","💌 ¡Un huésped te felicitó!"),bx("+"+pts+" pts and the Guest Favorite badge. Thank you for making guests feel welcome.","+"+pts+" pts y la insignia Favorito de los Huéspedes. Gracias por hacer sentir bienvenidos a los huéspedes."),{uid:u})});
+  S.cmp={src:f.src,txt:"",tags:[]};save();showToast(bx("Posted. "+tags.length+" associate(s) got +"+pts+" pts.","Publicado. "+tags.length+" asociado(s) recibieron +"+pts+" pts."));render()}
+function compItem(c){const txt=LANG==="es"&&c.txtEs?c.txtEs:c.txt;
+  return `<div class="card cx"><div class="row" style="margin:0"><span class="pill VC" style="flex:0 0 auto">${escH(compSrcName(c.src))}</span><small style="flex:1;text-align:right">${escH(careDate(c.at))}${c.ex?` · <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}</small></div><div class="cm raw">“${escH(txt)}”</div><div class="cxtags">${c.tags.map(n=>`<span class="cxtag">${careAv(n,26)}${escH(String(n).split(" ")[0])}</span>`).join("")}</div>${c.by?`<small>${bx("Logged by","Registrado por")} ${escH(String(c.by).split(" ")[0])}</small>`:""}${c.pts?` <small>· +${c.pts} pts</small>`:""}</div>`}
+function compMonthTable(){const mk=careMonth(new Date().toISOString()),pm=careMonth(new Date(new Date().getFullYear(),new Date().getMonth()-1,15).toISOString()),L2=compList(),cnt=(m)=>{const o={};L2.filter(c=>careMonth(c.at)===m).forEach(c=>c.tags.forEach(n=>o[n]=(o[n]||0)+1));return o},a=cnt(mk),b=cnt(pm),names=[...new Set([...Object.keys(a),...Object.keys(b)])].sort((x,y)=>(a[y]||0)-(a[x]||0)||x.localeCompare(y));
+  return `<div class="card"><h3>${bx("Compliments by associate","Cumplidos por asociado")}</h3><table><tr><th>${bx("Associate","Asociado")}</th><th>${bx("This month","Este mes")}</th><th>${bx("Last month","Mes pasado")}</th></tr>${names.map(n=>`<tr><td><span style="display:flex;align-items:center;gap:6px">${careAv(n,26)}${escH(n)}</span></td><td><b>${a[n]||0}</b></td><td>${b[n]||0}</td></tr>`).join("")||`<tr><td colspan="3">${bx("No compliments logged yet.","Aún no hay cumplidos.")}</td></tr>`}</table><small>${bx("Total this month","Total este mes")}: <b>${Object.values(a).reduce((x,y)=>x+y,0)}</b> ${bx("tags","etiquetas")}</small></div>`}
+M.comp=["💌","Compliments"];
+V.comp=function(){const f=compForm(),staff=careStaff(),mgr=authRole()==="GM"||authRole()==="AGM",L2=compList();
+  const form=compCanLog()?`<div class="card"><h3>${bx("Log a guest compliment","Registrar un cumplido de huésped")}</h3><small>${bx("Where did it come from?","¿De dónde vino?")}</small><div class="chips" role="group">${COMP_SRC.map(x=>`<button type="button" class="chip ${f.src===x[0]?"on":""}" aria-pressed="${f.src===x[0]}" onclick="compSrcSet('${x[0]}')">${bx(x[1],x[2])}</button>`).join("")}</div>
+  <textarea id="cmTxt" style="width:100%;min-height:76px" placeholder="${escH(bx("What did the guest say?","¿Qué dijo el huésped?"))}" oninput="compForm().txt=this.value">${escH(f.txt)}</textarea>
+  <small>${bx("Tag the associates (each gets","Etiqueta a los asociados (cada uno recibe")} +${compPts()} pts ${bx("and the Guest Favorite badge)","y la insignia Favorito de los Huéspedes)")}</small><div class="chips">${staff.map(s=>`<button type="button" class="chip ${f.tags.includes(s.n)?"on":""}" aria-pressed="${f.tags.includes(s.n)}" onclick="compTagTog(${escH(JSON.stringify(s.n)).replace(/"/g,"&quot;")})">${escH(String(s.n).split(" ")[0])} <small>${escH(shortRole(s.role))}</small></button>`).join("")}</div>
+  <div class="bad" id="cmErr" role="alert"></div><button class="btn" style="width:100%" onclick="compPost()">${bx("Post compliment","Publicar cumplido")}</button></div>`:"";
+  const cfg=mgr?`<div class="card"><h3>${bx("Bonus points","Puntos de bono")}</h3><div class="row"><input type="number" min="0" max="500" id="cmPts" value="${compPts()}" aria-label="${escH(bx("Bonus points per tagged associate","Puntos por asociado etiquetado"))}"><button class="btn2" style="flex:0 0 90px" onclick="compPtsSet($('cmPts').value)">${bx("Save","Guardar")}</button></div><small>${bx("Points each tagged associate gets. Default 50.","Puntos que recibe cada asociado etiquetado. Por defecto 50.")}</small></div>`:"";
+  return `<h2>💌 ${bx("Guest Compliments","Cumplidos de Huéspedes")}</h2>${form}${careLead()?compMonthTable():""}${cfg}<div class="card"><h3>${bx("Compliment wall","Muro de cumplidos")} · ${escH(S.hotel)}</h3><small>${bx("Real guest words, thanks to our team.","Palabras reales de huéspedes, gracias a nuestro equipo.")}</small></div>${L2.slice(0,20).map(compItem).join("")}`};
+function compHomeCard(){const c=compList()[0];if(!c)return "";return `<div class="card" onclick="go('comp')" style="cursor:pointer"><b>💌 ${bx("Guest compliments","Cumplidos de huéspedes")}</b>${compItem(c).replace('class="card cx"','class="cx" style="margin-top:8px;padding-left:10px"')}<small>${bx("See the wall ›","Ver el muro ›")}</small></div>`}
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("comp"))TILES[r].push("comp")});
+const _homeComp=V.home;V.home=function(){return compHomeCard()+_homeComp()};
+const _funComp=V.fun;V.fun=function(){const L2=compList().slice(0,2);return `<div class="card" onclick="go('comp')" style="cursor:pointer"><b>💌 ${bx("Guest compliments","Cumplidos de huéspedes")}</b>${L2.map(c=>compItem(c).replace('class="card cx"','class="cx" style="margin-top:8px;padding-left:10px"')).join("")}<small>${bx("See the wall ›","Ver el muro ›")}</small></div>`+_funComp()};
+/*COMP_END*/
 </script></body></html>
