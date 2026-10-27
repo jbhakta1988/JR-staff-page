@@ -3305,36 +3305,47 @@ const BR={MSPWE:"IHG",MSPAM:"Hilton",MSPMS:"Marriott"};
 function grp(r){const u=meUser()||{};if(u.qotd_role)return u.qotd_role;r=String(r||"").toLowerCase();if(/audit/.test(r)||u.shift==="Night"||u.shift==="NA")return"night_audit";if(/front/.test(r))return"front_desk";if(/laundry/.test(r))return"laundry";if(/house ?person|houseman/.test(r))return"houseman";if(/^housekeeping$|lead|super/.test(r))return"hk_supervisor";if(/keep/.test(r))return"room_attendant";if(/maint|eng/.test(r))return"maintenance";if(/breakfast/.test(r))return"breakfast";if(/driver|shuttle/.test(r))return"driver";if(/bar/.test(r))return"bartender";return"gm"}
 let BANK=null;fetch("data/qotd.json").then(r=>r.json()).then(b=>{BANK=b;try{const x=JSON.parse(localStorage.getItem("jrqotd_custom")||"[]");BANK=BANK.concat(x)}catch(e){}if(S.tab==="home"||S.tab==="qotd")render()}).catch(()=>{});
 const today=()=>new Date().toLocaleDateString("en-CA",{timeZone:"America/Chicago"});
+const WEEKLY=["room_attendant","hk_supervisor","laundry","houseman","maintenance","breakfast","driver","bartender"],ROLES=["front_desk","night_audit","gm",...WEEKLY];
+function freqMap(){try{return JSON.parse(localStorage.getItem("jrqotd_freq")||"{}")}catch(e){return {}}}
+function freq(g,h){h=h||S.hotel;const m=(freqMap()[h]||{})[g];return m||(WEEKLY.includes(g)?"weekly":"daily")}
+function pts(){const d={ad:1,cd:6,aw:5,cw:25};try{return Object.assign(d,JSON.parse(localStorage.getItem("jrqotd_pts")||"{}"))}catch(e){return d}}
+const addD=(d,n)=>{const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const monday=d=>{const w=new Date(d+"T12:00:00Z").getUTCDay();return addD(d,-((w+6)%7))};
+const myG=()=>grp(authRole()||S.role),isWk=()=>freq(myG())==="weekly",step=()=>isWk()?7:1;
+const period=d=>isWk()?monday(d):d;
+if(useRemote&&window.sb)setTimeout(()=>{try{if(useRemote())sb.rpc("qotd_get_freq",{p_hotel:S.hotel}).then(r=>{if(r&&r.data){const m=freqMap();m[S.hotel]=m[S.hotel]||{};r.data.forEach(x=>m[S.hotel][x.role]=x.freq);localStorage.setItem("jrqotd_freq",JSON.stringify(m))}},()=>{})}catch(e){}},0);
 const K=()=>"jrqotd_"+S.hotel+"_"+((meUser()||{}).id||"x");
 function st(){try{return JSON.parse(localStorage.getItem(K()))||{h:{},rev:{},streak:0,last:""}}catch(e){return {h:{},rev:{},streak:0,last:""}}}
 function sv(s){try{localStorage.setItem(K(),JSON.stringify(s))}catch(e){}}
 function retired(){try{return JSON.parse(localStorage.getItem("jrqotd_retired")||"[]")}catch(e){return []}}
-function pick(){if(!BANK)return null;const s=st(),d=today();if(s.h[d])return s.h[d];const b=BR[S.hotel],g=grp(authRole()||S.role),rt=retired();
+function pick(){if(!BANK)return null;const s=st(),d=today(),pk=period(d);if(s.h[pk])return s.h[pk];const b=BR[S.hotel],g=grp(authRole()||S.role),rt=retired();
   // only questions tagged for this exact role; ~80% own-role, ~20% shared; light brand question max once per 7 days
   const md=d.slice(5),live=q=>(!q[15]||q[15]===S.hotel)&&(!q[17]||q[17]>=d)&&(!q[16]||(q[16][0]<=q[16][1]?md>=q[16][0]&&md<=q[16][1]:md>=q[16][0]||md<=q[16][1]));
   const ok=BANK.filter(q=>(q[1]=="all"||q[1]==b)&&(q[13]||[]).includes(g)&&!rt.includes(q[0])&&q[12]!==false&&live(q));
-  const wk=Object.entries(s.h).filter(([k])=>k>new Date(Date.now()-7*864e5).toLocaleDateString("en-CA",{timeZone:"America/Chicago"})).map(([,v])=>v.id);
+  const wk=Object.entries(s.h).filter(([k])=>k>addD(d,isWk()?-42:-7)).map(([,v])=>v.id);
   const lightOk=!ok.some(q=>q[14]==="brand_light"&&wk.includes(q[0]));
   let id=Object.keys(s.rev).map(Number).find(i=>s.rev[i]<=d&&ok.some(q=>q[0]==i)),review=!!id;
   if(!id){const seen=new Set(Object.values(s.h).map(x=>x.id));let pool=ok.filter(q=>!seen.has(q[0])&&(q[14]!=="brand_light"||lightOk));if(!pool.length)pool=ok.filter(q=>q[14]!=="brand_light");
     const want=Math.random()<.8?"role":"shared";const pref=pool.filter(q=>want==="role"?q[14]==="role":q[14]!=="role");const seas=pool.filter(q=>q[16]&&Math.random()<.5),use=seas.length?seas:(pref.length?pref:pool);
     id=(use[Math.floor(Math.random()*use.length)]||[])[0]}
-  if(!id)return null;s.h[d]={id,review,role:g};sv(s);return s.h[d]}
+  if(!id)return null;s.h[pk]={id,review,role:g,freq:isWk()?"weekly":"daily"};sv(s);return s.h[pk]}
 const L=()=>S.qlang||LANG;
 const tl=(en,es)=>L()==="es"?es:en;
 window.qotdCard=function(){const a=pick();if(!a)return"";const q=BANK.find(x=>x[0]==a.id);if(!q)return"";const es=L()==="es",opts=es?q[7]:q[6],done=a.ans!=null,s=st();
-  return `<div class=card id=qotd style="background:linear-gradient(135deg,#eaf7ff,#f3ecff)"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>🧠 ${tl("Question of the Day","Pregunta del Día")}</b><span><small>🔥 ${s.streak} ${tl("day streak","días seguidos")}</small> <button class=btn2 style="padding:2px 8px;min-height:0" onclick="S.qlang=(L_()==='es'?'en':'es');render()" aria-label="EN/ES">${es?"EN":"ES"}</button></span></div>
+  return `<div class=card id=qotd style="background:linear-gradient(135deg,#eaf7ff,#f3ecff)"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>🧠 ${isWk()?tl("Question of the Week","Pregunta de la semana"):tl("Question of the Day","Pregunta del Día")}</b><span><small>🔥 ${s.streak} ${isWk()?tl("week streak","semanas seguidas"):tl("day streak","días seguidos")}</small> <button class=btn2 style="padding:2px 8px;min-height:0" onclick="S.qlang=(L_()==='es'?'en':'es');render()" aria-label="EN/ES">${es?"EN":"ES"}</button></span></div>
   ${a.review?`<small style="color:#6a1b9a">↻ ${tl("Review","Repaso")}</small>`:""}<div style="font-weight:600;margin:8px 0">${escH(es?q[5]:q[4])}</div>
   <div style="display:grid;gap:6px">${opts.map((o,i)=>{let bg="#fff",an="";if(done){if(i==q[8]){bg="#c8f7c5";an="animation:qpop .5s"}else if(i==a.ans){bg="#ffd6d6";an="animation:qshake .4s"}}
     return `<button ${done?"disabled":""} onclick="qotdAnswer(${i})" style="text-align:left;padding:10px;border-radius:10px;border:1px solid #c9d3e3;background:${bg};${an};min-height:44px;color:#111">${String.fromCharCode(65+i)}. ${escH(o)}</button>`}).join("")}</div>
-  ${done?`<div style="margin-top:8px;animation:qfade .6s"><b>${a.ans==q[8]?"✅ "+tl("Correct!","¡Correcto!"):"💡 "+tl("Not quite","Casi")}</b> ${escH(es?q[10]:q[9])}<br><small>${/^http/.test(q[11])?`<a href="${escH(q[11])}" target=_blank rel=noopener>${tl("Source","Fuente")}</a>`:escH(q[11])} · ${tl("Answer saved — come back tomorrow","Respuesta guardada; vuelve mañana")}</small></div>`:""}</div>`};
+  ${done?`<div style="margin-top:8px;animation:qfade .6s"><b>${a.ans==q[8]?"✅ "+tl("Correct!","¡Correcto!"):"💡 "+tl("Not quite","Casi")}</b> ${escH(es?q[10]:q[9])}<br><small>${/^http/.test(q[11])?`<a href="${escH(q[11])}" target=_blank rel=noopener>${tl("Source","Fuente")}</a>`:escH(q[11])} · ${isWk()?tl("Answer saved — new question Monday","Respuesta guardada; nueva pregunta el lunes"):tl("Answer saved — come back tomorrow","Respuesta guardada; vuelve mañana")}</small></div>`:""}</div>`};
 window.L_=L;
-window.qotdAnswer=function(i){const s=st(),d=today(),a=s.h[d];if(!a||a.ans!=null)return;const q=BANK.find(x=>x[0]==a.id);a.ans=i;const ok=i==q[8];
-  s.streak=s.last===new Date(Date.now()-864e5).toLocaleDateString("en-CA",{timeZone:"America/Chicago"})?s.streak+1:(s.last===d?s.streak:1);s.last=d;
-  if(!ok)s.rev[a.id]=new Date(Date.now()+3*864e5).toLocaleDateString("en-CA",{timeZone:"America/Chicago"});else if(a.review)delete s.rev[a.id];
+window.qotdAnswer=function(i){const s=st(),d=today(),pk=period(d),n=step(),wk=isWk(),a=s.h[pk];if(!a||a.ans!=null)return;const q=BANK.find(x=>x[0]==a.id);a.ans=i;const ok=i==q[8];
+  // streak counts periods (days or weeks); a missed question comes back for review after 3 periods
+  s.streak=s.last===addD(pk,-n)?s.streak+1:(s.last===pk?s.streak:1);s.last=pk;
+  if(!ok)s.rev[a.id]=addD(pk,3*n);else if(a.review)delete s.rev[a.id];
   sv(s);if(useRemote()&&window.sb)sb.rpc("answer_qotd",{p_idx:i}).then(()=>{},()=>{});
-  render();setTimeout(()=>{if(window.ptsAward)ok?ptsAward(6,"Question of the Day — correct!","Pregunta del Día — ¡correcta!",true):ptsAward(1,"Question of the Day answered","Pregunta del Día respondida");
-    if([7,30,100].includes(s.streak))setTimeout(()=>ptsAward({7:20,30:75,100:250}[s.streak],"Brainiac badge!","¡Insignia Cerebrito!",true),1200)},350)};
+  render();setTimeout(()=>{if(window.ptsAward){const P=pts();if(wk)ok?ptsAward(P.aw+P.cw,"Question of the Week — correct!","Pregunta de la semana — ¡correcta!",true):ptsAward(P.aw,"Question of the Week answered","Pregunta de la semana respondida");
+    else ok?ptsAward(P.ad+P.cd,"Question of the Day — correct!","Pregunta del Día — ¡correcta!",true):ptsAward(P.ad,"Question of the Day answered","Pregunta del Día respondida")}
+    if((wk?[4,13,52]:[7,30,100]).includes(s.streak))setTimeout(()=>ptsAward((wk?{4:20,13:75,52:250}:{7:20,30:75,100:250})[s.streak],"Brainiac badge!","¡Insignia Cerebrito!",true),1200)},350)};
 const css=document.createElement("style");css.textContent="@keyframes qpop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}@keyframes qshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}@keyframes qfade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}@media (prefers-reduced-motion:reduce){#qotd *{animation:none!important}}";document.head.appendChild(css);
 setTimeout(()=>{const _h=V.home;V.home=function(){return qotdCard()+_h()};if(S.tab==="home")render()},0); // wrap last so other home cards don't split ours
 // GM / owner: bank editor + analytics
@@ -3343,7 +3354,13 @@ V.qotd=function(){if(!BANK)return`<div class=card>…</div>`;const rt=retired(),
   const agg=k=>{const m={};ans.forEach(a=>{const q=BANK.find(x=>x[0]==a.id);if(!q)return;const g=q[k];m[g]=m[g]||[0,0];m[g][0]++;if(a.ans==q[8])m[g][1]++});return Object.entries(m).sort((a,b)=>a[1][1]/a[1][0]-b[1][1]/b[1][0])};
   const tbl=rows=>`<table class=t><tr><th></th><th>${tl("Answered","Respondidas")}</th><th>${tl("% correct","% correcto")}</th></tr>${rows.map(r=>`<tr><td>${escH(r[0])}</td><td>${r[1][0]}</td><td>${Math.round(100*r[1][1]/r[1][0])}%</td></tr>`).join("")||"<tr><td colspan=3>—</td></tr>"}</table>`;
   const b=BR[S.hotel],list=BANK.filter(q=>q[1]=="all"||q[1]==b);
+  const P=pts(),seen=new Set(Object.values(s.h).map(x=>x.id)),d=today();
+  const pool=g=>BANK.filter(q=>(q[1]=="all"||q[1]==b)&&(q[13]||[]).includes(g)&&!rt.includes(q[0])&&q[12]!==false&&(!q[15]||q[15]===S.hotel)&&(!q[17]||q[17]>=d)&&!seen.has(q[0])).length;
+  const health=ROLES.map(g=>{const f=freq(g),n=pool(g),w=f==="weekly"?n<13:n<90;return `<tr><td>${escH(g)}</td><td><select onchange="qotdFreq('${g}',this.value)"><option value=daily ${f==="daily"?"selected":""}>${tl("Daily","Diaria")}</option><option value=weekly ${f==="weekly"?"selected":""}>${tl("Weekly","Semanal")}</option></select></td><td${w?" class=bad":""}>${n} ${f==="weekly"?tl("weeks","semanas"):tl("days","días")}${w?" ⚠️":""}</td></tr>`}).join("");
   return `<h2>🧠 ${tl("Question of the Day","Pregunta del Día")}</h2>
+  <div class=card><b>${tl("Daily or weekly, by role","Diaria o semanal, por puesto")} · ${escH(S.hotel)}</b><table class=t><tr><th>${tl("Role","Puesto")}</th><th>${tl("Frequency","Frecuencia")}</th><th>${tl("Unique questions left","Preguntas nuevas restantes")}</th></tr>${health}</table>
+   <small>${tl("Weekly questions stay open Monday–Sunday. ⚠️ = under 13 weeks (weekly) or 90 days (daily) of new questions.","Las preguntas semanales están abiertas de lunes a domingo. ⚠️ = menos de 13 semanas (semanal) o 90 días (diaria) de preguntas nuevas.")}</small>
+   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;font-size:13px">${[["ad",tl("Daily: answer","Diaria: responder")],["cd",tl("Daily: correct bonus","Diaria: bono correcta")],["aw",tl("Weekly: answer","Semanal: responder")],["cw",tl("Weekly: correct bonus","Semanal: bono correcta")]].map(([k,t])=>`<label>${t}<input type=number min=0 max=500 value=${P[k]} onchange="qotdPts('${k}',this.value)" style="width:100%"></label>`).join("")}</div></div>
   <div class=card><b>${tl("Weak topics","Temas débiles")} · ${tl("By topic","Por tema")}</b>${tbl(agg(3))}<b>${tl("By role","Por puesto")}</b>${tbl((()=>{const m={};ans.forEach(a=>{const q=BANK.find(x=>x[0]==a.id);if(!q)return;const g=a.role||"?";m[g]=m[g]||[0,0];m[g][0]++;if(a.ans==q[8])m[g][1]++});return Object.entries(m)})())}<small>${tl("Demo shows this device only. Live: % correct by topic, role, hotel, and who needs help.","Demo muestra solo este dispositivo. En vivo: % correcto por tema, puesto, hotel y quién necesita apoyo.")}</small></div>
   <div class=card><b>${tl("Add question","Agregar pregunta")}</b><small>${tl("English and Spanish are both required","Se requieren inglés y español")}</small>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><select id=qb><option>all</option><option>IHG</option><option>Hilton</option><option>Marriott</option></select><select id=qr multiple size=4 aria-label="Roles">${["front_desk","night_audit","room_attendant","laundry","houseman","hk_supervisor","maintenance","breakfast","driver","bartender","gm"].map(x=>`<option>${x}</option>`).join("")}</select><select id=qk><option value=role>role</option><option value=shared>shared</option><option value=brand_light>brand_light</option></select></div>
@@ -3353,6 +3370,8 @@ V.qotd=function(){if(!BANK)return`<div class=card>…</div>`;const rt=retired(),
    <textarea id=qxe placeholder="${tl("Explanation","Explicación")} (EN)" style="width:100%"></textarea><textarea id=qxs placeholder="${tl("Explanation","Explicación")} (ES)" style="width:100%"></textarea><input id=qu placeholder="${tl("Source link","Enlace de la fuente")}" style="width:100%">
    <label><input type=checkbox id=qd> ${tl("Spanish is a draft — not shown to staff until reviewed","El español es un borrador; no se muestra al personal hasta revisarlo")}</label><button onclick="qotdSave()" style="width:100%;margin-top:6px">${tl("Save","Guardar")}</button></div>
   <div class=card><b>${tl("Questions","Preguntas")} (${list.length})</b><table class=t>${list.map(q=>`<tr style="opacity:${rt.includes(q[0])?.4:1}"><td><small>${escH((q[13]||[]).join(", "))} · ${escH(q[3])}${q[14]!=="role"?" · "+escH(q[14]||""):""}</small><br>${escH(L()==="es"?q[5]:q[4])}${q[12]===false?" <b class=bad>ES draft</b>":""}</td><td><button class=btn2 onclick="qotdRetire(${q[0]})">${rt.includes(q[0])?tl("Restore","Restaurar"):tl("Retire","Retirar")}</button></td></tr>`).join("")}</table></div>`};
+window.qotdFreq=function(g,f){const m=freqMap();m[S.hotel]=m[S.hotel]||{};m[S.hotel][g]=f;localStorage.setItem("jrqotd_freq",JSON.stringify(m));if(useRemote()&&window.sb)sb.rpc("qotd_set_freq",{p_hotel:S.hotel,p_role:g,p_freq:f}).then(()=>{},()=>{});render()};
+window.qotdPts=function(k,v){const P=pts();P[k]=Math.max(0,Math.min(500,+v||0));localStorage.setItem("jrqotd_pts",JSON.stringify(P));render()};
 window.qotdRetire=function(id){let r=retired();r=r.includes(id)?r.filter(x=>x!=id):r.concat(id);localStorage.setItem("jrqotd_retired",JSON.stringify(r));if(useRemote()&&window.sb)sb.rpc("qotd_retire",{p_id:id,p_retire:r.includes(id)}).then(()=>{},()=>{});render()};
 window.qotdSave=function(){const v=id=>document.getElementById(id).value.trim(),oe=v("qoe").split("\n").map(x=>x.trim()).filter(Boolean),os=v("qos").split("\n").map(x=>x.trim()).filter(Boolean),c=+v("qc");
   if(!v("qe")||!v("qs")||!v("qxe")||!v("qxs")||!v("qt")||oe.length<3||oe.length>4||os.length!==oe.length||c>=oe.length){alert(tl("English and Spanish are both required","Se requieren inglés y español")+" · 3–4 options");return}
