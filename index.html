@@ -4028,14 +4028,14 @@ function rcCard(x,mgr){const i=LANG==="es"?1:0,u=rcSafeUrl(x.u);
   return `<div class="card" style="padding:10px"><div class="row" style="margin:0"><b style="flex:1" class="raw">${rcCat(x.cat)[1]} ${escH(x.t[i])}</b>${x.custom?`<span class="pill RFI" style="flex:0 0 auto">${bx("GM tip","Tip del GM")}</span>`:""}${x.edited?`<span class="pill OD" style="flex:0 0 auto">${bx("edited","editado")}</span>`:""}</div><div style="margin:6px 0;font-weight:600" class="raw">${escH(x.a[i])}</div>${x.n[i]?`<small class="raw">${escH(x.n[i])}</small>`:""}${u?`<div><a href="${escH(u)}" target="_blank" rel="noopener noreferrer"><small>🔗 ${bx("Source","Fuente")}</small></a></div>`:""}
   ${x.qid?`<div><small style="color:#889">${bx("From training Q&A","De las preguntas de capacitación")} #${x.qid}</small></div>`:""}
   ${mgr?`<div class="chips"><button class="chip" onclick="rcEdit('${x.id}')">${bx("Edit","Editar")}</button><button class="chip" onclick="rcDel('${x.id}')">${x.custom?bx("Delete","Borrar"):bx("Hide","Ocultar")}</button></div>`:""}</div>`}
-function rcRows(){const q=(S.rcq||"").toLowerCase(),c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",rows=rcAll().filter(x=>(c==="all"||x.cat===c)&&(!q||[x.t[0],x.t[1],x.a[0],x.a[1],x.n[0],x.n[1]].join(" ").toLowerCase().includes(q)));
+function rcRows(){const q=(S.rcq||"").toLowerCase(),c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",rows=rcAll().filter(x=>x.cat!=="food"&&(c==="all"||x.cat===c)&&(!q||[x.t[0],x.t[1],x.a[0],x.a[1],x.n[0],x.n[1]].join(" ").toLowerCase().includes(q)));
   const order=RC_CATS.map(x=>x[0]);rows.sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat));
   let h=rows.map(x=>rcCard(x,mgr)).join("");
   if(!h)h=`<div class="card"><small>${c!=="all"&&!q?bx("No tip here yet. The team has not added one for this hotel, and we do not guess.","Aún no hay tip aquí. El equipo no ha agregado uno para este hotel y no adivinamos."):bx("No tips match.","Ningún tip coincide.")}</small>${mgr?`<div style="margin-top:6px"><button class="btn2" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button></div>`:""}</div>`;
   return h}
 function rcQ(v){S.rcq=v;const e=$("rcList");if(e)e.innerHTML=rcRows()}
-function rcSet(c){S.rcc=c;render()}
-function rcEdit(id){S.rce=id;render();const e=$("rcForm");if(e)e.scrollIntoView()}
+function rcSet(c){if(c==="food"||c==="rest"){S.rcm="rest";S.rcc="all";S.rse="";render();return}S.rcc=c;render()}
+function rcEdit(id){S.rce=id;if(id==="new"&&S.rcm==="rest")S.rcc="food";render();const e=$("rcForm");if(e)e.scrollIntoView()}
 function rcDel(id){const r=rcState();if(id[0]==="c")r.add=r.add.filter(x=>x.id!==id);else r.hide[id]=1;save();render()}
 function rcRestore(){rcState().hide={};save();render()}
 function rcSave(){const r=rcState(),id=S.rce,t=$("rcT").value.trim(),a=$("rcA").value.trim(),n=$("rcN").value.trim(),u=rcSafeUrl($("rcU").value.trim()),cat=$("rcC").value;
@@ -4045,8 +4045,8 @@ function rcSave(){const r=rcState(),id=S.rce,t=$("rcT").value.trim(),a=$("rcA").
 function rcForm(){const id=S.rce;if(!id)return "";const x=id==="new"?{cat:S.rcc&&S.rcc!=="all"?S.rcc:"food",t:["",""],a:["",""],n:["",""],u:""}:rcAll().find(y=>y.id===id)||{cat:"food",t:["",""],a:["",""],n:["",""],u:""},i=LANG==="es"?1:0;
   return `<div class="card" id="rcForm"><h3>${id==="new"?bx("Add a tip for ","Agregar un tip para ")+escH(S.hotel):bx("Edit tip","Editar tip")}</h3><select id="rcC" ${id!=="new"&&id[0]!=="c"?"disabled":""}>${RC_CATS.map(c=>`<option value="${c[0]}" ${x.cat===c[0]?"selected":""}>${c[1]} ${bx(c[2],c[3])}</option>`).join("")}</select><input id="rcT" style="width:100%;margin-top:6px" placeholder="${escH(bx("Title (e.g. place name)","Título (ej. nombre del lugar)"))}" value="${escH(x.t[i])}"><textarea id="rcA" style="width:100%;margin-top:6px" placeholder="${escH(bx("What to tell the guest (address, hours, phone you verified)","Qué decirle al huésped (dirección, horario, teléfono verificado)"))}">${escH(x.a[i])}</textarea><input id="rcN" style="width:100%;margin-top:6px" placeholder="${escH(bx("Note (optional)","Nota (opcional)"))}" value="${escH(x.n[i])}"><input id="rcU" style="width:100%;margin-top:6px" placeholder="https:// ${escH(bx("link (optional)","enlace (opcional)"))}" value="${escH(x.u||"")}"><small>${bx("Only add details you have verified. Text you type shows the same in English and Spanish.","Agrega solo datos verificados. El texto que escribas se muestra igual en inglés y español.")}</small><div class="bad" id="rcErr" role="alert"></div><div class="row"><button class="btn" onclick="rcSave()">${bx("Save","Guardar")}</button><button class="btn2" onclick="S.rce='';render()">${bx("Cancel","Cancelar")}</button></div></div>`}
 M.recs=["📍","Local Tips"];
-V.recs=function(){const c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",cnt=k=>rcAll().filter(x=>k==="all"||x.cat===k).length,hid=rcHiddenCount();
-  return `<h2>📍 ${bx("Local Tips","Tips Locales")} · ${escH(S.hotel)}</h2><div class="card"><small>${bx("Quick answers for the front desk, drivers and bartenders. Tips are for this hotel's area.","Respuestas rápidas para recepción, conductores y cantineros. Los tips son para el área de este hotel.")}</small><input id="rcSearch" type="search" style="width:100%;margin-top:6px" placeholder="🔍 ${escH(bx("Search (brewery, zoo, Target…)","Buscar (cervecería, zoológico, Target…)"))}" value="${escH(S.rcq||"")}" oninput="rcQ(this.value)" aria-label="${escH(bx("Search local tips","Buscar tips locales"))}"><div class="chips"><button class="chip ${c==="all"?"on":""}" aria-pressed="${c==="all"}" onclick="rcSet('all')">${bx("All","Todos")} (${cnt("all")})</button>${RC_CATS.map(x=>`<button class="chip ${c===x[0]?"on":""}" aria-pressed="${c===x[0]}" onclick="rcSet('${x[0]}')">${x[1]} ${bx(x[2],x[3])} (${cnt(x[0])})</button>`).join("")}</div>${mgr?`<button class="btn2" style="width:100%" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button>${hid?`<div style="margin-top:6px"><button class="chip" onclick="rcRestore()">${bx("Show "+hid+" hidden","Mostrar "+hid+" ocultos")}</button></div>`:""}`:""}</div>${rcForm()}<div id="rcList">${rcRows()}</div>`};
+V.recs=function(){const c=S.rcc||"all",mgr=authRole()==="GM"||authRole()==="AGM",cnt=k=>rcAll().filter(x=>x.cat!=="food"&&(k==="all"||x.cat===k)).length,hid=rcHiddenCount();
+  return `<h2>📍 ${bx("Local Tips","Tips Locales")} · ${escH(S.hotel)}</h2><div class="card"><small>${bx("Quick answers for the front desk, drivers and bartenders. Tips are for this hotel's area.","Respuestas rápidas para recepción, conductores y cantineros. Los tips son para el área de este hotel.")}</small><input id="rcSearch" type="search" style="width:100%;margin-top:6px" placeholder="🔍 ${escH(bx("Search (brewery, zoo, Target…)","Buscar (cervecería, zoológico, Target…)"))}" value="${escH(S.rcq||"")}" oninput="rcQ(this.value)" aria-label="${escH(bx("Search local tips","Buscar tips locales"))}"><div class="chips"><button class="chip ${c==="all"?"on":""}" aria-pressed="${c==="all"}" onclick="rcSet('all')">${bx("All","Todos")} (${cnt("all")})</button>${RC_CATS.filter(x=>x[0]!=="food").map(x=>`<button class="chip ${c===x[0]?"on":""}" aria-pressed="${c===x[0]}" onclick="rcSet('${x[0]}')">${x[1]} ${bx(x[2],x[3])} (${cnt(x[0])})</button>`).join("")}</div>${mgr?`<button class="btn2" style="width:100%" onclick="rcEdit('new')">+ ${bx("Add a tip","Agregar un tip")}</button>${hid?`<div style="margin-top:6px"><button class="chip" onclick="rcRestore()">${bx("Show "+hid+" hidden","Mostrar "+hid+" ocultos")}</button></div>`:""}`:""}</div>${rcForm()}<div id="rcList">${rcRows()}</div>`};
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("recs"))TILES[r].push("recs")});
 const _homeRc=V.home;V.home=function(){const r=authRole();return (r==="Front Desk"||r==="Shuttle Driver"?`<div class="card" onclick="go('recs')" style="cursor:pointer"><b>📍 ${bx("Local tips","Tips locales")}</b> <small>${bx("food · MSP/MOA directions · attractions ›","comida · rutas MSP/MOA · atracciones ›")}</small></div>`:"")+_homeRc()};
 /*RECS_END*/
@@ -4110,13 +4110,18 @@ function rstList(){const mgr=authRole()==="GM"||authRole()==="AGM",rows=rstFilte
   const cnt=`<div class="span-all rst-cnt" aria-live="polite">${bx(rows.length+" of "+total+" restaurants",rows.length+" de "+total+" restaurantes")}</div>`;
   if(!rows.length)return cnt+`<div class="card"><small>${total?bx("No restaurants match these filters.","Ningún restaurante coincide con estos filtros."):bx("No restaurants for this hotel yet. We do not guess.","Aún no hay restaurantes para este hotel. No adivinamos.")}</small>${total?`<div style="margin-top:6px"><button class="chip" onclick="rstReset()">${bx("Clear filters","Quitar filtros")}</button></div>`:""}</div>`;
   return cnt+(rMode()==="desk"?rstTbl(rows,mgr):rows.map(x=>rstCard(x,mgr)).join(""))}
-function rstQ(v){S.rsq=v;const e=$("rstList");if(e)e.innerHTML=rstList()}
+function rstQ(v){S.rsq=v;const e=$("rstList");if(e)e.innerHTML=rstList();const f=$("rstFood");if(f)f.innerHTML=rstFoodBox()}
+// Food tips (former Local Tips > Food) live at the top of Food & Restaurants. A tip whose title is a listed restaurant is dropped (no duplicates).
+function rstFoodTips(){const nm=rstAll().map(x=>(x.name||"").toLowerCase()).filter(Boolean);return rcAll().filter(x=>x.cat==="food"&&!nm.some(n=>[x.t[0],x.t[1]].some(t=>(t||"").toLowerCase().trim()===n)))}
+function rstFoodBox(){const q=(S.rsq||"").toLowerCase(),mgr=authRole()==="GM"||authRole()==="AGM",all=rstFoodTips(),rows=all.filter(x=>!q||[x.t[0],x.t[1],x.a[0],x.a[1],x.n[0],x.n[1]].join(" ").toLowerCase().includes(q));
+  if(!all.length&&!mgr)return "";if(!rows.length&&q)return "";
+  return `<div class="card rst-food"><b>💡 ${bx("Quick food answers","Respuestas rápidas de comida")}</b> <small>${bx("(groceries, delivery, nearby dining)","(supermercado, entrega, comida cercana)")}</small><div class="rst-fg">${rows.map(x=>rcCard(x,mgr)).join("")}</div>${mgr?`<button class="chip" onclick="rcEdit('new')">+ ${bx("Add a food tip","Agregar un tip de comida")}</button>`:""}</div>`}
 function rstSetF(k,v){rstF()[k]=v;render()}
 function rstTog(k){const f=rstF();f[k]=f[k]?0:1;render()}
 function rstSortSel(v){S.rss=v;S.rsd=1;render()}
 function rstSortBy(k){if((S.rss||"dist")===k)S.rsd=(S.rsd||1)*-1;else{S.rss=k;S.rsd=1}render()}
 function rstReset(){S.rsf=null;S.rsq="";render()}
-function rstMode(m){S.rcm=m;S.rse="";render()}
+function rstMode(m){if(m==="food")m="rest";S.rcm=m;S.rse="";S.rce="";if(m!=="rest"&&S.rcc==="food")S.rcc="all";render()}
 function rstArea2(a){S.rsa=a;S.rsf=null;render()}
 function rstEdit(id){S.rse=id;render();const e=$("rstForm");if(e)e.scrollIntoView()}
 function rstDel(id){const r=rstState();if(id[0]==="r"&&id[1]==="c")r.add=r.add.filter(x=>x.id!==id);else r.hide[id]=1;save();render()}
@@ -4128,18 +4133,18 @@ function rstSave(){const r=rstState(),id=S.rse,g=k=>$("rst"+k).value.trim(),v={n
 function rstForm(){const id=S.rse;if(!id)return "";const x=id==="new"?{name:"",cu:"american",price:"",addr:"",phone:"",web:"",htxt:"",why:["",""],tags:[]}:rstAll().find(y=>y.id===id)||{name:"",cu:"american",price:"",addr:"",phone:"",web:"",htxt:"",why:["",""],tags:[]},i=LANG==="es"?1:0,hv=x.htxt||(x.hours?rstHours(x,i):"");
   const inp=(k,lab,val,ph)=>`<label class="rst-l">${lab}<input id="rst${k}" style="width:100%" value="${escH(val)}" placeholder="${escH(ph||"")}"></label>`;
   return `<div class="card" id="rstForm"><h3>${id==="new"?bx("Add a restaurant for ","Agregar restaurante para ")+escH(S.hotel):bx("Edit restaurant","Editar restaurante")}</h3>${inp("N",bx("Name","Nombre"),x.name)}<label class="rst-l">${bx("Cuisine","Cocina")}<select id="rstC">${Object.keys(RST_CU).map(k=>`<option value="${k}" ${x.cu===k?"selected":""}>${escH(RST_CU[k][i])}</option>`).join("")}</select></label><label class="rst-l">${bx("Price","Precio")}<select id="rstP"><option value="">—</option>${["$","$$","$$$","$$$$"].map(p=>`<option ${x.price===p?"selected":""}>${p}</option>`).join("")}</select></label>${inp("A",bx("Address","Dirección"),x.addr)}${inp("Ph",bx("Phone (only if verified)","Teléfono (solo si verificado)"),x.phone)}${inp("U",bx("Website (https://…)","Sitio web (https://…)"),x.web)}${inp("H",bx("Hours (as you verified them)","Horario (como lo verificó)"),hv)}${inp("W",bx("Why guests like it","Por qué les gusta"),x.why[i])}<label class="rst-l" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="rstL" ${x.tags.includes("late")?"checked":""}> ${bx("Open late (past 10 pm)","Abierto tarde (después de las 10 pm)")}</label><label class="rst-l" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="rstFm" ${x.tags.includes("family")?"checked":""}> ${bx("Good for families","Bueno para familias")}</label><div id="rstErr" class="fe" style="color:#b00020"></div><div class="chips"><button class="btn2" onclick="rstSave()">${bx("Save","Guardar")}</button><button class="chip" onclick="S.rse='';render()">${bx("Cancel","Cancelar")}</button></div></div>`}
-function rstTabs(){const m=S.rcm==="rest"?"rest":"tips";return `<div class="chips span-all" role="tablist"><button class="chip ${m==="tips"?"on":""}" role="tab" aria-selected="${m==="tips"}" onclick="rstMode('tips')">📍 ${bx("Tips","Tips")}</button><button class="chip ${m==="rest"?"on":""}" role="tab" aria-selected="${m==="rest"}" onclick="rstMode('rest')">🍽️ ${bx("Restaurants","Restaurantes")} (${rstAll().length})</button></div>`}
+function rstTabs(){const m=S.rcm==="rest"?"rest":"tips";return `<div class="chips span-all" role="tablist"><button class="chip ${m==="tips"?"on":""}" role="tab" aria-selected="${m==="tips"}" onclick="rstMode('tips')">📍 ${bx("Tips","Tips")}</button><button class="chip ${m==="rest"?"on":""}" role="tab" aria-selected="${m==="rest"}" onclick="rstMode('rest')">🍽️ ${bx("Food & Restaurants","Comida y restaurantes")} (${rstAll().length+rstFoodTips().length})</button></div>`}
 function rstView(){const f=rstF(),mgr=authRole()==="GM"||authRole()==="AGM",a=rstArea(),i=LANG==="es"?1:0,hid=rstHiddenCount(),dk=rstDK(a),all=rstAll(),cus=[...new Set(all.map(x=>x.cu))].sort((p,q)=>(RST_CU[p]||[p,p])[i].localeCompare((RST_CU[q]||[q,q])[i])),k=S.rss||"dist",
     chip=(key,lab)=>`<button class="chip ${f[key]?"on":""}" aria-pressed="${!!f[key]}" onclick="rstTog('${key}')">${lab}</button>`,hm=window.RESTAURANT_HOTELS&&window.RESTAURANT_HOTELS[dk];
-  return `<h2>🍽️ ${bx("Restaurants","Restaurantes")} · ${escH(S.hotel)}</h2>${rstTabs()}<div class="card span-all"><small>${bx("Where to send guests to eat: front desk, drivers and bartenders. Distances are approximate driving miles/minutes from "+(hm?hm.name:dk)+", no traffic. Walkable = about 0.8 mi or less (estimate).","A dónde enviar a los huéspedes a comer: recepción, conductores y cantineros. Las distancias son millas/minutos aproximados en auto desde "+(hm?hm.name:dk)+", sin tráfico. A pie = unas 0.8 mi o menos (estimado).")}</small>
+  return `<h2>🍽️ ${bx("Food & Restaurants","Comida y restaurantes")} · ${escH(S.hotel)}</h2>${rstTabs()}<div class="card span-all"><small>${bx("Where to send guests to eat: front desk, drivers and bartenders. Distances are approximate driving miles/minutes from "+(hm?hm.name:dk)+", no traffic. Walkable = about 0.8 mi or less (estimate).","A dónde enviar a los huéspedes a comer: recepción, conductores y cantineros. Las distancias son millas/minutos aproximados en auto desde "+(hm?hm.name:dk)+", sin tráfico. A pie = unas 0.8 mi o menos (estimado).")}</small>
   ${["MSPWE","MSPAM","MSPMS"].includes(S.hotel)?"":`<div class="chips"><button class="chip ${a==="gv"?"on":""}" onclick="rstArea2('gv')">${bx("Golden Valley (MSPWE)","Golden Valley (MSPWE)")}</button><button class="chip ${a==="bl"?"on":""}" onclick="rstArea2('bl')">${bx("Bloomington / MOA (MSPAM, MSPMS)","Bloomington / MOA (MSPAM, MSPMS)")}</button></div>`}
   <input id="rstSearch" type="search" style="width:100%;margin-top:6px" placeholder="🔍 ${escH(bx("Search (pizza, brunch, sushi, open late…)","Buscar (pizza, brunch, sushi, abierto tarde…)"))}" value="${escH(S.rsq||"")}" oninput="rstQ(this.value)" aria-label="${escH(bx("Search restaurants","Buscar restaurantes"))}">
   <div class="rst-fr"><select aria-label="${escH(bx("Cuisine","Cocina"))}" onchange="rstSetF('cu',this.value)"><option value="all">${bx("All cuisines","Todas las cocinas")}</option>${cus.map(c=>`<option value="${c}" ${f.cu===c?"selected":""}>${escH((RST_CU[c]||[c,c])[i])}</option>`).join("")}</select><select aria-label="${escH(bx("Price","Precio"))}" onchange="rstSetF('px',this.value)"><option value="all">${bx("Any price","Cualquier precio")}</option>${["$","$$","$$$","$$$$"].map(p=>`<option ${f.px===p?"selected":""}>${p}</option>`).join("")}</select><select aria-label="${escH(bx("Sort","Ordenar"))}" onchange="rstSortSel(this.value)"><option value="dist" ${k==="dist"?"selected":""}>${bx("Sort: distance","Orden: distancia")}</option><option value="rating" ${k==="rating"?"selected":""}>${bx("Sort: rating","Orden: calificación")}</option><option value="name" ${k==="name"?"selected":""}>${bx("Sort: name","Orden: nombre")}</option></select></div>
   <div class="chips">${chip("late","🌙 "+bx("Open late","Abierto tarde"))}${chip("deliv","🛵 "+bx("Delivery","Entrega"))}${chip("walk","🚶 "+bx("Walkable","A pie"))}${chip("fam","👨‍👩‍👧 "+bx("Family","Familiar"))}${a==="bl"?chip("moa","🛍️ "+bx("Inside MOA","Dentro de MOA")):""}${chip("r4","⭐ 4.0+")}<button class="chip" onclick="rstReset()">↺ ${bx("Reset","Restablecer")}</button></div>
   ${mgr?`<button class="btn2" style="width:100%" onclick="rstEdit('new')">+ ${bx("Add a restaurant","Agregar un restaurante")}</button>${hid?`<div style="margin-top:6px"><button class="chip" onclick="rstRestore()">${bx("Show "+hid+" hidden","Mostrar "+hid+" ocultos")}</button></div>`:""}`:""}
-  <div class="rst-note">⚠️ ${bx("Hours can change, call ahead.","Los horarios pueden cambiar, llame antes.")} ${bx("Ratings change: Google/Yelp scores are as of "+RST_ASOF+" (4.0+ uses the average of the scores shown; blank = not verified).","Las calificaciones cambian: los puntajes de Google/Yelp son al "+RST_ASOF+" (4.0+ usa el promedio de los puntajes mostrados; vacío = no verificado).")}</div></div>${rstForm()}<div id="rstList" class="rst-list span-all ${rMode()==="desk"?"rst-desk":""}">${rstList()}</div>`}
-{const _v=V.recs;V.recs=function(){if(S.rcm==="rest")return rstView();const h=_v();const p=h.indexOf("</h2>");return p<0?rstTabs()+h:h.slice(0,p+5)+rstTabs()+h.slice(p+5)}}
-{const st=document.createElement("style");st.textContent=".rst-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px;align-items:start}.rst-list>*{min-width:0;margin:0}.rst-list>.rst-cnt,.rst-list>.rst-tw,.rst-list>.card:only-child{grid-column:1/-1}.rst-list.rst-desk{display:block}.rst-c{padding:10px}.rst-m{font-size:13px;color:#445;margin:3px 0}.rst-r{font-weight:700;margin:3px 0}.rst-n{color:#778;font-weight:400;font-size:13px}.rst-w{margin:4px 0;font-size:14px}.rst-h,.rst-a{font-size:13px;margin:3px 0}.rst-tgs,.rst-bd{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}.rst-tg{display:inline-block;background:#e6ebf2;color:#14365d;border-radius:10px;padding:2px 8px;font-size:12px;margin:1px 2px 1px 0}.rst-bd span{font-size:12px;color:#334;background:#f3f5f8;border-radius:10px;padding:2px 8px}.rst-acts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}.rst-b{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:6px 12px;border-radius:10px;background:#14365d;color:#fff!important;text-decoration:none;font-weight:600;font-size:13px;border:0}.rst-d{margin-top:4px;font-size:13px}.rst-d summary{min-height:44px;display:flex;align-items:center;cursor:pointer}.rst-d div{margin:3px 0;overflow-wrap:anywhere}.rst-fr{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.rst-fr select{flex:1 1 140px;min-height:44px}.rst-note{margin-top:8px;font-size:12px;color:#5a4a00;background:#fff8dc;border-radius:8px;padding:6px 8px}.rst-cnt{font-size:13px;color:#445;margin:2px 0 6px}.rst-l{display:block;margin-top:6px;font-size:13px}.rst-tw{overflow-x:auto}.rst-t{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}.rst-t th,.rst-t td{padding:6px 8px;vertical-align:top;text-align:left;border-bottom:1px solid #e3e7ee;overflow-wrap:anywhere}.rst-t .rst-acts{flex-wrap:wrap}.rst-t .rst-b{min-width:44px;padding:4px 8px}.rst-t td:nth-child(1){min-width:200px}.rst-t th:last-child,.rst-t th:nth-child(7){font-weight:800;font-size:14px;color:#14365d;padding:6px 12px;background:#eef3fa}.rst-t thead th{background:#eef3fa}";document.head.appendChild(st)}
+  <div class="rst-note">⚠️ ${bx("Hours can change, call ahead.","Los horarios pueden cambiar, llame antes.")} ${bx("Ratings change: Google/Yelp scores are as of "+RST_ASOF+" (4.0+ uses the average of the scores shown; blank = not verified).","Las calificaciones cambian: los puntajes de Google/Yelp son al "+RST_ASOF+" (4.0+ usa el promedio de los puntajes mostrados; vacío = no verificado).")}</div></div>${rstForm()}${rcForm()}<div id="rstFood" class="span-all">${rstFoodBox()}</div><div id="rstList" class="rst-list span-all ${rMode()==="desk"?"rst-desk":""}">${rstList()}</div>`}
+{const _v=V.recs;V.recs=function(){if(S.rcc==="food"){S.rcm="rest";S.rcc="all"}if(S.rcm==="rest")return rstView();const h=_v();const p=h.indexOf("</h2>");return p<0?rstTabs()+h:h.slice(0,p+5)+rstTabs()+h.slice(p+5)}}
+{const st=document.createElement("style");st.textContent=".rst-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px;align-items:start}.rst-list>*{min-width:0;margin:0}.rst-food{margin:0 0 10px}.rst-fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:8px;margin:6px 0}.rst-fg>.card{margin:0;background:#f8fafc}.rst-list>.rst-cnt,.rst-list>.rst-tw,.rst-list>.card:only-child{grid-column:1/-1}.rst-list.rst-desk{display:block}.rst-c{padding:10px}.rst-m{font-size:13px;color:#445;margin:3px 0}.rst-r{font-weight:700;margin:3px 0}.rst-n{color:#778;font-weight:400;font-size:13px}.rst-w{margin:4px 0;font-size:14px}.rst-h,.rst-a{font-size:13px;margin:3px 0}.rst-tgs,.rst-bd{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}.rst-tg{display:inline-block;background:#e6ebf2;color:#14365d;border-radius:10px;padding:2px 8px;font-size:12px;margin:1px 2px 1px 0}.rst-bd span{font-size:12px;color:#334;background:#f3f5f8;border-radius:10px;padding:2px 8px}.rst-acts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}.rst-b{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:6px 12px;border-radius:10px;background:#14365d;color:#fff!important;text-decoration:none;font-weight:600;font-size:13px;border:0}.rst-d{margin-top:4px;font-size:13px}.rst-d summary{min-height:44px;display:flex;align-items:center;cursor:pointer}.rst-d div{margin:3px 0;overflow-wrap:anywhere}.rst-fr{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.rst-fr select{flex:1 1 140px;min-height:44px}.rst-note{margin-top:8px;font-size:12px;color:#5a4a00;background:#fff8dc;border-radius:8px;padding:6px 8px}.rst-cnt{font-size:13px;color:#445;margin:2px 0 6px}.rst-l{display:block;margin-top:6px;font-size:13px}.rst-tw{overflow-x:auto}.rst-t{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}.rst-t th,.rst-t td{padding:6px 8px;vertical-align:top;text-align:left;border-bottom:1px solid #e3e7ee;overflow-wrap:anywhere}.rst-t .rst-acts{flex-wrap:wrap}.rst-t .rst-b{min-width:44px;padding:4px 8px}.rst-t td:nth-child(1){min-width:200px}.rst-t th:last-child,.rst-t th:nth-child(7){font-weight:800;font-size:14px;color:#14365d;padding:6px 12px;background:#eef3fa}.rst-t thead th{background:#eef3fa}";document.head.appendChild(st)}
 /*REST_END*/
 /*RUSH_START*/
 // Rush room queue: front desk flags a room (early check-in time, guest priority, note). Pins to the top of the room board and the
@@ -4398,4 +4403,182 @@ addEventListener("keydown",e=>{if(e.key!=="Tab")return;const w=$("welcome");if(!
 {const _p3=window.respPost2;window.respPost2=function(m){if(_p3)_p3(m);respPageBar();respTip(m);respEmpty();respDL()}}
 if(meUser())render();
 /*RESP3_END*/
+/*LPLAN_START*/
+// Labor Plan editor (JR Corporate only) + Training Hours Requests (GM/AGM submit, corporate decides).
+// Stored in localStorage for now. Design for Supabase: supabase/migrations/20261027_labor_plan_edits.sql.
+// Client-side gating only, not real security, until Supabase sign-in is live.
+(function(){
+const LPK="jrportal_lplan_v1",TRK="jrportal_trreq_v1",DN=[["Mon","Lun"],["Tue","Mar"],["Wed","Mié"],["Thu","Jue"],["Fri","Vie"],["Sat","Sáb"],["Sun","Dom"]];
+const RS=[["new","New hire","Nuevo ingreso"],["cross","Cross-train","Entrenamiento cruzado"],["brand","Brand/certification","Marca/certificación"],["other","Other","Otro"]];
+const POSL=["Front Desk","HK Lead","Housekeeper","Maintenance","House Person","Laundry Attendant","Breakfast Attendant","Shuttle Driver"];
+const B=(e,s)=>LANG==="es"?s:e, E=x=>escH(String(x==null?"":x));
+const isCorp=()=>authRole()==="Above Property", isGMA=()=>authRole()==="GM"||authRole()==="AGM";
+const jget=(k,d)=>{try{return JSON.parse(sget(k)||"null")||d}catch(e){return d}};
+const mon=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
+const iso=d=>{const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
+const addW=(w,n)=>{const d=new Date(w+"T00:00:00");d.setDate(d.getDate()+7*n);return iso(d)};
+const CUR=iso(mon(new Date()));
+const r1=n=>Math.round(n*2)/2, sum=a=>a.reduce((s,n)=>s+(+n||0),0);
+const LP={hotel:null,week:CUR,day:0,draft:null,undo:[],note:"",assoc:false,tw:CUR,tf:null,toast:null};
+let ORIG={},LASTLP=null;
+function snap(h){if(!ORIG[h])ORIG[h]=JSON.parse(JSON.stringify({h:laborPlan.hours[h]||{},a:laborPlan.associate[h]||{},r:(laborPlan.rooms||{})[h]||[0,0,0,0,0,0,0]}));return ORIG[h]}
+function store(){return jget(LPK,{})}
+function key(h,w){return h+"|"+w}
+function basePlan(h){chk();const o=JSON.parse(JSON.stringify(snap(h)));return {hours:o.h,assoc:o.a,rooms:o.r}}
+function saved(h,w){return store()[key(h,w)]||null}
+function planFor(h,w){const s=saved(h,w);return s?JSON.parse(JSON.stringify(s)):Object.assign(basePlan(h),{by:null,at:null,note:""})}
+function trList(){return jget(TRK,[])}
+function trSave(l){sset(TRK,JSON.stringify(l))}
+function pending(h){return trList().filter(r=>r.st==="Pending"&&(!h||r.hotel===h))}
+function trHours(r){return (r.days||[]).map(on=>on?(+r.hpd||0):0)}
+function trainingRows(h,w){return trList().filter(r=>r.hotel===h&&r.week===w&&r.st==="Approved")}
+// apply saved current-week plan to the live laborPlan so Win/Loss uses it
+function chk(){if(laborPlan!==LASTLP){LASTLP=laborPlan;ORIG={};Object.keys(HOTELS).forEach(snap);applyLive(1)}}
+function applyLive(inner){if(!inner)chk();Object.keys(HOTELS).forEach(h=>{const s=saved(h,CUR);if(!s)return;if(!laborPlan.rooms[h])return;laborPlan.hours[h]=JSON.parse(JSON.stringify(s.hours));laborPlan.associate[h]=JSON.parse(JSON.stringify(s.assoc));laborPlan.rooms[h]=s.rooms.slice()})}
+const _sset=null;
+function hotel(){return isCorp()?(LP.hotel&&HOTELS[LP.hotel]?LP.hotel:S.hotel):S.hotel}
+function mode(){return innerWidth<768?"phone":innerWidth<1200?"tab":"desk"}
+function wkLabel(w){const d=new Date(w+"T00:00:00"),e=new Date(d);e.setDate(e.getDate()+6);const f=x=>x.toLocaleDateString(LANG==="es"?"es-US":"en-US",{month:"short",day:"numeric"});return f(d)+" – "+f(e)}
+function stamp(p){return p&&p.by?`${B("Last edited by","Última edición por")} <b>${E(p.by)}</b> · ${E(new Date(p.at).toLocaleString(LANG==="es"?"es-US":"en-US",{dateStyle:"medium",timeStyle:"short"}))}${p.note?` · “${E(p.note)}”`:""}`:B("Default plan (not edited by corporate yet)","Plan base (corporativo aún no lo edita)")}
+function toast(msg,undoFn){LP.toast={msg,undoFn};clearTimeout(LP.tt);LP.tt=setTimeout(()=>{LP.toast=null;drawToast()},7000);drawToast()}
+function drawToast(){let el=document.getElementById("lpToast");if(!el){el=document.createElement("div");el.id="lpToast";document.body.appendChild(el)}
+ el.innerHTML=LP.toast?`<span>${E(LP.toast.msg)}</span>${LP.toast.undoFn?`<button type=button onclick="LPX.toastUndo()">${B("Undo","Deshacer")}</button>`:""}`:"";el.hidden=!LP.toast}
+function hotelPick(){return isCorp()?`<div class="lp-seg" role="tablist">${Object.keys(HOTELS).map(k=>`<button type=button class="${k===hotel()?"on":""}" onclick="LPX.setHotel('${k}')">${k}${pending(k).length?` <span class=lp-badge>${pending(k).length}</span>`:""}</button>`).join("")}</div>`:""}
+function weekPick(w,fn){return `<div class="lp-wk"><button type=button aria-label="${B("Previous week","Semana anterior")}" onclick="LPX.${fn}(-1)">‹</button><b>${E(wkLabel(w))}</b>${w===CUR?`<span class="pill">${B("This week","Esta semana")}</span>`:""}<button type=button aria-label="${B("Next week","Semana siguiente")}" onclick="LPX.${fn}(1)">›</button></div>`}
+// ---------- LABOR PLAN ----------
+function viewPlan(){const h=hotel(),w=LP.week,ed=isCorp();
+ if(ed&&(!LP.draft||LP.draft._k!==key(h,w))){LP.draft=planFor(h,w);LP.draft._k=key(h,w);LP.undo=[];LP.note=""}
+ const p=ed?LP.draft:planFor(h,w),tr=trainingRows(h,w),m=mode();
+ const rowsObj=LP.assoc?p.assoc:p.hours,names=Object.keys(rowsObj);
+ const dayT=[0,1,2,3,4,5,6].map(i=>sum(Object.values(p.hours).map(a=>a[i]))), trT=[0,1,2,3,4,5,6].map(i=>sum(tr.map(r=>trHours(r)[i])));
+ const dirty=ed&&saved(h,w)?JSON.stringify(strip(LP.draft))!==JSON.stringify(strip(saved(h,w))):ed&&JSON.stringify(strip(LP.draft))!==JSON.stringify(strip(Object.assign(basePlan(h),{by:null,at:null,note:""})));
+ let html=`<div id=lpRoot class="lp ${m}"><h2>${B("Labor Plan","Plan de labor")}</h2>${hotelPick()}${weekPick(w,"wk")}
+ <div class="card lp-meta"><small>${stamp(saved(h,w))}</small>${ed?"":`<div class=lp-ro>🔒 ${B("View only. Only JR Corporate can change labor plans.","Solo lectura. Solo JR Corporativo puede cambiar los planes de labor.")}</div>`}</div>
+ <div class="lp-seg sm"><button type=button class="${!LP.assoc?"on":""}" onclick="LPX.mode(false)">${B("By position","Por puesto")}</button><button type=button class="${LP.assoc?"on":""}" onclick="LPX.mode(true)">${B("By associate","Por asociado")}</button></div>`;
+ if(ed)html+=`<div class=lp-tools><button type=button onclick="LPX.copyLast()">📋 ${B("Copy last week","Copiar semana pasada")}</button><button type=button ${LP.undo.length?"":"disabled"} onclick="LPX.undo()">↶ ${B("Undo","Deshacer")}</button><button type=button onclick="LPX.reset()">${B("Reset to saved","Volver a lo guardado")}</button></div>`;
+ const cell=(nm,i,v)=>ed?(m==="phone"?`<span class=lp-step><button type=button aria-label="-0.5" onclick="LPX.step('${E(nm)}',${i},-0.5)">−</button><input inputmode=decimal aria-label="${E(nm)} ${DN[i][0]}" value="${v}" onchange="LPX.set('${E(nm)}',${i},this.value)"><button type=button aria-label="+0.5" onclick="LPX.step('${E(nm)}',${i},0.5)">+</button></span>`:`<input class=lp-in inputmode=decimal aria-label="${E(nm)} ${DN[i][0]}" value="${v}" onchange="LPX.set('${E(nm)}',${i},this.value)">`):`<span>${v}</span>`;
+ if(m==="phone"){const i=LP.day;
+  html+=`<div class="lp-days">${DN.map((d,j)=>`<button type=button class="${j===i?"on":""}" onclick="LPX.day(${j})">${B(d[0],d[1])}<small>${dayT[j]+trT[j]}</small></button>`).join("")}</div><div class=card>${names.map(nm=>`<div class=lp-row><span class=lp-nm>${E(roleName(nm)||nm)}</span>${cell(nm,i,rowsObj[nm][i])}${ed?`<button type=button class=lp-all onclick="LPX.all('${E(nm)}',${i})" title="${B("Apply to all days","Aplicar a todos los días")}">⇉ ${B("All days","Todos")}</button>`:""}</div>`).join("")}
+  ${tr.map(r=>`<div class="lp-row lp-tr"><span class=lp-nm>🎓 ${B("Training","Entrenamiento")} · ${E(r.assoc)} (${E(roleName(r.pos))})</span><span>${trHours(r)[i]}</span></div>`).join("")}
+  <div class="lp-row lp-tot"><span class=lp-nm>${B("Plan","Plan")}</span><b>${dayT[i]}</b></div><div class="lp-row lp-tot"><span class=lp-nm>${B("Training","Entrenamiento")}</span><b>${trT[i]}</b></div><div class="lp-row lp-tot"><span class=lp-nm>${B("Total","Total")}</span><b>${dayT[i]+trT[i]}</b></div></div>`;
+ }else{
+  html+=`<div class="card lp-wrap"><table class="lp-t" data-sp=1><thead><tr><th>${LP.assoc?B("Associate","Asociado"):B("Position","Puesto")}</th>${DN.map(d=>`<th>${B(d[0],d[1])}</th>`).join("")}<th>${B("Week","Semana")}</th>${ed?"<th></th>":""}</tr></thead><tbody>
+  ${names.map(nm=>`<tr><th scope=row>${E(roleName(nm)||nm)}</th>${rowsObj[nm].map((v,i)=>`<td>${cell(nm,i,v)}</td>`).join("")}<td><b>${sum(rowsObj[nm])}</b></td>${ed?`<td><button type=button class=lp-all onclick="LPX.all('${E(nm)}',0)" title="${B("Copy Monday to all days","Copiar lunes a todos los días")}">⇉ ${B("Mon → all","Lun → todos")}</button></td>`:""}</tr>`).join("")}
+  ${tr.map(r=>`<tr class=lp-tr><th scope=row>🎓 ${B("Training","Entrenamiento")} · ${E(r.assoc)} (${E(roleName(r.pos))})</th>${trHours(r).map(v=>`<td>${v}</td>`).join("")}<td><b>${sum(trHours(r))}</b></td>${ed?"<td></td>":""}</tr>`).join("")}
+  </tbody><tfoot><tr><th>${B("Plan total","Total plan")}</th>${dayT.map(v=>`<td>${v}</td>`).join("")}<td><b>${sum(dayT)}</b></td>${ed?"<td></td>":""}</tr><tr class=lp-tr><th>${B("Training total","Total entrenamiento")}</th>${trT.map(v=>`<td>${v}</td>`).join("")}<td><b>${sum(trT)}</b></td>${ed?"<td></td>":""}</tr><tr><th>${B("Plan + training","Plan + entrenamiento")}</th>${dayT.map((v,i)=>`<td><b>${v+trT[i]}</b></td>`).join("")}<td><b>${sum(dayT)+sum(trT)}</b></td>${ed?"<td></td>":""}</tr></tfoot></table></div>`;
+ }
+ if(!LP.assoc)html+=`<div class=card><b>${B("Rooms for MPR","Cuartos para MPR")}</b><div class=lp-rooms>${p.rooms.map((v,i)=>`<label>${B(DN[i][0],DN[i][1])}${ed?`<input class=lp-in inputmode=numeric value="${v}" onchange="LPX.rooms(${i},this.value)">`:`<b>${v}</b>`}</label>`).join("")}</div></div>`;
+ if(ed)html+=`<div class="card lp-save"><label>${B("Change note (required)","Nota del cambio (obligatoria)")}<input id=lpNote value="${E(LP.note)}" oninput="LPX.note(this.value)" placeholder="${B("e.g. Group block Thu, +8 FD","p. ej. grupo el jueves, +8 recepción")}"></label><button type=button class=primary ${dirty?"":"disabled"} onclick="LPX.save()">${B("Save plan","Guardar plan")}</button>${dirty?`<small>${B("Unsaved changes","Cambios sin guardar")}</small>`:""}</div>`;
+ if(isCorp()||isGMA())html+=`<button type=button class=lp-link onclick="go('trreq')">🎓 ${B("Training hours requests","Solicitudes de horas de entrenamiento")}${isCorp()&&pending().length?` <span class=lp-badge>${pending().length}</span>`:""}</button>`;
+ return html+"</div>"}
+function strip(p){if(!p)return p;return {hours:p.hours,assoc:p.assoc,rooms:p.rooms}}
+function push(){LP.undo.push(JSON.stringify(strip(LP.draft)));if(LP.undo.length>50)LP.undo.shift()}
+function rows(){return LP.assoc?LP.draft.assoc:LP.draft.hours}
+function rr(){render()}
+// ---------- TRAINING REQUESTS ----------
+function viewTr(){const h=hotel();
+ let html=`<div id=trRoot class="lp ${mode()}"><h2>${B("Training hours","Horas de entrenamiento")}</h2>${hotelPick()}`;
+ if(isCorp())html+=queue(h);
+ if(isGMA())html+=form(h);
+ const mine=trList().filter(r=>r.hotel===h&&(isCorp()?r.st!=="Pending":true)).slice().reverse();
+ html+=`<div class=card><h3>${isCorp()?B("Decided","Decididas"):B("My hotel's requests","Solicitudes de mi hotel")}</h3>${mine.length?mine.map(r=>`<div class=lp-req><div><b>${E(r.assoc)}</b> · ${E(roleName(r.pos))} · ${E(wkLabel(r.week))}</div><div><span class="pill ${r.st==="Approved"?"ok":r.st==="Denied"?"bad":"warnp"}">${B(r.st,{Pending:"Pendiente",Approved:"Aprobada",Denied:"Negada"}[r.st])}</span> ${sum(trHours(r))} ${B("hrs","hrs")} (${r.hpd}/${B("day","día")}) · ${E(rsn(r.reason))}${r.trainer?` · ${B("Trainer","Entrenador")}: ${E(r.trainer)}`:""}</div>${r.comment?`<div class=lp-cmt>💬 ${B("Corporate","Corporativo")}: ${E(r.comment)}</div>`:""}<small>${B("Requested by","Pedida por")} ${E(r.by)}</small></div>`).join(""):`<small>${B("No requests yet.","Aún no hay solicitudes.")}</small>`}</div>`;
+ return html+"</div>"}
+const rsn=k=>{const x=RS.find(r=>r[0]===k);return x?B(x[1],x[2]):k};
+function form(h){const f=LP.tf||(LP.tf={assoc:"",pos:"Front Desk",trainer:"",week:CUR,days:[1,1,1,1,1,0,0],hpd:8,reason:"new",notes:""});
+ const people=USERS.filter(u=>u.hotel===h&&u.active!==false&&!["GM","AGM"].includes(u.role));
+ return `<div class="card lp-form"><h3>${B("Request training hours","Pedir horas de entrenamiento")}</h3>
+ <label>${B("Associate","Asociado")}<input id=trA list=trAL value="${E(f.assoc)}" placeholder="${B("Name or 'New hire'","Nombre o 'Nuevo ingreso'")}" oninput="LPX.tf('assoc',this.value)"><datalist id=trAL><option value="${B("New hire (TBD)","Nuevo ingreso (por definir)")}">${people.map(u=>`<option value="${E(u.name)}">`).join("")}</datalist></label>
+ <div class=lp-chips>${RS.map(r=>`<button type=button class="${f.reason===r[0]?"on":""}" onclick="LPX.tf('reason','${r[0]}')">${B(r[1],r[2])}</button>`).join("")}</div>
+ <div class=lp-2><label>${B("Position","Puesto")}<select onchange="LPX.tf('pos',this.value)">${POSL.map(p=>`<option value="${p}" ${p===f.pos?"selected":""}>${E(roleName(p)||p)}</option>`).join("")}</select></label>
+ <label>${B("Trainer","Entrenador")}<input value="${E(f.trainer)}" list=trTL oninput="LPX.tf('trainer',this.value)"><datalist id=trTL>${people.map(u=>`<option value="${E(u.name)}">`).join("")}</datalist></label></div>
+ ${weekPick(f.week,"twk")}
+ <div class=lp-days>${DN.map((d,i)=>`<button type=button class="${f.days[i]?"on":""}" aria-pressed="${!!f.days[i]}" onclick="LPX.tday(${i})">${B(d[0],d[1])}</button>`).join("")}</div>
+ <div class=lp-chips><span>${B("Hours/day","Horas/día")}</span>${[4,6,8].map(n=>`<button type=button class="${+f.hpd===n?"on":""}" onclick="LPX.tf('hpd',${n})">${n}</button>`).join("")}<input class=lp-in inputmode=decimal aria-label="${B("Hours per day","Horas por día")}" value="${f.hpd}" onchange="LPX.tf('hpd',this.value)"></div>
+ <label>${B("Notes (optional)","Notas (opcional)")}<input value="${E(f.notes)}" oninput="LPX.tf('notes',this.value,1)"></label>
+ <button type=button class=primary onclick="LPX.submit()">${B("Submit request","Enviar solicitud")} · ${sum(f.days.map(o=>o?+f.hpd:0))} ${B("hrs","hrs")}</button></div>`}
+function queue(h){const q=pending(h);
+ return `<div class="card lp-q"><div class=lp-qh><h3>${B("Waiting for approval","Esperando aprobación")} ${q.length?`<span class=lp-badge>${q.length}</span>`:""}</h3>${q.length>1?`<button type=button onclick="LPX.approveAll()">✔✔ ${B("Approve all","Aprobar todas")} (${q.length})</button>`:""}</div>
+ ${q.length?q.map(r=>`<div class=lp-req id="tr-${r.id}"><div><b>${E(r.assoc)}</b> · ${E(roleName(r.pos))} · ${E(rsn(r.reason))}</div><small>${E(wkLabel(r.week))} · ${r.days.map((o,i)=>o?B(DN[i][0],DN[i][1]):"").filter(Boolean).join(", ")}${r.trainer?` · ${B("Trainer","Entrenador")}: ${E(r.trainer)}`:""} · ${B("by","por")} ${E(r.by)}</small>${r.notes?`<div class=lp-cmt>${E(r.notes)}</div>`:""}
+ <div class=lp-act><span class=lp-step><button type=button aria-label="-0.5" onclick="LPX.adj('${r.id}',-0.5)">−</button><input inputmode=decimal aria-label="${B("Hours per day","Horas por día")}" value="${r.hpd}" onchange="LPX.adj('${r.id}',0,this.value)"><button type=button aria-label="+0.5" onclick="LPX.adj('${r.id}',0.5)">+</button></span><small>${B("hrs/day","hrs/día")} = <b>${sum(trHours(r))}</b> ${B("total","total")}</small></div>
+ <input class=lp-c placeholder="${B("Comment (optional)","Comentario (opcional)")}" value="${E(r.cdraft||"")}" oninput="LPX.cm('${r.id}',this.value)">
+ <div class=lp-act><button type=button class="primary lp-ok" onclick="LPX.decide('${r.id}','Approved')">✔ ${B("Approve","Aprobar")} ${sum(trHours(r))} ${B("hrs","hrs")}</button><button type=button class=lp-no onclick="LPX.decide('${r.id}','Denied')">${B("Deny","Negar")}</button></div></div>`).join(""):`<small>${B("Nothing waiting. 🎉","Nada pendiente. 🎉")}</small>`}</div>`}
+function decideMany(ids,st){const l=trList(),prev=JSON.stringify(l),me=meUser().name;l.forEach(r=>{if(ids.includes(r.id)){r.st=st;r.comment=r.cdraft||"";delete r.cdraft;r.dby=me;r.dat=Date.now()}});trSave(l);
+ toast(st==="Approved"?B(`Approved ${ids.length} — training added to the plan`,`${ids.length} aprobada(s) — entrenamiento agregado al plan`):B("Request denied","Solicitud negada"),()=>{trSave(JSON.parse(prev))});render()}
+window.LPX={
+ setHotel(k){LP.hotel=k;LP.draft=null;if(isCorp()){S.hotel=k;save()}render()},
+ wk(n){LP.week=addW(LP.week,n);render()}, twk(n){LP.tf.week=addW(LP.tf.week,n);render()},
+ day(i){LP.day=i;render()}, mode(a){LP.assoc=a;render()}, note(v){LP.note=v;const b=document.querySelector(".lp-save .primary");},
+ set(nm,i,v){if(!isCorp())return;const n=r1(Math.max(0,parseFloat(v)||0));push();rows()[nm][i]=n;if(LP.assoc)resum();rr()},
+ step(nm,i,d){if(!isCorp())return;push();rows()[nm][i]=Math.max(0,r1((+rows()[nm][i]||0)+d));if(LP.assoc)resum();rr()},
+ all(nm,i){if(!isCorp())return;push();const v=rows()[nm][i];rows()[nm]=[v,v,v,v,v,v,v];if(LP.assoc)resum();rr()},
+ rooms(i,v){if(!isCorp())return;push();LP.draft.rooms[i]=Math.max(0,parseInt(v)||0);rr()},
+ copyLast(){if(!isCorp())return;push();const p=planFor(hotel(),addW(LP.week,-1));Object.assign(LP.draft,strip(JSON.parse(JSON.stringify(p))));toast(B("Copied last week's plan. Review, then Save.","Plan de la semana pasada copiado. Revise y guarde."));rr()},
+ undo(){const s=LP.undo.pop();if(s)Object.assign(LP.draft,JSON.parse(s));rr()},
+ reset(){LP.draft=null;render()},
+ save(){if(!isCorp())return;if(!LP.note.trim()){toast(B("Add a change note first.","Primero agregue una nota del cambio."));const n=document.getElementById("lpNote");if(n)n.focus();return}
+  const st=store(),k=key(hotel(),LP.week),prev=st[k]?JSON.stringify(st[k]):null;st[k]=Object.assign(strip(JSON.parse(JSON.stringify(LP.draft))),{by:meUser().name,at:Date.now(),note:LP.note.trim()});sset(LPK,JSON.stringify(st));LP.draft=null;applyLive();
+  toast(B("Plan saved","Plan guardado"),()=>{const s=store();if(prev)s[k]=JSON.parse(prev);else delete s[k];sset(LPK,JSON.stringify(s));LP.draft=null;const o=ORIG[k.split("|")[0]];if(o&&k.endsWith(CUR)){const h=k.split("|")[0];laborPlan.hours[h]=JSON.parse(JSON.stringify(o.h));laborPlan.associate[h]=JSON.parse(JSON.stringify(o.a));laborPlan.rooms[h]=o.r.slice()}applyLive()});render()},
+ tf(k,v,quiet){LP.tf[k]=k==="hpd"?Math.max(0,r1(parseFloat(v)||0)):v;if(!quiet&&k!=="assoc"&&k!=="trainer")render()},
+ tday(i){LP.tf.days[i]=LP.tf.days[i]?0:1;render()},
+ submit(){if(!isGMA())return;const f=LP.tf;if(!f.assoc.trim()){toast(B("Add the associate's name (or New hire).","Agregue el nombre (o Nuevo ingreso)."));return}if(!sum(f.days.map(o=>o?+f.hpd:0))){toast(B("Pick days and hours.","Elija días y horas."));return}
+  const l=trList();l.push({id:"tr"+Date.now().toString(36),hotel:hotel(),assoc:f.assoc.trim(),pos:f.pos,trainer:f.trainer.trim(),week:f.week,days:f.days.slice(),hpd:+f.hpd,reason:f.reason,notes:f.notes.trim(),st:"Pending",by:meUser().name+" ("+authRole()+")",at:Date.now()});trSave(l);LP.tf=null;toast(B("Sent to JR Corporate for approval","Enviada a JR Corporativo para aprobación"));render()},
+ adj(id,d,v){if(!isCorp())return;const l=trList(),r=l.find(x=>x.id===id);if(!r)return;r.hpd=v!=null?Math.max(0,r1(parseFloat(v)||0)):Math.max(0,r1(r.hpd+d));trSave(l);render()},
+ cm(id,v){const l=trList(),r=l.find(x=>x.id===id);if(r){r.cdraft=v;trSave(l)}},
+ decide(id,st){if(!isCorp())return;decideMany([id],st)},
+ approveAll(){if(!isCorp())return;const q=pending(hotel());if(!q.length)return;if(!confirm(B(`Approve all ${q.length} requests for ${hotel()} (${sum(q.map(r=>sum(trHours(r))))} hrs)?`,`¿Aprobar las ${q.length} solicitudes de ${hotel()} (${sum(q.map(r=>sum(trHours(r))))} hrs)?`)))return;decideMany(q.map(r=>r.id),"Approved")},
+ toastUndo(){const t=LP.toast;LP.toast=null;drawToast();if(t&&t.undoFn){t.undoFn();render()}}
+};
+function resum(){const h=hotel(),d=LP.draft,byPos={};USERS.filter(u=>(u.hotel===h)).forEach(u=>{if(d.assoc[u.name]){const pos=u.role==="Housekeeping"?"HK Lead":u.role;if(u.role==="Shuttle Driver")return;byPos[pos]=byPos[pos]||[0,0,0,0,0,0,0];d.assoc[u.name].forEach((n,i)=>byPos[pos][i]+=+n||0)}});Object.keys(byPos).forEach(p=>d.hours[p]=byPos[p])}
+M.lplan=["🗓️","Labor Plan"];M.trreq=["🎓","Training Hours"];
+Object.assign(I18N.es,{"Labor Plan":"Plan de labor","Training Hours":"Horas de entrenamiento"});
+V.lplan=viewPlan;V.trreq=viewTr;
+try{NOCOLS.push("lplan","trreq")}catch(e){}
+TILES.GM=(TILES.GM||[]).concat(["lplan","trreq"]);
+if(TILES.Housekeeping)TILES.Housekeeping=TILES.Housekeeping.concat(["lplan"]);
+const _lab=V.labor;V.labor=function(){return `<button type=button class=lp-link onclick="go('lplan')">🗓️ ${B("Labor plan","Plan de labor")} ${isCorp()?B("(edit)","(editar)"):B("(view)","(ver)")}</button>`+_lab()};
+const _render=render;
+render=function(){const u=meUser();
+ if(u&&S&&S.tab==="trreq"&&!(isCorp()||isGMA()))S.tab="home";
+ if(u&&S&&S.tab==="lplan"&&!(leader()||(TILES[S.role]||[]).includes("lplan")))S.tab="home";
+ try{chk()}catch(e){}
+ _render();
+ if(!u)return;
+ if(S.tab==="lplan"||S.tab==="trreq"){$("app").classList.add("wide");$("app").classList.remove("cols")}
+ const n=isCorp()?pending().length:0;
+ document.querySelectorAll("[onclick*=\"go('trreq')\"]").forEach(b=>{if(n&&!b.querySelector(".lp-badge"))b.insertAdjacentHTML("beforeend",` <span class=lp-badge>${n}</span>`)});
+ if(isCorp()&&n&&S.tab==="home"){const a=$("app");a.insertAdjacentHTML("afterbegin",`<button type=button class="lp-alert" onclick="go('trreq')">🎓 ${B(`${n} training hour request${n>1?"s":""} waiting for approval`,`${n} solicitud(es) de horas de entrenamiento esperando aprobación`)} <span class=lp-badge>${n}</span> ›</button>`)}
+ if(!isCorp()&&!isGMA())document.querySelectorAll("[onclick*=\"go('trreq')\"]").forEach(b=>b.remove());
+};
+let lastM=mode();addEventListener("resize",()=>{const m=mode();if(m!==lastM){lastM=m;if(S&&(S.tab==="lplan"||S.tab==="trreq"))render()}});
+const st=document.createElement("style");st.textContent=`
+.lp-badge{display:inline-block;min-width:20px;padding:1px 6px;border-radius:10px;background:#d93025;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:18px}
+.lp-seg{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.lp-seg button,.lp-chips button,.lp-days button,.lp-tools button,.lp-wk button{border:1px solid #c9d2e0;background:#fff;border-radius:10px;padding:8px 12px;font:inherit;min-height:40px;cursor:pointer}
+.lp-seg button.on,.lp-chips button.on,.lp-days button.on{background:#1f2a44;color:#fff;border-color:#1f2a44}
+.lp-wk{display:flex;align-items:center;gap:10px;margin:6px 0}.lp-wk button{min-width:44px;font-size:20px}
+.lp-tools{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.lp-tools button:disabled{opacity:.4}
+.lp-ro{margin-top:6px;padding:8px;border-radius:8px;background:#f1f3f7;font-weight:600}
+.lp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0}.lp-days button{padding:6px 2px;display:flex;flex-direction:column;align-items:center}.lp-days small{opacity:.8}
+.lp-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eef1f5}.lp-nm{flex:1}.lp-tot{font-weight:600}
+.lp-tr{background:#fff7e0}.lp-tr th,.lp-tr .lp-nm{color:#8a5a00}
+.lp-step{display:inline-flex;align-items:center;gap:4px}.lp-step button{width:40px;height:40px;border-radius:10px;border:1px solid #c9d2e0;background:#fff;font-size:20px}.lp-step input{width:56px;text-align:center;height:40px;font:inherit;border:1px solid #c9d2e0;border-radius:8px}
+.lp-in{width:58px;text-align:center;height:34px;font:inherit;border:1px solid #c9d2e0;border-radius:6px}.lp-in:focus{outline:2px solid #2b6cb0;background:#eef5ff}
+.lp-all{border:1px solid #c9d2e0;background:#fff;border-radius:8px;padding:6px 8px;font-size:12px;cursor:pointer;white-space:nowrap}
+.lp-wrap{overflow-x:auto}.lp-t{width:100%;border-collapse:collapse}.lp-t th,.lp-t td{padding:6px;text-align:center;border-bottom:1px solid #eef1f5}.lp-t th[scope=row],.lp-t tfoot th{text-align:left;white-space:nowrap}.lp-t tfoot td,.lp-t tfoot th{font-weight:600;background:#f7f9fc}
+.lp-rooms{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px}.lp-rooms label{display:flex;flex-direction:column;align-items:center;font-size:12px}
+.lp-save label,.lp-form label{display:flex;flex-direction:column;gap:4px;margin:6px 0;font-weight:600}.lp-save input,.lp-form input:not(.lp-in),.lp-form select,.lp-c{height:42px;font:inherit;border:1px solid #c9d2e0;border-radius:8px;padding:0 10px;width:100%;box-sizing:border-box}
+.lp .primary{background:#1a7f37;color:#fff;border:0;border-radius:12px;padding:12px 18px;font:inherit;font-weight:700;min-height:48px;cursor:pointer;width:100%}.lp .primary:disabled{background:#9bb5a2}
+.lp-link{display:block;width:100%;margin:10px 0;padding:12px;border-radius:12px;border:1px solid #c9d2e0;background:#fff;font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.lp-alert{display:block;width:100%;margin:0 0 10px;padding:14px;border-radius:12px;border:0;background:#fff4d6;color:#5c3d00;font:inherit;font-weight:700;text-align:left;cursor:pointer}
+.lp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.lp-2{display:grid;grid-template-columns:1fr;gap:6px}
+.lp-req{border:1px solid #e3e8f0;border-radius:12px;padding:10px;margin:8px 0;display:flex;flex-direction:column;gap:6px}
+.lp-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.lp-ok{flex:2}.lp-no{flex:1;min-height:48px;border-radius:12px;border:1px solid #d93025;color:#d93025;background:#fff;font:inherit;font-weight:600}
+.lp-cmt{background:#f1f3f7;border-radius:8px;padding:6px 8px}
+.lp-qh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.lp-qh button{border:1px solid #1a7f37;color:#1a7f37;background:#fff;border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;min-height:40px}
+#lpToast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#1f2a44;color:#fff;padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw}#lpToast[hidden]{display:none}#lpToast button{background:none;border:0;color:#9fd0ff;font:inherit;font-weight:700;cursor:pointer}
+@media(min-width:768px){.lp-2{grid-template-columns:1fr 1fr}.lp-q{}.lp-req .lp-act .primary{width:auto}}
+@media(min-width:1200px){#trRoot.desk{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}#trRoot.desk>h2,#trRoot.desk>.lp-seg{grid-column:1/-1}}
+`;document.head.appendChild(st);
+})();
+/*LPLAN_END*/
 </script></body></html>
