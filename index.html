@@ -147,12 +147,22 @@ body.he-print .wk button{display:none}
   .hescroll{overflow:visible;border:0}
   .hegrid{min-width:0}
 }
+#welcome{position:fixed;inset:0;z-index:10000;background:linear-gradient(160deg,#14365d 0%,#1f4f86 60%,#2d6aa8 100%);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto;animation:wlfade .35s ease}
+#welcome .wl-in{position:relative;width:100%;max-width:420px;text-align:center;display:flex;flex-direction:column;gap:18px;padding-top:24px}
+#welcome .wl-brand{font-weight:800;letter-spacing:.3px;font-size:18px;opacity:.9}#welcome .wl-brand span{color:#f9c74f}
+#welcome .wl-hi{font-size:32px;font-weight:800;line-height:1.15}
+#welcome .wl-msg{font-size:20px;line-height:1.45;background:#ffffff1f;border-radius:16px;padding:20px 18px}
+#welcome .wl-go{min-height:52px;border:0;border-radius:14px;background:#f9c74f;color:#14365d;font-size:18px;font-weight:800;cursor:pointer}
+#welcome .wl-go:focus-visible,#welcome .wl-lang:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#welcome .wl-lang{position:absolute;right:0;top:-8px;min-width:44px;min-height:44px;border:1px solid #ffffff80;border-radius:999px;background:transparent;color:#fff;font-weight:700;cursor:pointer}
+@keyframes wlfade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:reduce){#welcome{animation:none}}
 </style></head><body>
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span class="hhq" style="font-weight:800;letter-spacing:.3px;white-space:nowrap">Hotel<span style="color:#f9c74f">HQ</span></span><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
 <div id="toast" class="toast" hidden></div>
 
 <script src="fd-coverage.js"></script>
+<script src="data/welcome-messages.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
 // Example directory only. Do not put a live employee roster in this public file.
@@ -1624,6 +1634,24 @@ async function signIn(){
   loginPin="";loginErr="";loginUid="";applyUserLanguage(u);save();render();
 }
 async function signOut(){sbPush=false;sbSession=null;if(sb){try{await sb.auth.signOut()}catch(e){}}S.uid="";S.tab="home";loginPin="";loginUid="";loginErr="";loadLang();rememberPushLang();save();render()}
+// ---- Daily welcome greeting (hotel staff, GMs; not JR Corporate). Messages live in data/welcome-messages.js as [English, Spanish].
+// One message per hotel per day (same for everyone at that hotel). Shown once per person per day until they tap "Let's go".
+const WELCOME_ROLES_OFF=["Above Property"];
+function welcomeDay(){const d=new Date(),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}
+function welcomeMsg(){const m=window.WELCOME_MSGS||[];if(!m.length)return null;const d=new Date(),day=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5),off={MSPWE:0,MSPAM:21,MSPMS:43}[S.hotel]||0;return m[(day+off)%m.length]}
+function welcomeDone(){return !!sget("hhq_welcome_"+S.uid+"_"+welcomeDay())}
+function welcomeDismiss(){sset("hhq_welcome_"+S.uid+"_"+welcomeDay(),"1");const el=document.getElementById("welcome");if(el)el.remove();document.body.style.overflow=""}
+function welcomeToggleLang(){setLang(LANG==="es"?"en":"es")}
+function welcomeSync(){
+  const el=document.getElementById("welcome"),u=meUser(),m=welcomeMsg();
+  if(!u||WELCOME_ROLES_OFF.includes(authRole())||!m||welcomeDone()){if(el)el.remove();document.body.style.overflow="";return}
+  const es=LANG==="es",h=new Date().getHours(),first=String(u.name||"").trim().split(/\s+/)[0]||"",
+    hi=es?(h<12?"Buenos días":h<18?"Buenas tardes":"Buenas noches"):(h<12?"Good morning":h<18?"Good afternoon":"Good evening"),
+    html=`<div class="wl-in"><button type="button" class="wl-lang" onclick="welcomeToggleLang()" aria-label="English / Español">${es?"EN":"ES"}</button><div class="wl-brand">Hotel<span>HQ</span></div><div class="wl-hi" id="wlTitle">${escH(hi)}${first?", "+escH(first):""}</div><div class="wl-msg">${escH(es?m[1]:m[0])}</div><button type="button" class="wl-go" id="wlGo" onclick="welcomeDismiss()">${es?"¡Vamos!":"Let's go"}</button></div>`;
+  if(el){el.innerHTML=html;return}
+  const d=document.createElement("div");d.id="welcome";d.setAttribute("role","dialog");d.setAttribute("aria-modal","true");d.setAttribute("aria-labelledby","wlTitle");d.innerHTML=html;document.body.appendChild(d);document.body.style.overflow="hidden";
+  const b=document.getElementById("wlGo");if(b)b.focus({preventScroll:true});
+}
 function render(){
   const u=meUser();
   if(!u){renderLogin();return}
@@ -1672,6 +1700,7 @@ function render(){
   const af=ackParam();
   if(af){const el=document.getElementById("alert-"+af); if(el) el.scrollIntoView({block:"center"})}
   consumeAckParam();
+  welcomeSync();
 }
 function setHotel(k){if(authRole()!="Above Property"||!HOTELS[k])return;S.hotel=k;S.tab="home";save();render();scrollTo(0,0)}
 function setRole(r){if(!leader()||!ROLES.includes(r))return;S.role=r;S.tab="home";save();render();scrollTo(0,0)}
