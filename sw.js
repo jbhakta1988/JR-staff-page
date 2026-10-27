@@ -1,4 +1,4 @@
-/* JR Staff Portal service worker. Register with scope /JR-staff-page/.
+/* HotelHQ service worker. Register with scope /JR-staff-page/.
    The ack action opens /JR-staff-page/?ack=<alert_id> and does not call the API. */
 function idbGet(key) {
   return new Promise(function (resolve) {
@@ -60,7 +60,7 @@ async function storedLang(fallback) {
 async function showPush(event) {
   var payload = readPayload(event);
   var lang = await storedLang(payload.lang);
-  var title = payload.title || "JR Staff Portal";
+  var title = payload.title || "HotelHQ";
   var hasAlert = payload.alert_id != null && payload.alert_id !== "";
   var actions = [];
   if (hasAlert) actions.push({ action: "ack", title: lang === "es" ? "Confirmar" : "Acknowledge" });
