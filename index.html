@@ -3824,4 +3824,58 @@ function giHomeCard(){const r=S.role,due=giDue(),mine=giMyDept(),n=mine?giList()
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("gi")&&!["Shuttle Driver","House Person","Laundry Attendant"].includes(r))TILES[r].push("gi")});
 const _homeGi=V.home;V.home=function(){return giHomeCard()+_homeGi()};
 /*GI_END*/
+/*LF_START*/
+// Lost & found v2: photo, where/room/found by/date, guest contact log, status (stored/claimed/shipped/disposed),
+// release-to + signature checkbox, 90-day disposal reminder, search. Replaces the old simple list (old rows are migrated once).
+const LF_ST=[["stored","Stored","Guardado"],["claimed","Claimed","Reclamado"],["shipped","Shipped","Enviado"],["disposed","Disposed","Desechado"]];
+const LF_DAYS=90,LF_SOON=75;
+function lfStName(k){const x=LF_ST.find(y=>y[0]===k)||LF_ST[0];return bx(x[1],x[2])}
+function lfList(){const d=D();if(!d.lfx){const old=Array.isArray(d.lf)?d.lf:[],map={Holding:"stored",Claimed:"claimed",Shipped:"shipped",Disposed:"disposed"};
+  d.lfx=old.map((x,i)=>({id:i+1,photo:"",desc:x.it||"-",where:"",room:String(x.room||""),by:x.by||"",at:careAgo(2+i),st:map[x.st]||"stored",contacts:[],rel:null,ex:1}));
+  const n=()=>careNextId(d.lfx);
+  d.lfx.push({id:n(),photo:"",desc:"Gold ring (small), found by the sink",where:"Bathroom, checked-out room",room:"108",by:"Rosa (EX)",at:careAgo(95),st:"stored",contacts:[{at:careAgo(92),who:"Front desk",how:"call",note:"Left voicemail for the guest"},{at:careAgo(85),who:"Front desk",how:"email",note:"Emailed claim instructions, no reply"}],rel:null,ex:1});
+  d.lfx.push({id:n(),photo:"",desc:"Navy hoodie",where:"Pool deck",room:"",by:"Maria (EX)",at:careAgo(20),st:"claimed",contacts:[{at:careAgo(18),who:"Front desk",how:"call",note:"Guest will pick up"}],rel:{to:"Guest (EXAMPLE)",sig:true,at:careAgo(15)},ex:1});
+  d.lf=d.lf||[]}
+  return d.lfx}
+function lfCanManage(){const r=authRole();return r==="GM"||r==="AGM"||r==="Front Desk"||r==="Housekeeping"}
+function lfCanLog(){return authRole()!=="Above Property"}
+function lfAge(x){return Math.floor((Date.now()-new Date(x.at).getTime())/864e5)}
+function lfDueDays(x){return LF_DAYS-lfAge(x)}
+function lfDue(){return lfList().filter(x=>x.st==="stored"&&lfDueDays(x)<=0)}
+function lfSoon(){return lfList().filter(x=>x.st==="stored"&&lfDueDays(x)>0&&lfDueDays(x)<=LF_DAYS-LF_SOON)}
+function lfF(){S.lff=S.lff||{room:"",desc:"",where:"",by:"",date:""};return S.lff}
+function lfSync(){const f=lfF();[["lfDesc","desc"],["lfWhere","where"],["lfRoom","room"],["lfBy","by"],["lfDate","date"]].forEach(([i,k])=>{const e=$(i);if(e)f[k]=e.value})}
+function lfAdd(){lfSync();const f=lfF();if(!f.desc.trim()){const e=$("lfErr");if(e)e.textContent=bx("Add a short description.","Agrega una descripción corta.");return}
+  const list=lfList();list.unshift({id:careNextId(list),photo:ph||"",desc:f.desc.trim(),where:f.where.trim(),room:f.room.trim(),by:f.by.trim()||cw(),at:f.date?new Date(f.date+"T12:00:00").toISOString():new Date().toISOString(),st:"stored",contacts:[],rel:null});
+  S.lff={room:"",desc:"",where:"",by:"",date:""};ph="";phFile=null;save();showToast(bx("Item logged","Artículo registrado"));render()}
+function lfQ(v){S.lfq=v;const e=$("lfList");if(e)e.innerHTML=lfRows()}
+function lfFilt(k){S.lfs=k;render()}
+function lfOpen(id){S.lfo=S.lfo===id?0:id;S.lfrel=0;render()}
+function lfContact(id){const x=lfList().find(y=>y.id===id);if(!x)return;const how=$("lcHow"+id).value,note=$("lcNote"+id).value.trim();x.contacts.push({at:new Date().toISOString(),who:cw(),how,note});save();render()}
+function lfRelForm(id){S.lfrel=S.lfrel===id?0:id;render()}
+function lfRelease(id,kind){const x=lfList().find(y=>y.id===id);if(!x)return;const to=($("lrTo"+id).value||"").trim(),sig=$("lrSig"+id).checked,e=$("lrErr"+id);
+  if(!to){e.textContent=bx("Enter who it is released to.","Escribe a quién se entrega.");return}
+  if(!sig){e.textContent=bx("Check the signature box once the guest has signed.","Marca la casilla cuando el huésped haya firmado.");return}
+  x.st=kind;x.rel={to,sig:true,at:new Date().toISOString(),by:cw(),track:($("lrTrk"+id)&&$("lrTrk"+id).value||"").trim()};S.lfrel=0;save();render()}
+function lfDispose(id){const x=lfList().find(y=>y.id===id);if(!x)return;x.st="disposed";x.rel={to:bx("Disposed per policy","Desechado según política"),sig:false,at:new Date().toISOString(),by:cw()};save();render()}
+function lfHit(x,q){return !q||[x.desc,x.where,x.room,x.by,x.rel&&x.rel.to,x.st,lfStName(x.st)].join(" ").toLowerCase().includes(q.toLowerCase())}
+const LF_HOW={call:["Call","Llamada"],email:["Email","Correo"],text:["Text","Texto"],person:["In person","En persona"]};
+function lfCard(x){const open=S.lfo===x.id,mg=lfCanManage(),due=x.st==="stored"&&lfDueDays(x)<=0,soon=x.st==="stored"&&!due&&lfDueDays(x)<=LF_DAYS-LF_SOON;
+  const flag=due?`<span class="pill VD">${bx("Disposal due","Desechar ya")}</span>`:soon?`<span class="pill OD">${bx("Disposal in","Desechar en")} ${lfDueDays(x)}${bx("d","d")}</span>`:"";
+  let det="";
+  if(open){det=`<div style="margin-top:8px"><small><b>${bx("Guest contact log","Registro de contacto")}</b></small>${x.contacts.map(c=>`<div class="wlpos"><small>${escH(careDate(c.at))} · ${bx(LF_HOW[c.how][0],LF_HOW[c.how][1])} · ${escH(String(c.who).split(" ")[0])}</small><br>${escH(c.note||"")}</div>`).join("")||`<div><small>${bx("No contact attempts yet.","Aún sin intentos de contacto.")}</small></div>`}
+    ${lfCanLog()&&x.st==="stored"?`<div class="row"><select id="lcHow${x.id}" style="flex:0 0 110px" aria-label="${escH(bx("Contact method","Medio de contacto"))}">${Object.keys(LF_HOW).map(k=>`<option value="${k}">${bx(LF_HOW[k][0],LF_HOW[k][1])}</option>`).join("")}</select><input id="lcNote${x.id}" placeholder="${escH(bx("What happened?","¿Qué pasó?"))}"><button class="btn2" style="flex:0 0 64px" onclick="lfContact(${x.id})">+</button></div>`:""}
+    ${x.rel?`<div class="wlpos">${x.st==="disposed"?"🗑️":"✍️"} ${escH(x.rel.to)} · ${escH(careDate(x.rel.at))}${x.rel.sig?" · "+bx("signed","firmado"):""}${x.rel.track?" · "+escH(x.rel.track):""}</div>`:""}
+    ${mg&&x.st==="stored"?`<div class="chips"><button class="chip" onclick="lfRelForm(${x.id})">${bx("Release / ship","Entregar / enviar")}</button>${lfDueDays(x)<=0?`<button class="chip" onclick="lfDispose(${x.id})">${bx("Mark disposed","Marcar desechado")}</button>`:""}</div>`:""}
+    ${S.lfrel===x.id?`<div class="card" style="background:#f4f7fb"><input id="lrTo${x.id}" style="width:100%" placeholder="${escH(bx("Released to (name)","Entregado a (nombre)"))}" aria-label="${escH(bx("Released to","Entregado a"))}"><input id="lrTrk${x.id}" style="width:100%;margin-top:6px" placeholder="${escH(bx("Tracking # if shipped (optional)","# de rastreo si se envía (opcional)"))}"><label class="li"><input type="checkbox" id="lrSig${x.id}"><span>${bx("Recipient signed for the item","El destinatario firmó de recibido")}</span></label><div class="bad" id="lrErr${x.id}" role="alert"></div><div class="row"><button class="btn" onclick="lfRelease(${x.id},'claimed')">${bx("Claimed","Reclamado")}</button><button class="btn" onclick="lfRelease(${x.id},'shipped')">${bx("Shipped","Enviado")}</button></div></div>`:""}</div>`}
+  return `<div class="card" style="padding:10px"><div style="display:flex;gap:10px;align-items:flex-start" onclick="lfOpen(${x.id})">${x.photo?`<img alt="" src="${x.photo}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none">`:`<span style="width:64px;height:64px;border-radius:8px;background:#eef3fa;display:flex;align-items:center;justify-content:center;font-size:28px;flex:none">🧳</span>`}<div style="flex:1;min-width:0"><b class="raw">${escH(x.desc)}</b>${x.ex?` <span class="pill OD">${bx("EXAMPLE","EJEMPLO")}</span>`:""}<br><small>${x.room?bx("Rm ","Hab. ")+escH(x.room)+" · ":""}${escH(x.where||"")}</small><br><small>${bx("Found","Encontrado")} ${escH(careDate(x.at))} · ${escH(String(x.by).split(" ")[0])} · ${lfAge(x)}${bx("d ago","d")}</small><div style="margin-top:4px"><span class="pill ${x.st==="stored"?"OC":x.st==="disposed"?"OOO":"VC"}">${lfStName(x.st)}</span> ${flag} ${x.contacts.length?`<small>📞 ${x.contacts.length}</small>`:""}</div></div></div>${det}</div>`}
+function lfRows(){const q=S.lfq||"",s=S.lfs||"all",rows=lfList().filter(x=>(s==="all"||x.st===s)&&lfHit(x,q));return rows.map(lfCard).join("")||`<div class="card"><small>${bx("No items match.","Ningún artículo coincide.")}</small></div>`}
+M.lf=["🧳","Lost & Found"];
+V.lf=function(){const f=lfF(),due=lfDue(),s=S.lfs||"all",cnt=k=>lfList().filter(x=>k==="all"||x.st===k).length;
+  return `<h2>🧳 ${bx("Lost & Found","Objetos Perdidos")}</h2>${due.length&&lfCanManage()?`<div class="miss-banner">⏰ ${due.length} ${bx("item(s) past 90 days — dispose per policy","artículo(s) con más de 90 días — desechar según la política")}</div>`:""}
+  ${lfCanLog()?`<div class="card"><h3>${bx("Log a found item","Registrar objeto encontrado")}</h3><input id="lfDesc" style="width:100%" placeholder="${escH(bx("Description","Descripción"))}" value="${escH(f.desc)}"><div class="row"><input id="lfWhere" placeholder="${escH(bx("Where found","Dónde se encontró"))}" value="${escH(f.where)}"><input id="lfRoom" inputmode="numeric" placeholder="${escH(bx("Room #","Hab. #"))}" value="${escH(f.room)}"></div><div class="row"><input id="lfBy" placeholder="${escH(bx("Found by (you)","Encontrado por (tú)"))}" value="${escH(f.by)}"><input id="lfDate" type="date" value="${escH(f.date)}" aria-label="${escH(bx("Date found (blank = today)","Fecha (vacío = hoy)"))}"></div><div class="row">${photoField()}</div>${photoPrev()}<div class="bad" id="lfErr" role="alert"></div><button class="btn" style="width:100%" onclick="lfAdd()">${bx("Log item","Registrar artículo")}</button></div>`:""}
+  <div class="card"><input id="lfSearch" type="search" style="width:100%" placeholder="🔍 ${escH(bx("Search description, room, found by…","Buscar descripción, hab., quién lo encontró…"))}" value="${escH(S.lfq||"")}" oninput="lfQ(this.value)" aria-label="${escH(bx("Search lost and found","Buscar en objetos perdidos"))}"><div class="chips">${[["all",bx("All","Todos")]].concat(LF_ST.map(x=>[x[0],bx(x[1],x[2])])).map(x=>`<button class="chip ${s===x[0]?"on":""}" aria-pressed="${s===x[0]}" onclick="lfFilt('${x[0]}')">${x[1]} (${cnt(x[0])})</button>`).join("")}</div></div><div id="lfList">${lfRows()}</div>`};
+ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("lf")&&["GM","Front Desk","Housekeeping","Housekeeper","House Person","Laundry Attendant"].includes(r))TILES[r].push("lf")});
+const _homeLf=V.home;V.home=function(){const n=lfCanManage()?lfDue().length:0;return (n?`<div class="card" onclick="go('lf')" style="cursor:pointer"><b>🧳 ${bx("Lost & Found","Objetos Perdidos")}</b><div class="miss-banner" style="margin:6px 0 0">⏰ ${n} ${bx("item(s) past 90 days — dispose per policy","artículo(s) con más de 90 días — desechar según la política")}</div></div>`:"")+_homeLf()};
+/*LF_END*/
 </script></body></html>
