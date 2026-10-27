@@ -151,7 +151,7 @@ body.he-print .wk button{display:none}
 <header id="hdr"><button id="hbar" type="button" onclick="tp()"><span id="hbt"></span><span class="ex" id="hex">EXAMPLE</span><span id="hcar">▾</span></button><div id="hpanel" hidden><div id="hotel" class="seg" role="tablist" aria-label="Property"></div><div class="hname" id="hname"></div><div id="roleLabel" class="hname" hidden>Department</div><div id="langSlot"></div><div id="role" class="seg sm" aria-label="Department"></div><div id="warn"></div><button type="button" id="signout" class="btn2" style="width:100%;margin-top:8px" onclick="signOut()">Sign out</button><button type="button" id="hdone" class="btn2" style="width:100%;margin-top:8px" onclick="tp(0)">Done</button></div></header>
 <main id="app"></main><nav id="nav"></nav>
 <div id="toast" class="toast" hidden></div>
-<script src="vendor/dicebear.min.js"></script>
+
 <script src="fd-coverage.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
@@ -3460,94 +3460,116 @@ const _hm=V.home;V.home=function(){const o=A();const prompt=!o.done&&!o.skip?`<d
 })();
 /*FUN_END*/
 /*AVATAR_START*/
-// Character avatars: DiceBear 9 (MIT) bundled locally in vendor/dicebear.min.js, no network calls.
-// Styles: "Avataaars" by Pablo Stanley (free for personal & commercial use), "Adventurer" by Lisa Wischofsky (CC BY 4.0). Remixed via DiceBear.
+// Character avatars: DiceBear 9 (MIT) bundled locally under vendor/dicebear/. Core (~8 KB) loads with the app; each style bundle and the option list lazy-load on first use. No network calls to third parties.
 (function(){
-Object.assign(I18N.es,{"Avatar builder":"Creador de avatar","Edit avatar":"Editar avatar","Style":"Estilo","Skin tone":"Tono de piel","Hair":"Cabello","Hair color":"Color de cabello","Eyes":"Ojos","Eyebrows":"Cejas","Mouth":"Boca","Facial hair":"Vello facial","Glasses":"Lentes","Head covering":"Cubierta de cabeza","Clothing":"Ropa","Clothing color":"Color de ropa","Background":"Fondo","Randomize":"Aleatorio","Work badge":"Insignia de trabajo","Frame":"Marco","None":"Ninguno","Locked":"Bloqueado","Unlocks at":"Se desbloquea en","Shout-outs":"Reconocimientos","Avatar art":"Arte de avatar","Hijab":"Hiyab","Turban":"Turbante","Headwrap / winter hat":"Pañuelo / gorro","Cap / hat":"Gorra / sombrero","Team color":"Color del equipo","Perfect Week glow":"Brillo Semana Perfecta"});
+Object.assign(I18N.es,{"Avatar builder":"Creador de avatar","Edit avatar":"Editar avatar","Style":"Estilo","Skin tone":"Tono de piel","Randomize":"Aleatorio","Work badge":"Insignia de trabajo","Frame":"Marco","Pins":"Pines","None":"Ninguno","Unlocks at":"Se desbloquea con","Shout-outs":"Reconocimientos","Avatar art":"Arte de avatar","Background":"Fondo","Solid":"Sólido","Gradient":"Degradado","Pattern":"Patrón","Special":"Especial","People":"Personas","Cartoon":"Caricatura","Hand-drawn":"Dibujado a mano","Pixel":"Píxel","Robots & Fun":"Robots y diversión","Loading…":"Cargando…","Head covering":"Cubierta de cabeza","Credits":"Créditos","color":"color"});
+const B="vendor/dicebear/";
+const GROUPS=[["People",["avataaars","adventurer","lorelei","notionists","micah","personas","open-peeps","dylan","toon-head","avataaars-neutral","adventurer-neutral","lorelei-neutral","notionists-neutral"]],["Cartoon",["big-smile","big-ears","big-ears-neutral","miniavs","fun-emoji","thumbs"]],["Hand-drawn",["croodles","croodles-neutral"]],["Pixel",["pixel-art","pixel-art-neutral"]],["Robots & Fun",["bottts","bottts-neutral","glass","shapes"]]];
+const CRED={"avataaars":["Avataaars","Pablo Stanley","Free for personal & commercial use"],"avataaars-neutral":["Avataaars Neutral","Pablo Stanley","Free for personal & commercial use"],"bottts":["Bottts","Pablo Stanley","Free for personal & commercial use"],"bottts-neutral":["Bottts Neutral","Pablo Stanley","Free for personal & commercial use"],"adventurer":["Adventurer","Lisa Wischofsky","CC BY 4.0"],"adventurer-neutral":["Adventurer Neutral","Lisa Wischofsky","CC BY 4.0"],"big-ears":["Big Ears","The Visual Team","CC BY 4.0"],"big-ears-neutral":["Big Ears Neutral","The Visual Team","CC BY 4.0"],"big-smile":["Big Smile","Ashley Seo","CC BY 4.0"],"croodles":["Croodles","vijay verma","CC BY 4.0"],"croodles-neutral":["Croodles Neutral","vijay verma","CC BY 4.0"],"dylan":["Dylan","Natalia Spivak","CC BY 4.0"],"fun-emoji":["Fun Emoji","Davis Uche","CC BY 4.0"],"micah":["Micah","Micah Lanier","CC BY 4.0"],"miniavs":["Miniavs","Webpixels","CC BY 4.0"],"personas":["Personas","Draftbit","CC BY 4.0"],"toon-head":["Toon Head","Johan Melin","CC BY 4.0"],"lorelei":["Lorelei","Lisa Wischofsky","CC0"],"lorelei-neutral":["Lorelei Neutral","Lisa Wischofsky","CC0"],"notionists":["Notionists","Zoish","CC0"],"notionists-neutral":["Notionists Neutral","Zoish","CC0"],"open-peeps":["Open Peeps","Pablo Stanley","CC0"],"pixel-art":["Pixel Art","DiceBear","CC0"],"pixel-art-neutral":["Pixel Art Neutral","DiceBear","CC0"],"glass":["Glass","DiceBear","CC0"],"shapes":["Shapes","DiceBear","CC0"],"thumbs":["Thumbs","DiceBear","CC0"]};
 const SKIN=["fde7d6","f9d4b8","f1c19e","e6a97f","d08b5b","b97448","a0623b","8a4f2c","6f3d22","5a2e17","43220f","2f170a"];
-const HAIRC=["0e0e0e","2c1b18","4a312c","724133","a55728","b58143","d6b370","ecdcbf","c93305","e8e1e1","9e9e9e","f59797","6c5ce7","00bbf9"];
-const BG=["e8f0ff","d1f2eb","fff3cd","fde2e4","e2ece9","cddafd","f1e4ff","ffffff","f9c74f","90be6d"];
-const CLO=["262e33","25557c","5199e4","65c9ff","3c4f5c","929598","e6e6e6","ff5c5c","ff488e","ffafb9","ffffb1","a7ffc4"];
-const ST={avataaars:{lbl:"Classic",opts:{
-  top:["shortFlat","shortRound","shortWaved","shortCurly","theCaesar","theCaesarAndSidePart","sides","shavedSides","fro","froBand","dreads","dreads01","dreads02","frizzle","shaggy","shaggyMullet","curly","curvy","bob","bun","bigHair","longButNotTooLong","miaWallace","straight01","straight02","straightAndStrand","frida"],
-  cover:["","hijab","turban","winterHat1","winterHat02","winterHat03","winterHat04","hat"],
-  eyes:["default","happy","wink","squint","side","surprised","hearts","closed"],
-  eyebrows:["defaultNatural","raisedExcitedNatural","flatNatural","upDownNatural","unibrowNatural","default","raisedExcited","sadConcernedNatural"],
-  mouth:["smile","default","twinkle","tongue","serious","eating","concerned"],
-  facialHair:["","beardLight","beardMedium","beardMajestic","moustacheFancy","moustacheMagnum"],
-  glasses:["","prescription01","prescription02","round","wayfarers","kurt","sunglasses"],
-  clothing:["shirtCrewNeck","shirtVNeck","shirtScoopNeck","hoodie","collarAndSweater","blazerAndShirt","blazerAndSweater","overall","graphicShirt"]}},
- adventurer:{lbl:"Adventurer",opts:{
-  top:["short01","short02","short03","short04","short05","short06","short07","short08","short09","short10","short11","short12","short13","short14","short15","short16","short17","short18","short19","long01","long02","long03","long04","long05","long06","long07","long08","long09","long10","long11","long12","long13","long14","long15","long16","long17","long18","long19","long20","long21","long22","long23","long24","long25","long26"],
-  eyes:Array.from({length:26},(_,i)=>"variant"+String(i+1).padStart(2,"0")),
-  eyebrows:Array.from({length:15},(_,i)=>"variant"+String(i+1).padStart(2,"0")),
-  mouth:Array.from({length:30},(_,i)=>"variant"+String(i+1).padStart(2,"0")),
-  facialHair:["","mustache"],glasses:["","variant01","variant02","variant03","variant04","variant05"]}}};
-const ROLEB=[["","None","Ninguno",""],["hk","Housekeeping","Limpieza","🧹"],["mt","Maintenance","Mantenimiento","🔧"],["fd","Front Desk","Recepción","🛎️"],["bk","Breakfast","Desayuno","👨‍🍳"],["bar","Bartender","Bartender","🍸"],["drv","Driver","Chofer","🚐"],["ld","Laundry","Lavandería","🧺"]];
-const ROLE2B={Housekeeping:"hk",Housekeeper:"hk","House Person":"hk",Maintenance:"mt","Front Desk":"fd","Breakfast Attendant":"bk","Shuttle Driver":"drv","Laundry Attendant":"ld"};
-// unlockables: [id, EN, ES, test, unlock hint EN, ES]
+const EXTRA=["0e0e0e","2c1b18","4a312c","724133","a55728","b58143","d6b370","ecdcbf","c93305","e8e1e1","9e9e9e","f59797","ff488e","6c5ce7","00bbf9","25557c","43aa8b","90be6d","f9c74f","f8961e","f94144","ffffff"];
+const COVERS=["hijab","turban","winterHat1","winterHat02","winterHat03","winterHat04","hat"];
+const L=(en,es)=>LANG==="es"?es:en;
+// ---------- lazy loading ----------
+const loading={};
+function loadScript(src){return loading[src]||(loading[src]=new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.async=true;s.onload=res;s.onerror=rej;document.head.appendChild(s)}))}
+function ensure(style){if(window.DB&&DB.styles[style])return true;loadScript(B+"core.min.js").then(()=>loadScript(B+"styles/"+style+".js")).then(()=>{clearTimeout(ensure._t);ensure._t=setTimeout(render,30)}).catch(()=>{});return false}
+function ensureMeta(){if(window.DBMETA)return true;loadScript(B+"meta.js").then(()=>render());return false}
+// ---------- unlock helpers ----------
 const lv=()=>window.ptsLevel?ptsLevel():0, st=()=>window.ptsStats?ptsStats():{};
-const FR=[["","None","Ninguno",()=>1,"",""],["silver","Silver frame","Marco plateado",()=>lv()>=2,"Pro","Profesional"],["gold","Gold frame","Marco dorado",()=>lv()>=3,"Star","Estrella"],["rainbow","Legend frame","Marco Leyenda",()=>lv()>=6,"Legend","Leyenda"]];
-const FRCSS={"":"3px solid #fff",silver:"4px solid #b8c2cc",gold:"4px solid #f5b700",rainbow:"4px solid transparent;background-image:linear-gradient(#fff,#fff),conic-gradient(#f94144,#f9c74f,#90be6d,#577590,#9b5de5,#f94144);background-origin:border-box;background-clip:content-box,border-box"};
-const SPECIALBG=[["team","Team color","Color del equipo",()=>!!teamCols(),"About Me team","Equipo en Sobre Mí"],["glow","Perfect Week glow","Brillo Semana Perfecta",()=>(st().pw||0)>=1,"Perfect Week badge","Insignia Semana Perfecta"]];
+const goalHit=()=>{try{return !!(window.goalsAnyMet?goalsAnyMet():(st().pw||0)>=1)}catch(e){return false}};
+const qotd=()=>+(localStorage.getItem("jrqotd_streak")||0);
+const MON=new Date().getMonth();
 function teamCols(){try{const id=(meUser()||{}).id||"x",a=(JSON.parse(localStorage.getItem("jrabout_"+id))||{}).a||{};const th=window.funTheme&&funTheme();return (a.teams||[]).length&&th?th.cols.slice(0,2):null}catch(e){return null}}
+// [id,EN,ES,css, unlockFn, hintEN, hintES]
+const SOLID=["e8f0ff","d1f2eb","fff3cd","fde2e4","e2ece9","cddafd","f1e4ff","ffffff","f9c74f","90be6d","577590","1f2a44"].map(h=>["s"+h,"","","#"+h]);
+const GRAD=[["g1","Sunrise","Amanecer","linear-gradient(135deg,#f9c74f,#f94144)"],["g2","Ocean","Océano","linear-gradient(135deg,#00bbf9,#577590)"],["g3","Mint","Menta","linear-gradient(135deg,#d1f2eb,#43aa8b)"],["g4","Grape","Uva","linear-gradient(135deg,#9b5de5,#f15bb5)"],["g5","Sky","Cielo","linear-gradient(180deg,#cddafd,#ffffff)"],["g6","Sunset","Atardecer","linear-gradient(135deg,#f8961e,#9b5de5)"],["g7","Forest","Bosque","linear-gradient(135deg,#90be6d,#2d6a4f)"],["g8","Night","Noche","linear-gradient(135deg,#1f2a44,#577590)"]];
+const PAT=[["p1","Stripes","Rayas","repeating-linear-gradient(45deg,#e8f0ff 0 8px,#cddafd 8px 16px)"],["p2","Dots","Puntos","radial-gradient(#f8961e 20%,transparent 22%) 0 0/14px 14px,#fff3cd"],["p3","Checks","Cuadros","conic-gradient(#d1f2eb 25%,#fff 0 50%,#d1f2eb 0 75%,#fff 0) 0 0/16px 16px"],["p4","Confetti","Confeti","radial-gradient(circle at 20% 30%,#f94144 3px,transparent 4px),radial-gradient(circle at 70% 60%,#43aa8b 3px,transparent 4px),radial-gradient(circle at 40% 80%,#577590 3px,transparent 4px) 0 0/24px 24px,#fff"],["p5","Plaid","Escocés","repeating-linear-gradient(0deg,#f9413433 0 6px,transparent 6px 18px),repeating-linear-gradient(90deg,#57759033 0 6px,transparent 6px 18px),#fff"],["p6","Waves","Olas","radial-gradient(circle at 50% 100%,transparent 8px,#cddafd 9px 11px,transparent 12px) 0 0/20px 12px,#e8f0ff"]];
+const SEASON=[["Valentine","San Valentín","linear-gradient(135deg,#ffafcc,#f15bb5)",1],["Spring","Primavera","linear-gradient(135deg,#d1f2eb,#f9c74f)",2],["Fall","Otoño","linear-gradient(135deg,#f8961e,#7f4f24)",9],["Holidays","Fiestas","repeating-linear-gradient(45deg,#c1121f 0 8px,#2d6a4f 8px 16px)",11]];
+const SPECIAL=[["team","Team colors","Colores del equipo",()=>{const c=teamCols();return c?`linear-gradient(135deg,${c[0]},${c[1]})`:"#e8f0ff"},()=>!!teamCols(),"Pick a team in About Me","Elige un equipo en Sobre Mí"],
+ ["glow","Perfect Week glow","Brillo Semana Perfecta","radial-gradient(#fff3cd,#f9c74f)",()=>(st().pw||0)>=1,"Perfect Week badge","Insignia Semana Perfecta"],
+ ["gold","Gold shimmer","Brillo dorado","linear-gradient(135deg,#fff3b0,#f5b700,#fff3b0)",()=>lv()>=4,"All-Star level","Nivel Súper Estrella"],
+ ["galaxy","Galaxy","Galaxia","radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/12px 12px,linear-gradient(135deg,#240046,#3c096c,#5a189a)",()=>lv()>=5,"Captain level","Nivel Capitán"],
+ ["goal","Team goal stripes","Rayas de meta","repeating-linear-gradient(135deg,#43aa8b 0 8px,#90be6d 8px 16px)",goalHit,"Team goal met","Meta de equipo lograda"],
+ ...SEASON.map(s=>["sea"+s[3],s[0],s[1],s[2],()=>MON===s[3]||MON===s[3]-1,"Seasonal","De temporada"])];
+const FRAMES=[["","None","Ninguno","3px solid #fff"],["white","White","Blanco","4px solid #fff"],["navy","Navy","Azul marino","4px solid #1f2a44"],["teal","Teal","Verde azulado","4px solid #43aa8b"],["coral","Coral","Coral","4px solid #f94144"],["dashed","Dashed","Punteado","3px dashed #577590"],["double","Double","Doble","6px double #1f2a44"],
+ ["silver","Silver","Plateado","4px solid #b8c2cc",()=>lv()>=2,"Pro level","Nivel Profesional"],["gold","Gold","Dorado","4px solid #f5b700",()=>lv()>=3,"Star level","Nivel Estrella"],["neon","Neon","Neón","3px solid #00f5d4;box-shadow:0 0 8px #00f5d4",()=>lv()>=4,"All-Star level","Nivel Súper Estrella"],["captain","Captain","Capitán","5px double #f5b700",()=>lv()>=5,"Captain level","Nivel Capitán"],["rainbow","Legend","Leyenda","4px solid transparent;background-origin:border-box;background-clip:padding-box,border-box",()=>lv()>=6,"Legend level","Nivel Leyenda"],
+ ["fire","Streak flame","Llama de racha","4px solid #f8961e;box-shadow:0 0 10px #f94144",()=>(st().ck||0)>=30,"30-day checklist streak","Racha de 30 días"],["goal","Team goal","Meta de equipo","4px solid #43aa8b",goalHit,"Team goal met","Meta de equipo lograda"]];
+const ROLEB=[["","None","Ninguno",""],["hk","Housekeeping","Limpieza","🧹"],["hp","Houseman","Houseman","🛒"],["ld","Laundry","Lavandería","🧺"],["sup","Supervisor","Supervisor","📋"],["mt","Maintenance","Mantenimiento","🔧"],["mtt","Maintenance Tech","Técnico de mant.","🛠️"],["fd","Front Desk","Recepción","🛎️"],["na","Night Audit","Auditor nocturno","🌙"],["bk","Breakfast","Desayuno","👨‍🍳"],["bar","Bartender","Bartender","🍸"],["drv","Driver","Chofer","🚐"],["gm","GM","GM","👔"],["agm","AGM","AGM","🗝️"],["sales","Sales","Ventas","💼"]];
+const ROLE2B={Housekeeping:"sup",Housekeeper:"hk","House Person":"hp",Maintenance:"mt","Front Desk":"fd","Breakfast Attendant":"bk","Shuttle Driver":"drv","Laundry Attendant":"ld",GM:"gm",AGM:"agm"};
+// pins (overlay top-left): [id,EN,ES,emoji,unlock,hintEN,hintES]
+const PINS=[["","None","Ninguno",""],["star","Star","Estrella","⭐"],["heart","Heart","Corazón","❤️"],["sparkle","Sparkle","Brillo","✨"],
+ ["trophy","Team-goal trophy","Trofeo de meta","🏆",goalHit,"Team goal met","Meta de equipo lograda"],["brain","Brainiac glasses","Lentes de genio","🤓",()=>qotd()>=5,"5-day Question of the Day streak","Racha de 5 días de Pregunta del Día"],
+ ["flame","Streak flame","Llama de racha","🔥",()=>(st().ck||0)>=7,"7-day checklist streak","Racha de 7 días"],["clock","Punctual","Puntual","⏰",()=>(st().ci||0)>=10,"Punctual silver badge","Insignia Puntual plata"],["wrench","Fast Fixer","Reparador rápido","⚡",()=>(st().ft||0)>=10,"Fast Fixer badge","Insignia Reparador"],["shine","Spotless","Impecable","💎",()=>(st().ip||0)>=50,"Spotless silver badge","Insignia Impecable plata"],["crown","Crown","Corona","👑",()=>lv()>=6,"Legend level","Nivel Leyenda"],
+ ["pumpkin","Jack-o'-lantern","Calabaza","🎃",()=>MON===9,"October","Octubre"],["turkey","Thanksgiving","Acción de Gracias","🦃",()=>MON===10,"November","Noviembre"],["santa","Santa hat","Gorro navideño","🎅",()=>MON===11,"December","Diciembre"],["party","New Year","Año Nuevo","🥳",()=>MON===0,"January","Enero"],["cupid","Valentine","San Valentín","💘",()=>MON===1,"February","Febrero"],["clover","Clover","Trébol","☘️",()=>MON===2,"March","Marzo"],["skull","Día de Muertos","Día de Muertos","💀",()=>MON===9||MON===10,"Oct–Nov","Oct–Nov"],["flag","Summer","Verano","🌞",()=>MON>=5&&MON<=7,"Summer","Verano"]];
+const ok=x=>!x[4]||x[4]();
+function bgCss(id){const s=SOLID.find(x=>x[0]==id);if(s)return s[3];const g=[...GRAD,...PAT].find(x=>x[0]==id);if(g)return g[3];const sp=SPECIAL.find(x=>x[0]==id);if(sp)return typeof sp[3]=="function"?sp[3]():sp[3];return "#e8f0ff"}
+// ---------- config ----------
 const KEY=()=>"jravatar_"+((meUser()||{}).id||"x");
 function hash(s){let h=7;for(const c of String(s))h=(h*31+c.charCodeAt(0))>>>0;return h}
-function pick(a,r){return a[r%a.length]}
-function rnd(seed){let h=hash(seed);const r=()=>(h=(h*1103515245+12345)>>>0)>>>8;const style=r()%3?"avataaars":"adventurer",o=ST[style].opts,
-  c={style,skin:pick(SKIN,r()),hair:pick(o.top,r()),hairColor:pick(HAIRC,r()%8),eyes:pick(o.eyes,r()),eyebrows:pick(o.eyebrows,r()),mouth:pick(o.mouth.slice(0,4),r()),facialHair:r()%4?"":pick(o.facialHair,r()),glasses:r()%4?"":pick(o.glasses,r()),cover:"",clothing:o.clothing?pick(o.clothing,r()):"",clothesColor:pick(CLO,r()),bg:pick(BG,r()),role:"",frame:""};return c}
-function mine(){try{const c=JSON.parse(localStorage.getItem(KEY()));if(c)return c}catch(e){}const u=meUser()||{},c=rnd(u.id||"me");c.role=ROLE2B[u.role]||"";return c}
-function saveMine(c){try{localStorage.setItem(KEY(),JSON.stringify(c))}catch(e){}
-  // live: supabase.rpc('set_my_avatar',{p:c}) — profiles.avatar, self-edit only; team reads via team_avatars(hotel)
-  if(window.sb&&sb.rpc)sb.rpc("set_my_avatar",{p:c}).catch(()=>{})}
-function opts(c){const bgSolid=c.bg==="team"?(teamCols()||["#e8f0ff"])[0].replace("#",""):c.bg==="glow"?"fff3cd":c.bg;
-  if(c.style==="adventurer")return {seed:"x",skinColor:[c.skin],hair:[c.hair],hairColor:[c.hairColor],eyes:[c.eyes],eyebrows:[c.eyebrows],mouth:[c.mouth],glasses:c.glasses?[c.glasses]:[],glassesProbability:c.glasses?100:0,features:c.facialHair?["mustache"]:[],featuresProbability:c.facialHair?100:0,earringsProbability:0,backgroundColor:[bgSolid]};
-  return {seed:"x",skinColor:[c.skin],top:[c.cover||c.hair],topProbability:100,hairColor:[c.hairColor],hatColor:[c.clothesColor],eyes:[c.eyes],eyebrows:[c.eyebrows],mouth:[c.mouth],facialHair:c.facialHair?[c.facialHair]:[],facialHairProbability:c.facialHair?100:0,facialHairColor:[c.hairColor],accessories:c.glasses?[c.glasses]:[],accessoriesProbability:c.glasses?100:0,clothing:[c.clothing||"shirtCrewNeck"],clothesColor:[c.clothesColor],clothingGraphic:["hola"],backgroundColor:[bgSolid]}}
+const PEOPLE=["avataaars","adventurer","lorelei","notionists","micah","personas","big-smile","open-peeps"];
+function rnd(seed,style){const h=hash(seed);return {style:style||PEOPLE[h%PEOPLE.length],seed:String(seed),o:{},bg:SOLID[h%SOLID.length][0],frame:"",role:"",pin:""}}
+function migrate(c){if(c&&!c.o){const n={style:c.style||"avataaars",seed:"me",o:{},bg:"se8f0ff",frame:c.frame||"",role:c.role||"",pin:""};const o=n.o;if(c.skin)o.skinColor=c.skin;if(c.hairColor)o.hairColor=c.hairColor;["eyes","eyebrows","mouth"].forEach(k=>c[k]&&(o[k]=c[k]));
+  if(n.style=="avataaars"){o.top=c.cover||c.hair;o.facialHair=c.facialHair||"";o.accessories=c.glasses||"";if(c.clothing)o.clothing=c.clothing;if(c.clothesColor)o.clothesColor=c.clothesColor}else{o.hair=c.hair;o.glasses=c.glasses||""}return n}return c}
+function mine(){try{const c=JSON.parse(localStorage.getItem(KEY()));if(c)return migrate(c)}catch(e){}const u=meUser()||{},c=rnd(u.id||"me");c.role=ROLE2B[u.role]||"";return c}
+function saveMine(c){try{localStorage.setItem(KEY(),JSON.stringify(c))}catch(e){}if(window.sb&&sb.rpc)sb.rpc("set_my_avatar",{p:c}).catch(()=>{})}
+function dbOpts(c){const r={seed:c.seed||"x"},m=window.DBMETA&&DBMETA[c.style];
+  for(const k in c.o){const v=c.o[k];if(/Color$/.test(k)){r[k]=[v];continue}
+    if(v===""){r[k+"Probability"]=0}else{r[k]=[v];r[k+"Probability"]=100}}
+  if(c.style.endsWith("-neutral")||["glass","shapes","fun-emoji","thumbs","bottts-neutral"].includes(c.style)){if(!c.o.backgroundColor&&m&&m.backgroundColor)r.backgroundColor=[m.backgroundColor.d[hash(c.seed)%m.backgroundColor.d.length]]}else r.backgroundColor=["transparent"];
+  return r}
 const cache={};
-function uri(c){const k=JSON.stringify(c);if(cache[k])return cache[k];let u="";try{u=DB.createAvatar(DB.styles[c.style]||DB.styles.avataaars,opts(c)).toDataUri()}catch(e){u=""}return cache[k]=u}
-// name=null -> me; otherwise deterministic teammate avatar (live: from team_avatars)
+function uri(c){if(!ensure(c.style))return "";const k=JSON.stringify(c);if(cache[k])return cache[k];let u="";try{u=DB.createAvatar(DB.styles[c.style],dbOpts(c)).toDataUri()}catch(e){u=""}return cache[k]=u}
 window.avConfig=n=>n?rnd("mate_"+n):mine();
-window.avHTML=function(name,sz,cfg){const c=cfg||avConfig(name),b=ROLEB.find(x=>x[0]==c.role),tc=c.bg==="team"&&teamCols(),glow=c.bg==="glow";
-  const bgimg=tc?`background:linear-gradient(135deg,${tc[0]},${tc[1]});`:"";
-  return `<span class=av style="position:relative;display:inline-block;flex:none;width:${sz}px;height:${sz}px"><img alt="" src="${uri(c)}" style="width:100%;height:100%;border-radius:50%;box-sizing:border-box;${bgimg}border:${FRCSS[c.frame||""]};${glow?"box-shadow:0 0 10px 2px #f9c74f;":"box-shadow:0 1px 4px #0003;"}">${b&&b[3]&&sz>=28?`<span style="position:absolute;right:-3px;bottom:-3px;background:#fff;border-radius:50%;font-size:${Math.max(10,sz*.3)}px;line-height:1;padding:2px;box-shadow:0 1px 3px #0004">${b[3]}</span>`:""}</span>`};
-window.avLevelUp=function(){const u=uri(mine());const el=document.createElement("div");el.innerHTML=`<img alt="" src="${u}" style="width:120px;height:120px;border-radius:50%;border:5px solid #f5b700;background:#fff">`;el.style.cssText="position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none";document.body.appendChild(el);
-  if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&el.animate)el.animate([{transform:"translate(-50%,-50%) scale(.3)",opacity:0},{transform:"translate(-50%,-60%) scale(1.15) rotate(-6deg)",opacity:1,offset:.4},{transform:"translate(-50%,-55%) scale(1) rotate(4deg)",opacity:1,offset:.7},{transform:"translate(-50%,-50%) scale(.9)",opacity:0}],{duration:1800,easing:"ease-out"});
-  setTimeout(()=>el.remove(),matchMedia("(prefers-reduced-motion: reduce)").matches?1200:1800)};
+window.avHTML=function(name,sz,cfg){const c=cfg||avConfig(name),b=ROLEB.find(x=>x[0]==c.role),f=FRAMES.find(x=>x[0]==(c.frame||""))||FRAMES[0],p=PINS.find(x=>x[0]==c.pin),u=uri(c);
+  const rb=c.frame=="rainbow"?"background-image:"+bgCss(c.bg).split(",#")[0]+",conic-gradient(#f94144,#f9c74f,#90be6d,#577590,#9b5de5,#f94144);":"";
+  const ini=escH(String(name||((meUser()||{}).name)||"?").charAt(0));
+  return `<span class=av style="position:relative;display:inline-block;flex:none;width:${sz}px;height:${sz}px"><span style="display:block;width:100%;height:100%;border-radius:50%;box-sizing:border-box;overflow:hidden;background:${bgCss(c.bg)};border:${f[3]};${rb}box-shadow:0 1px 4px #0003">${u?`<img alt="" src="${u}" style="width:100%;height:100%;display:block">`:`<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-weight:700;font-size:${sz*.4}px;color:#1f2a44">${ini}</span>`}</span>${b&&b[3]&&sz>=28?`<span style="position:absolute;right:-3px;bottom:-3px;background:#fff;border-radius:50%;font-size:${Math.max(10,sz*.28)}px;line-height:1;padding:2px;box-shadow:0 1px 3px #0004">${b[3]}</span>`:""}${p&&p[3]&&sz>=28?`<span style="position:absolute;left:-3px;top:-3px;font-size:${Math.max(10,sz*.28)}px;line-height:1">${p[3]}</span>`:""}</span>`};
+window.avLevelUp=function(){const rm=matchMedia("(prefers-reduced-motion: reduce)").matches,el=document.createElement("div");el.innerHTML=avHTML(null,120);el.style.cssText="position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none";document.body.appendChild(el);
+  if(!rm&&el.animate)el.animate([{transform:"translate(-50%,-50%) scale(.3)",opacity:0},{transform:"translate(-50%,-60%) scale(1.15) rotate(-6deg)",opacity:1,offset:.4},{transform:"translate(-50%,-55%) scale(1) rotate(4deg)",opacity:1,offset:.7},{transform:"translate(-50%,-50%) scale(.9)",opacity:0}],{duration:1800,easing:"ease-out"});setTimeout(()=>el.remove(),rm?1200:1800)};
+// ---------- builder ----------
 let draft=null;
-window.avSet=function(k,v){draft[k]=v;if(k==="hair")draft.cover="";if(k==="style"){const o=ST[v].opts;draft.hair=o.top[0];draft.eyes=o.eyes[0];draft.eyebrows=o.eyebrows[0];draft.mouth=o.mouth[0];draft.facialHair="";draft.glasses="";draft.cover="";draft.clothing=o.clothing?o.clothing[0]:""}render()};
-window.avRand=function(){const k=draft.role,f=draft.frame;draft=rnd(Math.random()+"");draft.role=k;draft.frame=f;render()};
+window.avSet=function(k,v){if(k==="style"){draft={style:v,seed:draft.seed,o:{},bg:draft.bg,frame:draft.frame,role:draft.role,pin:draft.pin};const sk=draft.o;}else if(["bg","frame","role","pin"].includes(k))draft[k]=v;else{draft.o[k]=v;if(k==="top"&&draft.style=="avataaars")draft.o.top=v}render()};
+window.avOpen=function(k){S.avOpen=S.avOpen===k?"":k;render()};
+window.avRand=function(){const m=DBMETA[draft.style],o={};for(const k in m){const x=m[k];if(x.t=="c"&&x.e.length>1)o[k]=x.p<100&&Math.random()<.5?"":x.e[Math.floor(Math.random()*x.e.length)];else if(x.t=="k"&&k!="backgroundColor")o[k]=((k=="skinColor"||(k=="baseColor"&&draft.style=="micah"))?SKIN:x.d)[Math.floor(Math.random()*((k=="skinColor"||(k=="baseColor"&&draft.style=="micah"))?12:x.d.length))]}
+  draft.o=o;draft.seed=String(Math.random());draft.bg=[...SOLID,...GRAD,...PAT][Math.floor(Math.random()*26)][0];render()};
 window.avSave=function(){saveMine(draft);draft=null;window.ptsToast&&ptsToast("✅ "+t("Save"));go("about")};
-function L(en,es){return LANG==="es"?es:en}
-function sw(k,list,cur,hex){return `<div class=avrow>${list.map(v=>`<button aria-label="${escH(k+" "+v)}" onclick="avSet('${k}','${v}')" style="width:36px;height:36px;min-width:36px;padding:0;border-radius:50%;background:#${v};border:${cur==v?"3px solid #1f2a44":"1px solid #ccc"}"></button>`).join("")}</div>`}
-function thumbs(k,list,cur){return `<div class=avrow>${list.map(v=>{const c=Object.assign({},draft,{[k]:v});if(k==="cover"&&v)c.cover=v;if(k==="hair")c.cover="";return `<button aria-label="${escH(k+" "+(v||"none"))}" onclick="avSet('${k}','${v}')" style="padding:2px;min-width:56px;border-radius:12px;border:${cur==v?"3px solid #f8961e":"1px solid #ddd"};background:#fff"><img alt="" loading="lazy" src="${uri(c)}" style="width:48px;height:48px;display:block">${v?"":`<small>${t("None")}</small>`}</button>`}).join("")}</div>`}
-function sec(lbl,body,open){return `<details ${open?"open":""} class=card style="padding:10px"><summary><b>${t(lbl)}</b></summary>${body}</details>`}
+const LBL={base:["Skin","Piel"],earring:["Earring","Arete"],eyeShadow:["Eye shadow","Sombra"],headContrast:["Hair / hat","Cabello / gorro"],shape:["Shape","Forma"],topColor:["Top","Parte superior"],top:["Hair","Cabello"],hair:["Hair","Cabello"],frontHair:["Front hair","Fleco"],rearHair:["Back hair","Cabello trasero"],hairColor:["Hair color","Color de cabello"],skinColor:["Skin tone","Tono de piel"],eyes:["Eyes","Ojos"],eyebrows:["Eyebrows","Cejas"],brows:["Eyebrows","Cejas"],mouth:["Mouth","Boca"],lips:["Mouth","Boca"],nose:["Nose","Nariz"],facialHair:["Facial hair","Vello facial"],beard:["Beard","Barba"],mustache:["Mustache","Bigote"],glasses:["Glasses","Lentes"],accessories:["Accessories","Accesorios"],clothing:["Clothing","Ropa"],clothes:["Clothing","Ropa"],body:["Body / clothing","Cuerpo / ropa"],shirt:["Shirt","Camisa"],earrings:["Earrings","Aretes"],hat:["Hat","Sombrero"],head:["Head","Cabeza"],face:["Face","Cara"],mood:["Mood","Ánimo"],gesture:["Gesture","Gesto"],features:["Features","Rasgos"],freckles:["Freckles","Pecas"],blushes:["Blush","Rubor"],cheek:["Cheeks","Mejillas"],ear:["Ears","Orejas"],ears:["Ears","Orejas"],sideburn:["Sideburns","Patillas"],mask:["Mask","Cubrebocas"],hairAccessories:["Hair accessories","Accesorios de cabello"],clothingGraphic:["Shirt graphic","Gráfico de camisa"],bodyIcon:["Shirt icon","Icono de camisa"],texture:["Texture","Textura"],sides:["Sides","Lados"],backgroundColor:["Face / base color","Color de cara / base"]};
+function lbl(k){const x=LBL[k];if(x)return L(x[0],x[1]);if(/Color$/.test(k)){const b=k.replace(/Color$/,"");return (LBL[b]?L(LBL[b][0],LBL[b][1]):b.replace(/([A-Z])/g," $1").replace(/^./,c=>c.toUpperCase()))+" · "+t("color")}return k.replace(/([A-Z])/g," $1").replace(/^./,c=>c.toUpperCase())}
+function sec(key,title,body){const op=S.avOpen===key;return `<div class=card style="padding:10px"><button onclick="avOpen('${key}')" style="all:unset;cursor:pointer;display:flex;justify-content:space-between;width:100%;font-weight:700"><span>${title}</span><span>${op?"▾":"▸"}</span></button>${op?body():""}</div>`}
+const sel=(on)=>on?"3px solid #f8961e":"1px solid #ddd";
+function thumbRow(k,list,cur,allowNone){return `<div class=avrow>${(allowNone?[""]:[]).concat(list).map(v=>{const c={...draft,o:{...draft.o,[k]:v}};if(k=="top"&&COVERS.includes(v))c.o.top=v;return `<button aria-label="${escH(lbl(k)+" "+(v||t("None")))}" onclick="avSet('${k}','${v}')" style="padding:2px;border-radius:12px;border:${sel(cur==v)};background:${bgCss(draft.bg)}"><img alt="" loading="lazy" src="${uri(c)}" style="width:52px;height:52px;display:block">${v?"":`<small>${t("None")}</small>`}</button>`}).join("")}</div>`}
+function swatch(k,list,cur){return `<div class=avrow>${list.map(v=>`<button aria-label="${escH(lbl(k)+" #"+v)}" onclick="avSet('${k}','${v}')" style="width:38px;height:38px;padding:0;border-radius:50%;background:#${v};border:${cur==v?"3px solid #1f2a44":"1px solid #ccc"}"></button>`).join("")}</div>`}
+function lockRow(arr,k,render1){return `<div class=avrow>${arr.map(x=>{const u=ok(x);return `<button ${u?"":"disabled"} onclick="avSet('${k}','${x[0]}')" style="border-radius:12px;padding:6px 8px;border:${sel(draft[k]==x[0])};opacity:${u?1:.5};min-width:72px">${render1(x)}<br><small>${u?"":"🔒 "}${escH(L(x[1],x[2]))}${u||!x[5]?"":`<br>${t("Unlocks at")}: ${escH(L(x[5],x[6]))}`}</small></button>`}).join("")}</div>`}
 M.avatar=["🧑","Avatar builder"];
-V.avatar=function(){if(!draft)draft=Object.assign({},mine());const o=ST[draft.style].opts,c=draft;
-  const lock=(arr,k)=>`<div class=avrow>${arr.map(x=>{const ok=x[3]();return `<button ${ok?"":"disabled"} onclick="avSet('${k}','${x[0]}')" style="border-radius:12px;padding:6px 10px;border:${c[k]==x[0]?"3px solid #f8961e":"1px solid #ddd"};opacity:${ok?1:.5}">${ok?"":"🔒 "}${escH(L(x[1],x[2]))}${ok||!x[4]?"":`<br><small>${t("Unlocks at")} ${escH(L(x[4],x[5]))}</small>`}</button>`}).join("")}</div>`;
+V.avatar=function(){if(!draft)draft=JSON.parse(JSON.stringify(mine()));const c=draft,meta=ensureMeta()&&DBMETA[c.style];ensure(c.style);
+  const sections=[];
+  sections.push(sec("style",`${t("Style")} · ${escH(CRED[c.style][0])}`,()=>GROUPS.map(g=>`<div style="margin-top:8px"><b>${t(g[0])}</b><div class=avrow>${g[1].map(s=>`<button onclick="avSet('style','${s}')" style="padding:3px;border-radius:12px;border:${sel(c.style==s)};background:#fff;min-width:66px"><img alt="" loading="lazy" src="${B}thumbs/${s}.svg" style="width:56px;height:56px;display:block;margin:auto"><small>${escH(CRED[s][0])}</small></button>`).join("")}</div></div>`).join("")));
+  if(!meta)sections.push(`<div class=card>${t("Loading…")}</div>`);else{
+    const keys=Object.keys(meta).filter(k=>!(meta[k].t=="c"&&meta[k].e.length<2)&&!(k=="backgroundColor"&&!c.style.endsWith("-neutral")&&!["glass","shapes","fun-emoji","thumbs"].includes(c.style)));
+    keys.sort((a,b)=>(a=="skinColor"?-1:b=="skinColor"?1:0));
+    keys.forEach(k=>{const x=meta[k];
+      if(k=="top"&&c.style=="avataaars"){sections.push(sec("top",lbl("top"),()=>thumbRow("top",x.e.filter(v=>!COVERS.includes(v)),c.o.top)));sections.push(sec("cover",t("Head covering"),()=>thumbRow("top",COVERS,c.o.top)+`<small>${L("Hijab · Turban · Headwraps & winter hats · Hat","Hiyab · Turbante · Pañuelos y gorros · Sombrero")}</small>`));return}
+      if(x.t=="c")sections.push(sec(k,lbl(k),()=>thumbRow(k,x.e,c.o[k],x.p<100)));
+      else sections.push(sec(k,lbl(k),()=>swatch(k,(k=="skinColor"||(k=="baseColor"&&c.style=="micah"))?SKIN:[...new Set([...x.d,...(k=="backgroundColor"?SKIN:[]),...EXTRA])],c.o[k])))})}
+  sections.push(sec("bg",t("Background"),()=>`<b>${t("Solid")}</b><div class=avrow>${SOLID.map(s=>`<button aria-label="bg" onclick="avSet('bg','${s[0]}')" style="width:38px;height:38px;padding:0;border-radius:50%;background:${s[3]};border:${sel(c.bg==s[0])}"></button>`).join("")}</div>
+    <b>${t("Gradient")}</b>${lockRow(GRAD,"bg",x=>`<span style="display:inline-block;width:40px;height:40px;border-radius:50%;background:${x[3]}"></span>`)}<b>${t("Pattern")}</b>${lockRow(PAT,"bg",x=>`<span style="display:inline-block;width:40px;height:40px;border-radius:50%;background:${x[3]}"></span>`)}<b>${t("Special")}</b>${lockRow(SPECIAL,"bg",x=>`<span style="display:inline-block;width:40px;height:40px;border-radius:50%;background:${bgCss(x[0])}"></span>`)}`));
+  sections.push(sec("frame",t("Frame"),()=>lockRow(FRAMES,"frame",x=>avHTML(null,40,{...c,frame:x[0],pin:"",role:""}))));
+  sections.push(sec("role",t("Work badge"),()=>`<div class=avrow>${ROLEB.map(b=>`<button onclick="avSet('role','${b[0]}')" style="border-radius:12px;padding:6px 10px;border:${sel(c.role==b[0])}">${b[3]} ${escH(L(b[1],b[2]))}</button>`).join("")}</div>`));
+  sections.push(sec("pin",t("Pins"),()=>lockRow(PINS,"pin",x=>`<span style="font-size:24px">${x[3]||"—"}</span>`)));
+  const cr=CRED[c.style];
   return `<style>.avrow{display:flex;gap:6px;overflow-x:auto;padding:6px 0;-webkit-overflow-scrolling:touch}.avrow button{flex:none}</style>
   <h2>🧑 ${t("Avatar builder")}</h2>
-  <div class=card style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px">${avHTML(null,104,c)}<div style="display:flex;flex-direction:column;gap:6px;flex:1"><button onclick="avRand()">🎲 ${t("Randomize")}</button><button class=on onclick="avSave()">${t("Save")}</button></div></div>
-  ${sec("Style",`<div class=avrow>${Object.keys(ST).map(s=>`<button onclick="avSet('style','${s}')" style="border-radius:12px;padding:4px;border:${c.style==s?"3px solid #f8961e":"1px solid #ddd"};background:#fff"><img alt="" src="${uri(Object.assign(rnd("style"+s),{style:s,skin:c.skin}))}" style="width:56px;height:56px;display:block"><small>${ST[s].lbl}</small></button>`).join("")}</div>`,1)}
-  ${sec("Skin tone",sw("skin",SKIN,c.skin),1)}
-  ${sec("Hair",thumbs("hair",o.top,c.hair),1)}
-  ${sec("Hair color",sw("hairColor",HAIRC,c.hairColor))}
-  ${o.cover?sec("Head covering",thumbs("cover",o.cover,c.cover)+`<small>${t("Hijab")} · ${t("Turban")} · ${t("Headwrap / winter hat")} · ${t("Cap / hat")}</small>`):""}
-  ${sec("Eyes",thumbs("eyes",o.eyes,c.eyes))}
-  ${sec("Eyebrows",thumbs("eyebrows",o.eyebrows,c.eyebrows))}
-  ${sec("Mouth",thumbs("mouth",o.mouth,c.mouth))}
-  ${sec("Facial hair",thumbs("facialHair",o.facialHair,c.facialHair))}
-  ${sec("Glasses",thumbs("glasses",o.glasses,c.glasses))}
-  ${o.clothing?sec("Clothing",thumbs("clothing",o.clothing,c.clothing)):""}
-  ${o.clothing?sec("Clothing color",sw("clothesColor",CLO,c.clothesColor)):""}
-  ${sec("Background",sw("bg",BG,c.bg)+lock(SPECIALBG,"bg"))}
-  ${sec("Work badge",`<div class=avrow>${ROLEB.map(b=>`<button onclick="avSet('role','${b[0]}')" style="border-radius:12px;padding:6px 10px;border:${c.role==b[0]?"3px solid #f8961e":"1px solid #ddd"}">${b[3]} ${escH(L(b[1],b[2]))}</button>`).join("")}</div>`)}
-  ${sec("Frame",lock(FR,"frame"))}
-  <small style="display:block;margin:10px 4px;color:#666">${t("Avatar art")}: “Avataaars” by Pablo Stanley (free for personal & commercial use) · “Adventurer” by Lisa Wischofsky (CC BY 4.0) · via DiceBear (MIT)</small>`};
+  <div class=card style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px">${avHTML(null,104,c)}<div style="display:flex;flex-direction:column;gap:6px;flex:1"><button onclick="avRand()" ${meta?"":"disabled"}>🎲 ${t("Randomize")}</button><button class=on onclick="avSave()">${t("Save")}</button></div></div>
+  ${sections.join("")}
+  <small style="display:block;margin:10px 4px;color:#666">${t("Avatar art")}: “${escH(cr[0])}” ${L("by","por")} ${escH(cr[1])} (${escH(cr[2])}${cr[2]=="CC BY 4.0"?L(", remixed",", adaptado"):""}) · ${L("via","vía")} DiceBear (MIT). <a href="#" onclick="go('avcredits');return false">${t("Credits")}</a></small>`};
+M.avcredits=["📜","Credits"];
+V.avcredits=()=>`<h2>📜 ${t("Credits")}</h2><div class=card><small>DiceBear (MIT) © Florian Körner. ${L("Avatar styles:","Estilos de avatar:")}</small><table class=t>${Object.keys(CRED).map(s=>`<tr><td>${escH(CRED[s][0])}</td><td>${escH(CRED[s][1])}</td><td>${escH(CRED[s][2])}</td></tr>`).join("")}</table><small>CC BY 4.0: creativecommons.org/licenses/by/4.0 · CC0: creativecommons.org/publicdomain/zero/1.0 · ${L("Full texts in","Textos completos en")} vendor/dicebear/LICENSES.txt</small></div>`;
 ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("avatar"))TILES[r].push("avatar")});
-// Shout-outs wall with avatars (first names only)
 const SO=[["Ana","Rosa","Covered two extra rooms on a full house!","¡Cubrió dos habitaciones extra con hotel lleno!"],["Kevin","Luis","Fixed the ice machine before breakfast rush.","Arregló la máquina de hielo antes del desayuno."],["Rosa","Ana","Guest named her in a 5-star review!","¡Un huésped la nombró en una reseña de 5 estrellas!"]];
 const _fun=V.fun;V.fun=function(){return `<div class=card><b>📣 ${t("Shout-outs")}</b>${SO.map(s=>`<div style="display:flex;gap:10px;align-items:center;margin-top:10px">${avHTML(s[0],40)}<div><b>${s[0]}</b> → ${s[1]}<br><small>${escH(L(s[2],s[3]))}</small></div></div>`).join("")}</div>`+_fun()};
 const _hm=V.home;V.home=function(){const u=meUser()||{};return `<div class=card style="display:flex;align-items:center;gap:12px" onclick="go('avatar')">${avHTML(null,56)}<div><b>${escH(String(u.name||"").split(" ")[0])}</b><br><small>${t("Edit avatar")} ›</small></div></div>`+_hm()};
+window.avGrid=function(){return Object.keys(CRED).map(s=>avHTML(null,72,{...rnd("grid"+s,s),frame:["","gold","silver","neon","rainbow","double"][hash(s)%6],pin:"",role:ROLEB[hash(s)%ROLEB.length][0]})).join("")};
 })();
 /*AVATAR_END*/
 </script></body></html>
