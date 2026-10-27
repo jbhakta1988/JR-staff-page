@@ -4880,7 +4880,7 @@ window.LCMD={cleansFor,alerts,ingest,
  addAct(t){const x=t||(($("lcAct")||{}).value||"").trim();if(!x)return;const l=jget(AK,[]);l.push({id:"a"+Date.now().toString(36),h:S.hotel,text:x,owner:t?"GM":(($("lcOwn")||{}).value||"GM"),due:t?ld(2):(($("lcDue")||{}).value||ld(2)),done:false,at:Date.now()});jset(AK,l);render()},
  done(id){const l=jget(AK,[]),a=l.find(x=>x.id===id);if(a)a.done=true;jset(AK,l);render()},
  async imp(f){if(!f)return;try{const rows=/\.xlsx$/i.test(f.name)?await xlsxRows(await f.arrayBuffer()):csvRows(await f.text());S.lcmsg=ingest(rows)}catch(e){S.lcmsg=B("Import failed: ","Falló la importación: ")+e.message}render()},
- clearImp(){if(!isCorp())return;[IA,IW].forEach(k=>sset(k,"{}"));S.lcmsg="";render()},otRisk};
+ clearImp(){if(!isCorp())return;[IA,IW].forEach(k=>sset(k,"{}"));S.lcmsg="";render()},otRisk,xlsxRows,csvRows};
 M.lcmd=["📊","Labor Win/Loss"];Object.assign(I18N.es,{"Labor Win/Loss":"Labor Gana/Pierde"});
 try{NOCOLS.push("lcmd")}catch(e){}
 TILES.GM=(TILES.GM||[]).concat(["lcmd"]);
@@ -4901,4 +4901,114 @@ const css=document.createElement("style");css.textContent=`
 @media(min-width:1200px){#lcRoot.desk .card{max-width:none}}`;document.head.appendChild(css);
 })();
 /*LCMD_END*/
+/*ONCLOCK_START*/
+// "On the clock" compliance: every punched-in associate should log into HotelHQ within N min (default 30) of punch-in.
+// Data: punched-in snapshots (HE Single-Day Report: name, in, out, HE position; open punch = no out), imported every ~30 min.
+// For now: importer + generated EXAMPLE data; browser-only (localStorage). Design table: supabase/migrations/20261027_on_clock.sql
+(function(){
+const B=(e,s)=>LANG==="es"?s:e,E=x=>escH(String(x==null?"":x));
+const jget=(k,d)=>{try{return JSON.parse(sget(k)||"null")||d}catch(e){return d}},jset=(k,v)=>sset(k,JSON.stringify(v));
+const SK="jrportal_punchsnap_v1",LK="jrportal_logins_v1",MK="jrportal_punchmap_v1",CK="jrportal_oncfg_v1",RK="jrportal_onrem_v1";
+const role=()=>authRole(),isCorp=()=>role()==="Above Property",mgr=()=>["GM","AGM","Above Property"].includes(role());
+const NOTRACK=["GM","AGM","Above Property"];
+const cfg=h=>Object.assign({win:30,bonus:true,pts:5},jget(CK,{})[h]||{});
+const pad=n=>String(n).padStart(2,"0"),hm=d=>pad(d.getHours())+":"+pad(d.getMinutes());
+const tAt=(date,t)=>{const m=String(t||"").match(/(\d{1,2}):(\d{2})\s*([ap]m?)?/i);if(!m)return null;let H=+m[1];if(m[3]){const pm=/p/i.test(m[3]);if(pm&&H<12)H+=12;if(!pm&&H===12)H=0}const d=new Date(date+"T00:00:00");d.setHours(H,+m[2],0,0);return d.getTime()};
+const fmt=ts=>new Date(ts).toLocaleTimeString(LANG==="es"?"es-US":"en-US",{hour:"numeric",minute:"2-digit"});
+// ---- logins (first HotelHQ login per user per day) ----
+function noteLogin(){const u=meUser();if(!u||NOTRACK.includes(u.role))return;const l=jget(LK,{}),k=u.id+"|"+ld();if(!l[k]){l[k]=Date.now();jset(LK,l)}}
+const loginOf=(uid,date)=>uid?jget(LK,{})[uid+"|"+date]||null:null;
+// ---- snapshots ----
+function seed(){const all=jget(SK,{}),now=new Date(),t=ld(),y=ld(-1);let ch=false;
+ Object.keys(HOTELS).forEach(h=>{const L=all[h]||[];if(L.some(x=>x.date===t))return;ch=true;
+  const us=USERS.filter(u=>u.hotel===h&&u.active!==false&&!NOTRACK.includes(u.role)&&u.role!=="Shuttle Driver"),mins=[12,95,48,140,20,70,180,35];
+  const rows=us.map((u,i)=>{const d=new Date(now.getTime()-mins[i%mins.length]*6e4);return {name:u.name,pos:u.role==="Housekeeping"?"HK Lead":u.role,in:hm(d),out:""}});
+  rows.push({name:"EXAMPLE Temp Associate",pos:"Housekeeper",in:hm(new Date(now.getTime()-55*6e4)),out:""});
+  const yr=us.map((u,i)=>({name:u.name,pos:u.role,in:["07:00","07:00","06:30","08:00","07:00","15:00","06:00","09:00"][i%8],out:"15:30"}));
+  L.push({date:y,at:new Date(y+"T15:00:00").getTime(),src:"example",rows:yr},{date:t,at:now.getTime()-7*6e4,src:"example",rows});all[h]=L.slice(-60);
+  // example login history for yesterday: most on time, a few late / never
+  const lg=jget(LK,{});us.forEach((u,i)=>{const k=u.id+"|"+y;if(lg[k]!=null)return;const tin=tAt(y,yr[i].in);if(i%4===1)return;lg[k]=tin+(i%4===2?52:8)*6e4});
+  // today: some associates already logged in (front desk / the person testing will log in for real)
+  us.forEach((u,i)=>{const k=u.id+"|"+t;if(lg[k]||i%3!==1)return;const tin=tAt(t,rows[i].in);if(tin)lg[k]=tin+10*6e4});jset(LK,lg)});
+ if(ch)jset(SK,all)}
+const latest=(h,date)=>{const L=(jget(SK,{})[h]||[]).filter(x=>!date||x.date===date);return L.length?L.reduce((a,b)=>b.at>a.at?b:a):null};
+// ---- mapping (HE name / employee id -> HotelHQ user) ----
+const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function matchUser(h,r){const m=jget(MK,{})[h]||{},key=r.eid?("id:"+r.eid):("n:"+norm(r.name));const mid=m[key]||m["n:"+norm(r.name)];if(mid==="-")return null;if(mid)return USERS.find(u=>u.id===mid)||null;
+ const n=norm(r.name),flip=norm(String(r.name).split(",").reverse().join(" "));return USERS.find(u=>u.hotel===h&&(norm(u.name)===n||norm(u.name)===flip))||null}
+function status(h,r,date){const c=cfg(h),u=matchUser(h,r),tin=tAt(date,r.in);const L=u?loginOf(u.id,date):null,now=Date.now();
+ if(!u)return {u,cls:"bad",ico:"❓",txt:B("Not matched to a HotelHQ user","Sin usuario de HotelHQ asignado"),miss:true,tin};
+ if(L&&tin&&L<=tin+c.win*6e4)return {u,cls:"ok",ico:"✅",txt:B("Logged in at ","Entró a las ")+fmt(L),tin,L,on:true};
+ if(L)return {u,cls:"bad",ico:"🕒",txt:B("Logged in late at ","Entró tarde a las ")+fmt(L)+` (+${Math.round((L-tin)/6e4)} min)`,tin,L,miss:true};
+ const el=tin?Math.round(((date===ld()?now:tAt(date,r.out)||now)-tin)/6e4):0;
+ if(el<c.win&&date===ld())return {u,cls:"warn",ico:"⏳",txt:B(`Within window · ${el} of ${c.win} min`,`Dentro del plazo · ${el} de ${c.win} min`),tin};
+ return {u,cls:"bad",ico:"⛔",txt:B(`Not logged in after ${el} min`,`Sin entrar después de ${el} min`),tin,miss:true}}
+function missed(h,date){const sn=latest(h,date);if(!sn)return null;const rs=sn.rows.map(r=>status(h,r,date));return {n:rs.filter(x=>x.miss).length,of:rs.length}}
+// ---- views ----
+function panel(h){const sn=latest(h,ld()),c=cfg(h);if(!sn)return `<div class="card onc"><h3>🕒 ${B("On the clock","En el reloj")} · ${h}</h3><small>${B("No punch snapshot yet today.","Aún no hay registro de marcajes hoy.")}</small></div>`;
+ const open=sn.rows.filter(r=>!r.out),age=Math.round((Date.now()-sn.at)/6e4),st=open.map(r=>({r,s:status(h,r,ld())})).sort((a,b)=>({bad:0,warn:1,ok:2}[a.s.cls]-{bad:0,warn:1,ok:2}[b.s.cls]));
+ const n={ok:0,warn:0,bad:0};st.forEach(x=>n[x.s.cls]++);
+ return `<div class="card onc"><div class=onc-h><h3>🕒 ${B("On the clock","En el reloj")} · ${h}</h3><span class="onc-age ${age>35?"bad":""}">${B("Last snapshot","Último registro")} ${fmt(sn.at)} · ${age} min ${B("ago","atrás")}${sn.src==="example"?" · EXAMPLE":""}</span></div>
+ <div class=onc-sum><span class=ok>✅ ${n.ok} ${B("logged in","entraron")}</span><span class=warn>⏳ ${n.warn} ${B("within window","en plazo")}</span><span class=bad>⛔ ${n.bad} ${B("not logged in / late","sin entrar / tarde")}</span><small>${B("Rule","Regla")}: ${B(`log in within ${c.win} min of punch-in`,`entrar dentro de ${c.win} min del marcaje`)}</small></div>
+ <div class=onc-l><div class="onc-r onc-th"><span>${B("Associate","Asociado")}</span><span>${B("Punched in","Marcó entrada")}</span><span>${B("HotelHQ login","Entrada a HotelHQ")}</span></div>${st.map(({r,s})=>`<div class="onc-r ${s.cls}"><span><b>${E(s.u?s.u.name:r.name)}</b><small>${E(roleName(r.pos)||r.pos)}${s.u&&norm(s.u.name)!==norm(r.name)?" · HE: "+E(r.name):""}</small></span><span>${E(r.in)}</span><span class=onc-s>${s.ico} ${E(s.txt)}</span></div>`).join("")||`<small>${B("No one punched in.","Nadie ha marcado entrada.")}</small>`}</div></div>`}
+function settings(h){const c=cfg(h),ed=mgr(),m=jget(MK,{})[h]||{},sn=latest(h,ld()),us=USERS.filter(u=>u.hotel===h&&!NOTRACK.includes(u.role));
+ const um=sn?sn.rows.filter(r=>{const k=r.eid?"id:"+r.eid:"n:"+norm(r.name);return m[k]||!matchUser(h,r)}):[];
+ return `<details class="card onc-set"><summary>⚙️ ${B("Rule, bonus & name matching","Regla, bono y nombres")} · ${h}</summary>
+ <div class=onc-cfg><label>${B("Login window (min)","Plazo para entrar (min)")}<input type=number min=5 max=240 step=5 value="${c.win}" ${ed?"":"disabled"} onchange="ONC.cfg('${h}','win',this.value)"></label>
+ <label><span><input type=checkbox ${c.bonus?"checked":""} ${ed?"":"disabled"} onchange="ONC.cfg('${h}','bonus',this.checked)"> ${B("Points bonus for on-time login","Puntos por entrar a tiempo")}</span></label>
+ <label>${B("Bonus points","Puntos de bono")}<input type=number min=0 max=50 value="${c.pts}" ${ed?"":"disabled"} onchange="ONC.cfg('${h}','pts',this.value)"></label></div>
+ <h4>${B("Match HE names to HotelHQ users","Relacionar nombres de HE con usuarios")}</h4><small>${B("Auto-matched by name. Fix anyone unmatched or matched wrong.","Se relaciona por nombre. Corrija quien no coincida.")}</small>
+ ${um.map(r=>{const k=r.eid?"id:"+r.eid:"n:"+norm(r.name),cur=m[k]||"";return `<div class=onc-map><span>${E(r.name)}${r.eid?` <small>#${E(r.eid)}</small>`:""}</span><select ${ed?"":"disabled"} onchange="ONC.map('${h}','${E(k)}',this.value)"><option value="">${B("— choose user —","— elegir usuario —")}</option>${us.map(u=>`<option value="${u.id}" ${cur===u.id?"selected":""}>${E(u.name)} · ${E(roleName(u.role)||u.role)}</option>`).join("")}<option value="-" ${cur==="-"?"selected":""}>${B("Not a HotelHQ user (ignore)","No usa HotelHQ (ignorar)")}</option></select></div>`}).join("")||`<small>✅ ${B("Everyone matched.","Todos relacionados.")}</small>`}
+ <h4>⬆️ ${B("Import punch snapshot","Importar registro de marcajes")}</h4><small>${B("HE Single-Day Report as .csv or .xlsx with Name (or Employee), In, Out, Position; optional Employee ID and Hotel/Code. Blank Out = still punched in. In production this arrives automatically every 30 min.","Reporte de un día de HE (.csv/.xlsx) con Name, In, Out, Position; opcional Employee ID y Hotel/Code. Out vacío = sigue marcado. En producción llega cada 30 min.")}</small>
+ <input type=file id=oncFile accept=".csv,.xlsx" onchange="ONC.imp(this.files[0])"><div id=oncMsg>${E(S.oncmsg||"")}</div></details>`}
+function yLine(h){const m=missed(h,ld(-1)),c=cfg(h);if(!m)return "";return m.n?B(`${m.n} of ${m.of} people didn't log in within ${c.win} min yesterday`,`${m.n} de ${m.of} personas no entraron dentro de ${c.win} min ayer`):B(`Everyone logged in within ${c.win} min yesterday`,`Todos entraron dentro de ${c.win} min ayer`)}
+V.onclock=function(){if(!mgr())return "";seed();const hs=isCorp()?Object.keys(HOTELS):[S.hotel];
+ return `<div id=oncRoot><h2>🕒 ${B("On the clock","En el reloj")}</h2><p><small>${B("Who is punched in right now and whether they've opened HotelHQ.","Quién está marcado ahora y si ya abrió HotelHQ.")}</small></p>
+ ${isCorp()?`<div class="card onc-all">${hs.map(h=>{const m=missed(h,ld(-1));const sn=latest(h,ld());const bad=sn?sn.rows.filter(r=>!r.out&&status(h,r,ld()).cls==="bad").length:0;return `<div><b>${h}</b><span class="${bad?"bad":"ok"}">${bad?`⛔ ${bad} ${B("now","ahora")}`:"✅"}</span><small>${B("Yesterday","Ayer")}: ${m?m.n+"/"+m.of:"—"}</small></div>`}).join("")}</div>`:""}
+ ${hs.map(h=>`<div class=onc-yd>📅 ${h}: ${E(yLine(h))}</div>${panel(h)}${settings(h)}`).join("")}</div>`};
+window.ONC={missed,yLine,status,latest,seed,
+ cfg(h,k,v){if(!mgr())return;const a=jget(CK,{});a[h]=Object.assign(cfg(h),{[k]:k==="bonus"?!!v:Math.max(k==="win"?5:0,+v||0)});jset(CK,a);render()},
+ map(h,k,v){if(!mgr())return;const a=jget(MK,{});a[h]=a[h]||{};if(v)a[h][k]=v;else delete a[h][k];jset(MK,a);render()},
+ ingest(rows,h0){const low=r=>(r||[]).map(x=>String(x==null?"":x).trim().toLowerCase());const hi=rows.findIndex(r=>{const l=low(r);return (l.includes("name")||l.includes("employee")||l.includes("employee name"))&&l.some(x=>x==="in"||x.startsWith("in "))});
+  if(hi<0)return B("Couldn't find Name / In / Out columns.","No se encontraron columnas Name / In / Out.");const H=low(rows[hi]),c=f=>H.findIndex(f);
+  const cn=c(x=>x==="name"||x==="employee"||x==="employee name"),ci=c(x=>x==="in"||x.startsWith("in ")),co=c(x=>x==="out"||x.startsWith("out ")),cp=c(x=>x.startsWith("position")||x==="job"),ce=c(x=>x==="employee id"||x==="id"||x==="emp id"),cc=c(x=>x==="hotel"||x==="code");
+  const all=jget(SK,{}),by={};let n=0;rows.slice(hi+1).forEach(r=>{if(!r[cn])return;const h=cc>=0&&HOTELS[String(r[cc]||"").trim().toUpperCase()]?String(r[cc]).trim().toUpperCase():h0;
+   const t=v=>{v=String(v==null?"":v).trim();if(/^0?\.\d+$|^\d*\.\d+$/.test(v)){const m=Math.round(+v*1440);return pad(Math.floor(m/60)%24)+":"+pad(m%60)}return v};
+   (by[h]=by[h]||[]).push({name:String(r[cn]).trim(),in:t(r[ci]),out:co>=0?t(r[co]):"",pos:cp>=0?String(r[cp]||"").trim():"",eid:ce>=0?String(r[ce]||"").trim():""});n++});
+  Object.keys(by).forEach(h=>{all[h]=(all[h]||[]).concat([{date:ld(),at:Date.now(),src:"import",rows:by[h]}]).slice(-60)});jset(SK,all);
+  return B(`Snapshot imported: ${n} punch(es) for ${Object.keys(by).join(", ")||"—"}.`,`Registro importado: ${n} marcaje(s) para ${Object.keys(by).join(", ")||"—"}.`)},
+ async imp(f){if(!f||!mgr())return;try{const rows=/\.xlsx$/i.test(f.name)?await LCMD.xlsxRows(await f.arrayBuffer()):LCMD.csvRows(await f.text());S.oncmsg=ONC.ingest(rows,S.hotel)}catch(e){S.oncmsg=B("Import failed: ","Falló la importación: ")+e.message}render()},
+ dismiss(){const a=jget(RK,{});a[S.uid+"|"+ld()]=Object.assign(a[S.uid+"|"+ld()]||{},{hide:true});jset(RK,a);render()}};
+M.onclock=["🕒","On the clock"];Object.assign(I18N.es,{"On the clock":"En el reloj"});
+try{NOCOLS.push("onclock")}catch(e){}
+TILES.GM=(TILES.GM||[]).concat(["onclock"]);
+// associate reminder (gentle) + optional points
+function myNote(){const u=meUser();if(!u||NOTRACK.includes(u.role)||!u.hotel)return "";const h=u.hotel,sn=latest(h,ld());if(!sn)return "";const r=sn.rows.find(x=>!x.out&&matchUser(h,x)&&matchUser(h,x).id===u.id);if(!r)return "";
+ const a=jget(RK,{}),k=u.id+"|"+ld(),rec=a[k]||{};if(rec.hide)return "";const s=status(h,r,ld()),c=cfg(h);
+ if(s.on&&c.bonus&&!rec.pts&&!gamifyOff()&&c.pts>0){rec.pts=1;a[k]=rec;jset(RK,a);setTimeout(()=>window.ptsAward&&ptsAward(+c.pts,"Logged in on time","Entró a tiempo"),300)}
+ const msg=s.on?B(`👋 Thanks for checking in! You opened HotelHQ within ${c.win} min of clocking in.${c.bonus&&!gamifyOff()?` +${c.pts} pts`:""}`,`👋 ¡Gracias! Abriste HotelHQ dentro de ${c.win} min de marcar entrada.${c.bonus&&!gamifyOff()?` +${c.pts} pts`:""}`)
+  :B(`👋 Welcome! Quick tip: opening HotelHQ within ${c.win} min of clocking in helps you see your tasks and updates right away.`,`👋 ¡Bienvenido! Consejo: abrir HotelHQ dentro de ${c.win} min de marcar entrada te ayuda a ver tus tareas al instante.`);
+ return `<div class="card onc-me ${s.on?"ok":""}" id=oncMe><span>${E(msg)}</span><button type=button class=oc-mini aria-label="${B("Dismiss","Cerrar")}" onclick="ONC.dismiss()">✕</button></div>`}
+const _r=render;render=function(){const u=meUser();if(u)noteLogin();if(u&&S&&S.tab==="onclock"&&!mgr())S.tab="home";_r();if(!u)return;try{seed()}catch(e){}
+ const a=$("app");if(!a)return;
+ if(S.tab==="onclock"){a.classList.add("wide");a.classList.remove("cols")}
+ if(S.tab==="home"){if(mgr()&&!a.querySelector(".onc-home")){const hs=isCorp()?Object.keys(HOTELS):[S.hotel];let now=0;hs.forEach(h=>{const sn=latest(h,ld());if(sn)now+=sn.rows.filter(r=>!r.out&&status(h,r,ld()).cls==="bad").length});
+   a.insertAdjacentHTML("afterbegin",`<button type=button class="lp-home onc-home" onclick="go('onclock')">🕒 <span><b>${B("On the clock","En el reloj")}</b><small>${now?`⛔ ${now} ${B("punched in but not in HotelHQ","marcados pero sin entrar a HotelHQ")}`:"✅ "+B("Everyone punched in is logged in","Todos los marcados están dentro")} · ${E(isCorp()?hs.map(h=>{const m=missed(h,ld(-1));return h+" "+(m?m.n:0)}).join(" · ")+" "+B("missed yesterday","fallaron ayer"):yLine(S.hotel))}</small></span> ›</button>`)}
+  else if(!mgr()&&!a.querySelector("#oncMe")){const n=myNote();if(n)a.insertAdjacentHTML("afterbegin",n)}}
+ if(S.tab==="lcmd"&&mgr()){const t=S.lct||"wl",ln=yLine(S.hotel);if(ln){const x=t==="chk"?a.querySelector(".lc-chk"):t==="alerts"?a.querySelector("#lcRoot .card"):null;if(x&&!x.querySelector(".onc-chk")){const m=missed(S.hotel,ld(-1));x.insertAdjacentHTML(t==="chk"?"afterbegin":"beforeend",`<button type=button class="onc-chk ${m&&m.n?"bad":"ok"}" onclick="go('onclock')">🕒 ${E(ln)} ›</button>`)}}}};
+const css=document.createElement("style");css.textContent=`
+.onc-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.onc-h h3{margin:0}.onc-age{font-size:12px;opacity:.75}.onc-age.bad{color:#b3261e;opacity:1;font-weight:600}
+.onc-sum{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;align-items:center}.onc-sum span{padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600}.onc-sum small{flex-basis:100%;opacity:.75}
+.ok{--c:#1e7d3a}.warn{--c:#9a6700}.bad{--c:#b3261e}.onc-sum .ok{background:#e6f4ea;color:#1e7d3a}.onc-sum .warn{background:#fff4d6;color:#9a6700}.onc-sum .bad{background:#fde7e7;color:#b3261e}
+.onc-r{display:grid;grid-template-columns:1.3fr .6fr 1.6fr;gap:8px;padding:10px 6px;border-bottom:1px solid #eef1f5;align-items:center;border-left:4px solid transparent}.onc-r small{display:block;opacity:.7}.onc-th{font-size:12px;opacity:.7;border-left:0}
+.onc-r.ok{border-left-color:#1e7d3a}.onc-r.warn{border-left-color:#e0a800;background:#fffaf0}.onc-r.bad{border-left-color:#b3261e;background:#fff6f6}.onc-r .onc-s{color:var(--c);font-weight:600;font-size:14px}
+.onc-cfg{display:grid;grid-template-columns:1fr;gap:8px;margin:8px 0}.onc-cfg label{display:flex;flex-direction:column;gap:4px;font-weight:600}.onc-cfg input[type=number]{height:40px;font:inherit;border:1px solid #c9d2e0;border-radius:8px;padding:0 8px}
+.onc-map{display:grid;grid-template-columns:1fr;gap:4px;padding:6px 0;border-bottom:1px solid #eef1f5}.onc-map select{height:40px;font:inherit;border-radius:8px}.onc-set summary{cursor:pointer;font-weight:700}
+.onc-yd{margin:10px 0 4px;font-weight:600}.onc-all{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.onc-all>div{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px;border-radius:10px;background:#f6f8fb}.onc-all .bad{color:#b3261e;font-weight:700}.onc-all .ok{color:#1e7d3a}
+.onc-me{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;background:#eef4ff}.onc-me.ok{background:#e6f4ea}
+.onc-chk{display:block;width:100%;text-align:left;border:0;border-radius:10px;padding:10px;margin:6px 0;font:inherit;font-weight:600;cursor:pointer}.onc-chk.bad{background:#fde7e7;color:#b3261e}.onc-chk.ok{background:#e6f4ea;color:#1e7d3a}
+@media(max-width:520px){.onc-r{grid-template-columns:1fr auto}.onc-r .onc-s{grid-column:1/-1}.onc-th span:last-child{display:none}}
+@media(min-width:768px){.onc-cfg{grid-template-columns:1fr 1fr 1fr}.onc-map{grid-template-columns:1fr 1.2fr}}`;document.head.appendChild(css);
+})();
+/*ONCLOCK_END*/
 </script></body></html>
