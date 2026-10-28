@@ -139,7 +139,8 @@ test("migration locks scores down and stores no guest rows", () => {
   assert.match(sql, /security invoker/);
   assert.match(sql, /set search_path = ''/);
   assert.match(sql, /private\.is_mgr_of\(hotel\)/);
-  assert.match(sql, /private\.my_hotels\(\)/);
+  assert.match(sql, /hotel = any \(\(select private\.my_hotels\(\)\)::text\[\]\)/);
+  assert.equal(/hotel = any \(select private\.my_hotels\(\)\)/.test(sql), false);
   assert.match(sql, /private\.is_above\(\)/);
   assert.match(sql, /revoke all on function public\.set_itr_goal\(text, date, text, numeric\) from public, anon/);
   assert.match(sql, /security_invoker = true/);

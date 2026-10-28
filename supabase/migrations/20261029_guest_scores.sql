@@ -236,13 +236,15 @@ create policy guest_surveys_select on public.guest_surveys
   for select to authenticated
   using ((select private.is_mgr_of(hotel)));
 
+-- private.my_hotels() returns text[]. "= any (select my_hotels())" compares text to text[].
+-- Cast the scalar subquery so the check is text = any(text[]) and the list is read once.
 drop policy if exists guest_survey_metrics_select on public.guest_survey_metrics;
 create policy guest_survey_metrics_select on public.guest_survey_metrics
   for select to authenticated
   using (
     (select private.is_mgr_of(hotel))
     or (
-      hotel = any (select private.my_hotels())
+      hotel = any ((select private.my_hotels())::text[])
       and (select private.guest_score_metric_allowed(metric))
     )
   );
@@ -253,7 +255,7 @@ create policy itr_goals_select on public.itr_goals
   using (
     (select private.is_mgr_of(hotel))
     or (
-      hotel = any (select private.my_hotels())
+      hotel = any ((select private.my_hotels())::text[])
       and (select private.guest_score_metric_allowed(metric))
     )
   );
