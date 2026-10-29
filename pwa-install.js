@@ -188,6 +188,12 @@
     }
     var el = existing || build();
     fill(el);
+    var more = document.getElementById("hhqMoreBody");
+    if (more) {
+      if (!more.contains(el)) more.appendChild(el);
+      loginGuide();
+      return;
+    }
     if (el.parentNode !== app || app.firstChild !== el) app.insertBefore(el, app.firstChild);
     loginGuide();
   }

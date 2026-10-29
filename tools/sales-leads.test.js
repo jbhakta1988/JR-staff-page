@@ -113,6 +113,115 @@ test("the migration is additive, private, and has no real addresses", () => {
   bodies.forEach((body) => assert.match(body, /set search_path = ''/));
 });
 
+test("corporate rollup counts responses and keeps each cell short", () => {
+  const demo = sl.buildDemo(TODAY);
+  const rows = sl.rollup(demo.leads, sl.HOTELS);
+  const by = Object.fromEntries(rows.map((row) => [row.hotel, row]));
+  assert.equal(by.MSPWE.total, 2);
+  assert.equal(by.MSPWE.responded, 1);
+  assert.equal(by.MSPWE.awaiting, 1);
+  assert.equal(by.MSPWE.avgHours, 26);
+  assert.equal(by.MSPAM.total, 2);
+  assert.equal(by.MSPAM.responded, 2);
+  assert.equal(by.MSPAM.awaiting, 0);
+  assert.equal(by.MSPAM.avgHours, 3.5);
+  assert.equal(by.MSPMS.total, 1);
+  assert.equal(by.MSPMS.responded, 0);
+  assert.equal(by.MSPMS.awaiting, 1);
+  assert.equal(by.MSPMS.avgHours, null);
+  assert.deepEqual(sl.rollup([], ["MSPWE"]), [{ hotel: "MSPWE", total: 0, responded: 0, awaiting: 0, avgHours: null }]);
+  assert.equal(sl.formatHours(26), "26");
+  assert.equal(sl.formatHours(3.5), "3.5");
+  assert.equal(sl.formatHours(null), "—");
+
+  ["Sales Leads by Hotel", "Leads", "Responded", "Waiting", "Avg response hrs", "Mark responded"].forEach((en) => {
+    assert.notEqual(sl.label(en, "es"), en, en);
+  });
+
+  const en = sl.rollupCardHtml(demo, { lang: "en", corporate: true });
+  assert.match(en, /id="slRollup"/);
+  assert.match(en, /Sales Leads by Hotel/);
+  assert.match(en, /Avg response hrs/);
+  assert.match(en, />26</);
+  assert.match(en, />3\.5</);
+  assert.match(en, />—</);
+  const cells = [...en.matchAll(/<td>([^<]*)<\/td>/g)].map((match) => match[1]);
+  assert.equal(cells.length, 15);
+  cells.forEach((text) => {
+    assert.equal(text.includes(" "), false, text);
+    assert.ok(text.length > 0 && text.length <= 8, text);
+  });
+  assert.deepEqual(cells.filter((_, i) => i % 5 === 0), ["MSPWE", "MSPAM", "MSPMS"]);
+
+  const es = sl.rollupCardHtml(demo, { lang: "es", corporate: true });
+  assert.match(es, /Prospectos por hotel/);
+  assert.match(es, /En espera/);
+  assert.match(es, /Horas prom\. de respuesta/);
+  assert.equal(sl.rollupCardHtml(demo, { lang: "en", corporate: false }), "");
+
+  const gm = sl.homeCardHtml(demo, {
+    hotel: "MSPWE", lang: "en", canCapture: true, canManage: true, viewRole: "GM", now: TODAY
+  });
+  assert.doesNotMatch(gm, /id="slRollup"/);
+  const corp = sl.homeCardHtml(demo, {
+    hotel: "MSPWE", lang: "es", canCapture: true, canManage: true, viewRole: "GM", now: TODAY, corporate: true
+  });
+  assert.match(corp, /id="slRollup"/);
+  assert.match(corp, /Prospectos por hotel/);
+  assert.match(corp, /id="slHome"/);
+
+  const mapped = sl.mapLead({
+    id: 4, hotel: "MSPWE", created_by_name: "Jordan Lee (EX)",
+    contact_first: "Casey", contact_last: "Fictional", needs: ["Other"],
+    status: "Lost", created_at: "2026-10-22T16:00:00.000Z", updated_at: "2026-10-23T18:00:00.000Z",
+    responded_at: "2026-10-23T18:00:00.000Z", responded_by: "Jordan Lee (EX)"
+  });
+  assert.equal(mapped.respondedAt, "2026-10-23T18:00:00.000Z");
+  assert.equal(mapped.respondedBy, "Jordan Lee (EX)");
+  const fromView = sl.mapRollup({ hotel: "MSPAM", total_leads: "2", responded: "2", awaiting: "0", avg_hours: "3.5" });
+  assert.equal(fromView.avgHours, 3.5);
+});
+
+test("a responded lead shows a Responded badge in English and Spanish", () => {
+  const demo = sl.buildDemo(TODAY);
+  const en = sl.listHtml(demo, { lang: "en", hotel: "MSPAM", filter: "All", canCapture: true, canManage: true, origin: "example" });
+  assert.match(en, /class="sl-badge"/);
+  assert.match(en, />Responded</);
+  assert.doesNotMatch(en, /Mark responded/);
+  const es = sl.listHtml(demo, { lang: "es", hotel: "MSPAM", filter: "All", canCapture: true, canManage: true, origin: "example" });
+  assert.match(es, />Respondido</);
+  const waiting = sl.listHtml(demo, { lang: "en", hotel: "MSPMS", filter: "All", canCapture: true, canManage: true, origin: "example" });
+  assert.doesNotMatch(waiting, /class="sl-badge"/);
+  assert.match(waiting, /Mark responded/);
+  const waitingEs = sl.listHtml(demo, { lang: "es", hotel: "MSPMS", filter: "All", canCapture: true, canManage: true, origin: "example" });
+  assert.match(waitingEs, /Marcar respondido/);
+});
+
+test("the response migration is additive and hotel-scoped", () => {
+  const next = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261104_lead_responses.sql"), "utf8");
+  assert.match(next, /add column if not exists responded_at timestamptz/);
+  assert.match(next, /add column if not exists responded_by text/);
+  assert.match(next, /security_invoker = true/);
+  assert.match(next, /view public\.sales_lead_rollup/);
+  assert.match(next, /private\.is_above\(\)/);
+  assert.match(next, /hotel = any \(\(select private\.my_hotels\(\)\)::text\[\]\)/);
+  assert.match(next, /private\.sales_lead_can_manage\(\)/);
+  assert.match(next, /set search_path = ''/);
+  assert.match(next, /revoke all on table public\.sales_lead_rollup from public, anon, authenticated/);
+  assert.match(next, /grant select on table public\.sales_lead_rollup to authenticated/);
+  assert.match(next, /revoke all on function public\.mark_sales_lead_responded\(bigint, text\) from public, anon/);
+  assert.match(next, /grant execute on function public\.mark_sales_lead_responded\(bigint, text\) to authenticated/);
+  assert.doesNotMatch(next, /grant execute[\s\S]*to anon/);
+  assert.doesNotMatch(next, /drop table/i);
+  assert.doesNotMatch(next, /delete from/i);
+  assert.doesNotMatch(next, /truncate/i);
+  assert.doesNotMatch(next, /[a-z0-9._%+-]+@[a-z0-9.-]+\.(com|net|org|edu)/i);
+  assert.doesNotMatch(next, /gmail|yahoo|jrhospitality|service_role|sb_secret/i);
+  const bodies = next.split(/create or replace function/i).slice(1);
+  assert.equal(bodies.length, 2);
+  bodies.forEach((body) => assert.match(body, /set search_path = ''/));
+});
+
 test("GM home count only includes New leads from this week", () => {
   const demo = sl.buildDemo(TODAY);
   const html = sl.homeCardHtml(demo, {

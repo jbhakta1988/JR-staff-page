@@ -3,7 +3,9 @@
    email. Demo rows use fake contacts (example.test, 555-010 numbers) and say so.
    With Supabase on, save_sales_lead writes the row, then the sales-lead-email
    function mails the hotel's sales manager through Gmail SMTP. A failed send
-   keeps the lead and flags it "Email not sent". */
+   keeps the lead and flags it "Email not sent". A reply stores responded_at and shows
+   a Responded badge. JR Corporate's Sales Leads by Hotel card is built here and
+   home-focus.js parks it under More, not on the home surface. */
 (function (root) {
   "use strict";
 
@@ -99,7 +101,13 @@
     "Couldn't save that lead. Try again.": "No se pudo guardar. Inténtalo de nuevo.",
     "Check the sales manager email.": "Revisa el correo del gerente de ventas.",
     "Status": "Estado",
-    "Contact": "Contacto"
+    "Contact": "Contacto",
+    "Sales Leads by Hotel": "Prospectos por hotel",
+    "Leads": "Prospectos",
+    "Responded": "Respondido",
+    "Waiting": "En espera",
+    "Avg response hrs": "Horas prom. de respuesta",
+    "Mark responded": "Marcar respondido"
   };
   var ERRORS = {
     name: "Enter the contact's first and last name.",
@@ -189,6 +197,11 @@
     return { MSPWE: [], MSPAM: [], MSPMS: [] };
   }
   function noon(day) { return day + "T16:00:00.000Z"; }
+  function addHours(iso, hours) {
+    var ms = Date.parse(iso);
+    if (isNaN(ms)) return "";
+    return new Date(ms + hours * 3600000).toISOString();
+  }
   function demoLead(row) {
     row.example = true;
     row.emailStatus = row.emailStatus || "failed";
@@ -198,12 +211,17 @@
     row.groupEnd = row.groupEnd || "";
     row.notes = row.notes || "FAKE contact for this demo. Not a real guest.";
     row.updatedAt = row.updatedAt || row.createdAt;
+    row.respondedAt = row.respondedAt || "";
+    row.respondedBy = row.respondedBy || "";
     return row;
   }
   function buildDemo(todayIso) {
     var start = weekStart(todayIso);
     var today = chicagoDate(todayIso);
     var later = addDays(today, 30);
+    var mspamNew = noon(addDays(start, 1));
+    var mspweLost = noon(addDays(start, -4));
+    var mspamWon = noon(addDays(start, -3));
     return {
       origin: "example",
       routes: blankRoutes(),
@@ -218,7 +236,8 @@
           id: "ex-mspam-new", hotel: "MSPAM", createdByName: "Kim Nguyen (EX)",
           contactFirst: "Riley", contactLast: "Sample", contactPhone: "",
           contactEmail: "riley.sample@example.test", needs: ["Group Block", "Meeting Space"],
-          groupStart: later, groupEnd: addDays(later, 2), status: "New", createdAt: noon(addDays(start, 1)),
+          groupStart: later, groupEnd: addDays(later, 2), status: "New", createdAt: mspamNew,
+          respondedAt: addHours(mspamNew, 5), respondedBy: "Kim Nguyen (EX)",
           notes: "FAKE contact. Asked about a group block. Not a real guest."
         }),
         demoLead({
@@ -231,13 +250,15 @@
           id: "ex-mspwe-lost", hotel: "MSPWE", createdByName: "Jordan Lee (EX)",
           contactFirst: "Casey", contactLast: "Fictional", contactPhone: "(555) 010-0177",
           contactEmail: "casey.fictional@example.test", needs: ["Other"], needsOther: "FAKE site visit",
-          status: "Lost", createdAt: noon(addDays(start, -4))
+          status: "Lost", createdAt: mspweLost,
+          respondedAt: addHours(mspweLost, 26), respondedBy: "Jordan Lee (EX)"
         }),
         demoLead({
           id: "ex-mspam-won", hotel: "MSPAM", createdByName: "Kim Nguyen (EX)",
           contactFirst: "Sam", contactLast: "Placeholder", contactPhone: "(555) 010-0104",
           contactEmail: "sam.placeholder@example.test", needs: ["Local Negotiated Rate"],
-          status: "Won", createdAt: noon(addDays(start, -3))
+          status: "Won", createdAt: mspamWon,
+          respondedAt: addHours(mspamWon, 2), respondedBy: "Kim Nguyen (EX)"
         })
       ]
     };
@@ -319,7 +340,66 @@
       emailStatus: row.email_status || "pending",
       emailError: row.email_error || "",
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      respondedAt: row.responded_at || "",
+      respondedBy: row.responded_by || ""
+    };
+  }
+  function rollup(leads, hotels) {
+    var list = (hotels && hotels.length) ? hotels : HOTELS;
+    return list.map(function (hotel) {
+      var rows = (leads || []).filter(function (row) { return row && row.hotel === hotel; });
+      var answered = rows.filter(function (row) { return !!row.respondedAt; });
+      var totalHours = 0;
+      var n = 0;
+      answered.forEach(function (row) {
+        var start = Date.parse(row.createdAt);
+        var end = Date.parse(row.respondedAt);
+        if (isNaN(start) || isNaN(end) || end < start) return;
+        totalHours += (end - start) / 3600000;
+        n++;
+      });
+      return {
+        hotel: hotel,
+        total: rows.length,
+        responded: answered.length,
+        awaiting: rows.length - answered.length,
+        avgHours: n ? Math.round((totalHours / n) * 10) / 10 : null
+      };
+    });
+  }
+  function formatHours(value) {
+    if (value == null || value === "") return "—";
+    var n = Number(value);
+    if (!isFinite(n) || n < 0) return "—";
+    return String(Math.round(n * 10) / 10);
+  }
+  function rollupRows(state, hotels) {
+    var saved = state && state.rollup;
+    if (saved && saved.length) {
+      var by = {};
+      saved.forEach(function (row) { if (row && row.hotel) by[row.hotel] = row; });
+      return hotels.map(function (hotel) {
+        var row = by[hotel];
+        if (!row) return { hotel: hotel, total: 0, responded: 0, awaiting: 0, avgHours: null };
+        return {
+          hotel: hotel,
+          total: Number(row.total) || 0,
+          responded: Number(row.responded) || 0,
+          awaiting: Number(row.awaiting) || 0,
+          avgHours: row.avgHours == null || row.avgHours === "" ? null : Number(row.avgHours)
+        };
+      });
+    }
+    return rollup(state && state.leads, hotels);
+  }
+  function mapRollup(row) {
+    return {
+      hotel: row.hotel,
+      total: Number(row.total_leads) || 0,
+      responded: Number(row.responded) || 0,
+      awaiting: Number(row.awaiting) || 0,
+      avgHours: row.avg_hours == null || row.avg_hours === "" ? null : Number(row.avg_hours)
     };
   }
   function mapRoutes(rows) {
@@ -408,14 +488,35 @@
       ? "<button type=\"button\" class=\"btn2\" onclick=\"slResend('" + esc(row.id) + "')\">" + esc(label("Try email again", lang)) + "</button>"
       : "";
     var fake = row.example ? "<p class=\"sl-note\"><span class=\"ex\">" + esc(label("EXAMPLE", lang)) + "</span> " + esc(label("Fake contact", lang)) + "</p>" : "";
+    var badge = row.respondedAt ? "<p><span class=\"sl-badge\">" + esc(label("Responded", lang)) + "</span></p>" : "";
+    var mark = !row.respondedAt && ctx.canManage
+      ? "<button type=\"button\" class=\"btn2 sl-respond\" onclick=\"slRespond('" + esc(row.id) + "')\">" + esc(label("Mark responded", lang)) + "</button>"
+      : "";
     return "<article class=\"sl-card\" id=\"slLead-" + esc(row.id) + "\">" + fake +
-      "<h3>" + esc(row.contactFirst + " " + row.contactLast) + "</h3>" +
+      "<h3>" + esc(row.contactFirst + " " + row.contactLast) + "</h3>" + badge +
       "<p>" + phone + (phone && email ? " · " : "") + email + "</p>" +
       "<p>" + esc(needs.join(", ")) + "</p>" +
       (dates ? "<p>" + esc(dates) + "</p>" : "") +
       (row.notes ? "<p>" + esc(row.notes) + "</p>" : "") +
       "<p class=\"sl-note\">" + esc(label("Filed by", lang)) + " " + esc(row.createdByName || "") + "</p>" +
-      emailFlag(row, lang) + "<div class=\"sl-status\" role=\"group\" aria-label=\"" + esc(label("Status", lang)) + "\">" + status + "</div>" + again + "</article>";
+      emailFlag(row, lang) + "<div class=\"sl-status\" role=\"group\" aria-label=\"" + esc(label("Status", lang)) + "\">" + status + "</div>" + mark + again + "</article>";
+  }
+  function rollupCardHtml(state, ctx) {
+    var lang = ctx.lang;
+    if (!ctx.corporate || !state || state.origin === "loading") return "";
+    if (state.origin === "error") {
+      return "<div class=\"card raw sl\" id=\"slRollup\"><h3>" + esc(label("Sales Leads by Hotel", lang)) + "</h3><p class=\"sl-err\">" + esc(label("Couldn't load sales leads.", lang)) + "</p></div>";
+    }
+    var rows = rollupRows(state, HOTELS);
+    var body = rows.map(function (row) {
+      return "<tr><td>" + esc(row.hotel) + "</td><td>" + esc(String(row.total)) + "</td><td>" + esc(String(row.responded)) + "</td><td>" + esc(String(row.awaiting)) + "</td><td>" + esc(formatHours(row.avgHours)) + "</td></tr>";
+    }).join("");
+    var headers = ["Hotel", "Leads", "Responded", "Waiting", "Avg response hrs"].map(function (key) {
+      return "<th>" + esc(label(key, lang)) + "</th>";
+    }).join("");
+    var sample = state.origin === "example" ? "<p class=\"sl-note\"><span class=\"ex\">" + esc(label("EXAMPLE", lang)) + "</span> " + esc(label("Sample leads for this demo. Fake contacts only.", lang)) + "</p>" : "";
+    return "<div class=\"card raw sl\" id=\"slRollup\"><h3>" + esc(label("Sales Leads by Hotel", lang)) + "</h3>" + sample +
+      "<div class=\"sl-roll\"><table class=\"sl-t fit\"><thead><tr>" + headers + "</tr></thead><tbody>" + body + "</tbody></table></div></div>";
   }
   function settingsHtml(routes, ctx) {
     var lang = ctx.lang;
@@ -460,15 +561,16 @@
       "<div class=\"sl-filters\">" + filters + "</div>" + empty + cards + "</div>";
   }
   function homeCardHtml(state, ctx) {
+    var roll = rollupCardHtml(state, ctx);
     var view = ctx.viewRole;
     var showButton = ctx.canCapture && (view === "GM" || view === "Front Desk" || view === "AGM");
     var showCount = ctx.canManage && (view === "GM" || view === "Sales Manager");
-    if ((!showButton && !showCount) || !ctx.hotel || !state || state.origin === "loading") return "";
+    if ((!showButton && !showCount) || !ctx.hotel || !state || state.origin === "loading") return roll;
     var button = showButton ? "<button type=\"button\" class=\"btn sl-go\" id=\"slCapture\" onclick=\"slOpen()\">" + esc(label("Sales Lead", ctx.lang)) + "</button>" : "";
     var count = showCount ? "<button type=\"button\" class=\"sl-count\" id=\"slWeek\" onclick=\"go('sleads')\"><b>" + countNewThisWeek(state.leads || [], ctx.hotel, ctx.now) + "</b><span>" + esc(label("New leads this week", ctx.lang)) + "</span></button>" : "";
     var sample = state.origin === "example" && showCount ? "<p class=\"sl-note\"><span class=\"ex\">" + esc(label("EXAMPLE", ctx.lang)) + "</span> " + esc(label("Sample leads for this demo. Fake contacts only.", ctx.lang)) + "</p>" : "";
     var pair = !!(button && count);
-    return "<div class=\"card raw sl" + (pair ? " sl-pair" : "") + "\" id=\"slHome\">" + button + count + sample + "</div>";
+    return roll + "<div class=\"card raw sl" + (pair ? " sl-pair" : "") + "\" id=\"slHome\">" + button + count + sample + "</div>";
   }
 
   var api = {
@@ -489,8 +591,12 @@
     cleanEmails: cleanEmails,
     buildDemo: buildDemo,
     mapLead: mapLead,
+    mapRollup: mapRollup,
+    rollup: rollup,
+    formatHours: formatHours,
     formHtml: formHtml,
     listHtml: listHtml,
+    rollupCardHtml: rollupCardHtml,
     homeCardHtml: homeCardHtml,
     telHref: telHref
   };
@@ -563,31 +669,43 @@
     for (i = 0; i < keys.length; i++) if (msg.indexOf(keys[i]) >= 0) return keys[i].replace(/^sl_/, "");
     return "save";
   }
+  var LEAD_COLS = "id,hotel,created_by_name,contact_first,contact_last,contact_phone,contact_email,needs,needs_other,group_start,group_end,notes,status,email_status,email_error,created_at,updated_at,responded_at,responded_by";
+  var LEAD_COLS_BASE = "id,hotel,created_by_name,contact_first,contact_last,contact_phone,contact_email,needs,needs_other,group_start,group_end,notes,status,email_status,email_error,created_at,updated_at";
+  function failRemote() {
+    ui.remoteState = "error";
+    mem = { origin: "error", routes: blankRoutes(), leads: [] };
+    render();
+  }
+  function applyRemote(leadRows, routeRows, rollRows) {
+    mem = {
+      origin: "supabase",
+      routes: mapRoutes(routeRows || []),
+      leads: (leadRows || []).map(mapLead),
+      rollup: rollRows ? rollRows.map(mapRollup) : null
+    };
+    ui.remoteState = "ready";
+    render();
+  }
   function ensureRemote() {
     if (!remoteOn() || ui.remoteState === "loading" || ui.remoteState === "ready" || ui.remoteState === "error") return;
     ui.remoteState = "loading";
     Promise.all([
-      sb.from("sales_leads").select("id,hotel,created_by_name,contact_first,contact_last,contact_phone,contact_email,needs,needs_other,group_start,group_end,notes,status,email_status,email_error,created_at,updated_at").order("created_at", { ascending: false }).limit(200),
-      sb.from("sales_lead_routes").select("hotel,emails")
+      sb.from("sales_leads").select(LEAD_COLS).order("created_at", { ascending: false }).limit(200),
+      sb.from("sales_lead_routes").select("hotel,emails"),
+      sb.from("sales_lead_rollup").select("hotel,total_leads,responded,awaiting,avg_hours")
     ]).then(function (res) {
-      if (res[0].error) {
-        ui.remoteState = "error";
-        mem = { origin: "error", routes: blankRoutes(), leads: [] };
-        render();
+      var leadErr = res[0].error;
+      var missing = leadErr && /responded_(at|by)/i.test(String(leadErr.message || leadErr.details || ""));
+      if (missing) {
+        sb.from("sales_leads").select(LEAD_COLS_BASE).order("created_at", { ascending: false }).limit(200).then(function (again) {
+          if (again.error) { failRemote(); return; }
+          applyRemote(again.data, res[1].error ? [] : res[1].data, null);
+        }, failRemote);
         return;
       }
-      mem = {
-        origin: "supabase",
-        routes: mapRoutes(res[1].error ? [] : res[1].data),
-        leads: (res[0].data || []).map(mapLead)
-      };
-      ui.remoteState = "ready";
-      render();
-    }, function () {
-      ui.remoteState = "error";
-      mem = { origin: "error", routes: blankRoutes(), leads: [] };
-      render();
-    });
+      if (leadErr) { failRemote(); return; }
+      applyRemote(res[0].data, res[1].error ? [] : res[1].data, res[2].error ? null : res[2].data);
+    }, failRemote);
   }
   function current() {
     if (remoteOn()) {
@@ -778,6 +896,37 @@
     ui.routeDraft = cleaned.emails.length ? cleaned.emails.slice() : [""];
     commit({ origin: "example", routes: routes, leads: state.leads });
   };
+  root.slRespond = function (id) {
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(String(id))) return;
+    var actor = actorNow();
+    if (!canManage(actor.role) || !cleanName(actor.name)) return;
+    var state = current();
+    var row = null;
+    state.leads.forEach(function (item) { if (String(item.id) === String(id)) row = item; });
+    if (!row || row.respondedAt || row.hotel !== hotelNow(actor)) return;
+    if (remoteOn() && state.origin === "supabase") {
+      if (!/^\d+$/.test(String(id))) return;
+      sb.rpc("mark_sales_lead_responded", { p_id: Number(id), p_name: cleanName(actor.name) }).then(function (r) {
+        if (r.error) { ui.error = rpcCode(r.error); render(); return; }
+        ui.error = "";
+        reloadRemote();
+      }, function () { ui.error = "save"; render(); });
+      return;
+    }
+    var at = nowISO();
+    var leads = state.leads.map(function (item) {
+      if (String(item.id) !== String(id)) return item;
+      var copy = {};
+      var key;
+      for (key in item) copy[key] = item[key];
+      copy.respondedAt = at;
+      copy.respondedBy = cleanName(actor.name);
+      copy.updatedAt = at;
+      return copy;
+    });
+    ui.error = "";
+    commit({ origin: state.origin, routes: state.routes, leads: leads });
+  };
   root.slStatus = function (id, status) {
     if (STATUSES.indexOf(status) < 0 || !/^[A-Za-z0-9_-]{1,40}$/.test(String(id))) return;
     var actor = actorNow();
@@ -897,7 +1046,9 @@
       emailStatus: "failed",
       emailError: "demo",
       createdAt: nowISO(),
-      updatedAt: nowISO()
+      updatedAt: nowISO(),
+      respondedAt: "",
+      respondedBy: ""
     };
     finishSaved(value, "not_sent", "demo");
     commit({ origin: "example", routes: state.routes || blankRoutes(), leads: [row].concat(state.leads || []) });
@@ -977,6 +1128,13 @@
     ".sl-sent{background:#d4f5dc;color:#15642f;border-radius:10px;padding:10px;font-weight:800}",
     ".sl-card{border:1px solid #e1e6ee;border-radius:12px;padding:10px;margin:0 0 10px;background:#fff}",
     ".sl-card h3{margin:0 0 4px}",
+    ".sl-badge{display:inline-block;background:#d4f5dc;color:#15642f;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:800}",
+    ".sl-roll{overflow-x:auto}",
+    ".sl-t{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}",
+    ".sl-t th,.sl-t td{text-align:left;padding:6px 4px;border-bottom:1px solid #e1e6ee}",
+    ".sl-t th{white-space:normal;font-weight:700;vertical-align:bottom}",
+    ".sl-t td{white-space:nowrap;font-weight:700}",
+    ".sl-respond{width:100%;margin-top:8px}",
     ".sl-card a{color:#14365d}",
     ".sl-status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}",
     ".sl-status button{flex:1 1 40%;min-height:44px;background:#e6ebf2;border:0;font-weight:700}",
@@ -994,9 +1152,16 @@
     root.render = function () {
       var result = prev.apply(this, arguments);
       try {
+        var roll = document.getElementById("slRollup");
         var card = document.getElementById("slHome");
         var app = document.getElementById("app");
-        if (card && app && typeof S !== "undefined" && S.tab === "home" && app.firstChild !== card) app.insertAdjacentElement("afterbegin", card);
+        if (!app || typeof S === "undefined" || S.tab !== "home") return result;
+        if (document.getElementById("hhqFocus")) return result;
+        if (roll && app.firstChild !== roll) app.insertAdjacentElement("afterbegin", roll);
+        if (card && card.previousElementSibling !== roll) {
+          if (roll && roll.parentNode === app) roll.insertAdjacentElement("afterend", card);
+          else if (app.firstChild !== card) app.insertAdjacentElement("afterbegin", card);
+        }
       } catch (e) {}
       return result;
     };
