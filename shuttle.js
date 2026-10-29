@@ -1158,7 +1158,7 @@
     Promise.all([
       sb.from("hotel_features").select("hotel,feature,enabled").eq("feature", FEATURE),
       sb.from("shuttle_settings").select("hotel,tracking_code,slot_minutes,seat_capacity,open_minute,close_minute,track_url,pickup_order"),
-      sb.from("shuttle_signups").select("id,hotel,destination,destination_note,depart_at,guest_label,label_kind,party_size,bags,notes,flight_time,status,status_at,boarded_at,noshow_at,done_at,parking_visit_id,created_at").order("depart_at", { ascending: true }).limit(400)
+      sb.from("shuttle_signups").select("id,hotel,destination,destination_note,depart_at,guest_label,label_kind,party_size,bags,notes,flight_time,status,status_at,boarded_at,noshow_at,done_at").order("depart_at", { ascending: true }).limit(400)
     ]).then(function (res) {
       if (res.some(function (r) { return r.error; })) { remoteState = "demo"; mem = readStore() || buildDemo(nowISO()); render(); return; }
       var features = defaultFeatures();

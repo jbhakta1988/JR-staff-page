@@ -189,6 +189,9 @@ test("migration is additive and keeps the shared driver queue narrow", () => {
   assert.match(sql, /front_desk', 'gm', 'agm', 'shuttle_driver'/);
   assert.match(sql, /hotel = any \(private\.shuttle_pool\(\)\)/);
   assert.match(sql, /No phone, billing, rate, or plate/);
+  assert.match(sql, /grant select \(\s*id, hotel, destination/);
+  assert.doesNotMatch(sql, /grant select[\s\S]*parking_visit_id/);
+  assert.doesNotMatch(sql, /grant select on table public\.shuttle_signups to authenticated/);
   assert.match(sql, /'MSPWE', 'shuttle', false/);
   assert.match(sql, /'MSPAM', 'shuttle', true/);
   assert.match(sql, /'MSPMS', 'shuttle', true/);

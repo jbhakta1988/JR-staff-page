@@ -679,12 +679,18 @@ grant execute on function public.shuttle_book(text, text, text, timestamptz, tex
 grant execute on function public.shuttle_set_status(bigint, text) to authenticated;
 grant execute on function public.shuttle_save_settings(text, text, integer, integer, integer, integer, text, text[]) to authenticated;
 
-revoke all on table public.hotel_features from public, anon, authenticated;
 revoke all on table public.shuttle_settings from public, anon, authenticated;
 revoke all on table public.shuttle_signups from public, anon, authenticated;
 
-grant select on table public.hotel_features to authenticated;
-grant select on table public.shuttle_settings to authenticated;
-grant select on table public.shuttle_signups to authenticated;
+-- Shared read is only the sign-up and the van settings. No parking id, no
+-- created_by, and no billing columns exist on these tables.
+grant select (
+  hotel, tracking_code, slot_minutes, seat_capacity, open_minute, close_minute, track_url, pickup_order
+) on table public.shuttle_settings to authenticated;
+
+grant select (
+  id, hotel, destination, destination_note, depart_at, guest_label, label_kind,
+  party_size, bags, notes, flight_time, status, status_at, boarded_at, noshow_at, done_at
+) on table public.shuttle_signups to authenticated;
 
 revoke all on sequence public.shuttle_signups_id_seq from public, anon, authenticated;
