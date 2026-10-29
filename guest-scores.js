@@ -787,4 +787,8 @@ function fillScores(n, pct) {
     ".gs-low .btn,.gs-low .btn2{width:100%}"
   ].join("");
   document.head.appendChild(style);
+  (function (spec) {
+    if (root.HotelFeatures && root.HotelFeatures.register) root.HotelFeatures.register(spec);
+    else (root.HF_QUEUE = root.HF_QUEUE || []).push(spec);
+  })({ id: "guest_scores", en: "Guest scores", es: "Calificaciones de huéspedes", order: 20 });
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1,22 +1,40 @@
-/* Per-hotel module switches.
-   parking, sales_leads, greetings, and guest_scores share one list.
+/* Per-hotel module switches. JR Corporate edits them under Settings.
+   A module appears in that list only after its own file calls HotelFeatures.register.
+   Parking and guest scores register themselves. Sales leads and greetings do not,
+   until those features are on this page.
    A missing row stays on. Parking at MSPWE starts off.
-   JR Corporate changes the switches. Other modules call HotelFeatures.on(hotel, id). */
+   Other code reads HotelFeatures.on(hotel, id). */
 (function (root) {
   "use strict";
 
   var HOTELS = ["MSPWE", "MSPAM", "MSPMS"];
-  var FEATURES = [
-    { id: "parking", en: "Parking", es: "Estacionamiento" },
-    { id: "sales_leads", en: "Sales leads", es: "Prospectos de ventas" },
-    { id: "greetings", en: "Greetings", es: "Saludos" },
-    { id: "guest_scores", en: "Guest scores", es: "Calificaciones de huéspedes" }
-  ];
-  var FEATURE_OK = {};
-  FEATURES.forEach(function (f) { FEATURE_OK[f.id] = 1; });
+  var registered = [];
 
+  function known(feature) {
+    for (var i = 0; i < registered.length; i++) if (registered[i].id === feature) return registered[i];
+    return null;
+  }
+  function register(spec) {
+    if (!spec || !/^[a-z][a-z0-9_]{0,40}$/.test(spec.id || "")) return;
+    var row = known(spec.id);
+    var next = {
+      id: spec.id,
+      en: spec.en || spec.id,
+      es: spec.es || spec.en || spec.id,
+      order: spec.order == null ? 100 : spec.order
+    };
+    if (row) {
+      row.en = next.en;
+      row.es = next.es;
+      row.order = next.order;
+    } else registered.push(next);
+    registered.sort(function (a, b) { return a.order - b.order || a.en.localeCompare(b.en); });
+  }
+  function list() {
+    return registered.map(function (f) { return { id: f.id, en: f.en, es: f.es }; });
+  }
   function defaultOn(hotel, feature) {
-    if (!FEATURE_OK[feature] || HOTELS.indexOf(hotel) < 0) return false;
+    if (HOTELS.indexOf(hotel) < 0) return false;
     if (feature === "parking" && hotel === "MSPWE") return false;
     return true;
   }
@@ -24,13 +42,18 @@
 
   var api = {
     HOTELS: HOTELS,
-    FEATURES: FEATURES,
+    register: register,
+    list: list,
     defaultOn: defaultOn,
-    on: defaultOn
+    on: defaultOn,
+    sectionHtml: sectionHtml
   };
   root.HotelFeatures = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof document === "undefined") return;
+
+  (root.HF_QUEUE || []).forEach(register);
+  root.HF_QUEUE = [];
 
   var KEY = "jrportal_hotel_features_v1";
   var remote = null;
@@ -42,6 +65,7 @@
     });
   }
   function L(en, es) { return (typeof LANG !== "undefined" && LANG === "es") ? es : en; }
+  function labelOf(feature) { return L(feature.en, feature.es); }
   function corporate() {
     var role = "";
     try { role = authRole(); } catch (e) { role = ""; }
@@ -82,7 +106,7 @@
   }
   api.on = on;
   function setOn(hotel, feature, enabled) {
-    if (!corporate() || !FEATURE_OK[feature] || HOTELS.indexOf(hotel) < 0) return;
+    if (!corporate() || !known(feature) || HOTELS.indexOf(hotel) < 0) return;
     enabled = !!enabled;
     if (remoteOn()) {
       sb.rpc("set_hotel_feature", { p_hotel: hotel, p_feature: feature, p_enabled: enabled }).then(function () {
@@ -101,42 +125,52 @@
   }
   root.hfSet = function (hotel, feature, enabled) { setOn(hotel, feature, enabled); };
 
-  function cardHtml() {
-    if (!corporate()) return "";
-    var blocks = HOTELS.map(function (hotel) {
-      var rows = FEATURES.map(function (feature) {
-        var checked = on(hotel, feature.id) ? " checked" : "";
-        return "<label class=\"hf-row\"><input type=\"checkbox\"" + checked + " onchange=\"hfSet('" + hotel + "','" + feature.id + "',this.checked)\"> " +
-          esc(L(feature.en, feature.es)) + "</label>";
+  function sectionHtml(lang) {
+    var features = list();
+    if (!features.length) return "";
+    var es = lang === "es";
+    function t(en, sp) { return es ? sp : en; }
+    var head = HOTELS.map(function (hotel) { return "<th scope=\"col\">" + esc(hotel) + "</th>"; }).join("");
+    var body = features.map(function (feature) {
+      var cells = HOTELS.map(function (hotel) {
+        var checked = api.on(hotel, feature.id) ? " checked" : "";
+        var name = (es ? feature.es : feature.en) + ", " + hotel;
+        return "<td><input type=\"checkbox\" aria-label=\"" + esc(name) + "\"" + checked + " onchange=\"hfSet('" + hotel + "','" + feature.id + "',this.checked)\"></td>";
       }).join("");
-      return "<section class=\"hf-hotel\"><h3>" + esc(hotel) + "</h3>" + rows + "</section>";
+      return "<tr><th scope=\"row\">" + esc(es ? feature.es : feature.en) + "</th>" + cells + "</tr>";
     }).join("");
-    return "<div class=\"card raw hf\" id=\"hfCard\"><h3>" + esc(L("Hotel features", "Módulos del hotel")) + "</h3><p class=\"hf-note\">" +
-      esc(L("JR Corporate can turn a whole module off for one hotel.", "JR Corporate puede apagar un módulo entero en un hotel.")) + "</p>" + blocks + "</div>";
+    return "<section class=\"hf\" id=\"hfCard\"><h3>" + esc(t("Hotel Features", "Módulos del hotel")) + "</h3><p class=\"hf-note\">" +
+      esc(t("Turn a module off for one hotel. Staff there no longer see it.", "Apaga un módulo en un hotel. El personal de ahí ya no lo ve.")) + "</p>" +
+      "<table class=\"hf-t\"><thead><tr><th scope=\"col\">" + esc(t("Module", "Módulo")) + "</th>" + head + "</tr></thead><tbody>" + body + "</tbody></table></section>";
+  }
+  api.sectionHtml = sectionHtml;
+
+  function pageHtml() {
+    if (!corporate()) return "<div class=\"raw hf\" id=\"hfSettings\"><h2>" + esc(L("Settings", "Ajustes")) + "</h2></div>";
+    return "<div class=\"raw hf\" id=\"hfSettings\"><h2>" + esc(L("Settings", "Ajustes")) + "</h2>" + sectionHtml((typeof LANG !== "undefined" && LANG === "es") ? "es" : "en") + "</div>";
   }
 
-  if (typeof V !== "undefined" && V.home) {
-    var prevHome = V.home;
-    V.home = function () {
-      var card = "";
-      try { card = cardHtml(); } catch (e) { card = ""; }
-      return card + prevHome.apply(this, arguments);
+  if (typeof M !== "undefined") M.settings = ["⚙️", "Settings"];
+  if (typeof I18N !== "undefined" && I18N.es) I18N.es.Settings = "Ajustes";
+  if (typeof V !== "undefined") V.settings = pageHtml;
+  if (typeof tilesFor === "function") {
+    var prevTiles = tilesFor;
+    root.tilesFor = function (role) {
+      var list = (prevTiles(role) || []).slice();
+      if (corporate() && list.indexOf("settings") < 0) list.push("settings");
+      return list;
     };
   }
+  try { if (typeof NOCOLS !== "undefined" && NOCOLS.indexOf("settings") < 0) NOCOLS.push("settings"); } catch (e2) {}
+
   var style = document.createElement("style");
-  style.textContent = ".hf-note{font-size:13px;color:#3c4658}.hf-hotel{margin-top:8px}.hf-row{display:flex;align-items:center;gap:8px;min-height:44px;font-weight:700}.hf-row input{width:22px;height:22px;min-height:0}";
+  style.textContent = [
+    ".hf-note{font-size:13px;color:#3c4658;margin:0 0 8px}",
+    ".hf-t{width:100%;border-collapse:collapse;font-size:14px}",
+    ".hf-t th,.hf-t td{padding:8px 4px;border-bottom:1px solid #e6ebf2;text-align:center;vertical-align:middle}",
+    ".hf-t th:first-child,.hf-t td:first-child{text-align:left}",
+    ".hf-t input{width:22px;height:22px;min-height:0}"
+  ].join("");
   document.head.appendChild(style);
-  if (typeof render === "function") {
-    var prevRender = render;
-    root.render = function () {
-      var result = prevRender.apply(this, arguments);
-      try {
-        var card = document.getElementById("hfCard");
-        var app = document.getElementById("app");
-        if (card && app && typeof S !== "undefined" && S.tab === "home" && app.firstChild !== card) app.insertAdjacentElement("afterbegin", card);
-      } catch (e) {}
-      return result;
-    };
-  }
-  try { if (typeof meUser === "function" && meUser() && typeof render === "function") render(); } catch (e) {}
+  try { if (typeof meUser === "function" && meUser() && typeof render === "function") render(); } catch (e3) {}
 })(typeof window !== "undefined" ? window : globalThis);
