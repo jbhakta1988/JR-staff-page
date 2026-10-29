@@ -1,4 +1,7 @@
 -- Let shuttle, meeting rooms, and winter use the same hotel_features switches.
+-- This file is named so it runs after every other migration in the stack.
+-- It is the last hotel_features check: parking, sales_leads, greetings,
+-- guest_scores, shuttle, meetings, and winter.
 -- Additive. Existing rows are left in place. Not applied by the app.
 -- Menus read HotelFeatures.on. A missing row stays on, except the shared
 -- shuttle, which the app shows only at MSPAM and MSPMS.
