@@ -56,9 +56,17 @@
   });
 
   function featureOn(hotel, feature) {
+    if (feature === "shuttle" && SHUTTLE.indexOf(hotel) < 0) return false;
     if (root.HotelFeatures && root.HotelFeatures.on) return root.HotelFeatures.on(hotel, feature);
     if (feature === "parking" && hotel === "MSPWE") return false;
     return true;
+  }
+  if (root.HotelFeatures && root.HotelFeatures.on) {
+    var prevOn = root.HotelFeatures.on;
+    root.HotelFeatures.on = function (hotel, feature) {
+      if (feature === "shuttle" && SHUTTLE.indexOf(hotel) < 0) return false;
+      return prevOn(hotel, feature);
+    };
   }
   function hotel() {
     try { return S.hotel; } catch (e) { return ""; }
