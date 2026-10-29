@@ -485,7 +485,16 @@
     "#hhqMore > summary{min-height:48px;display:flex;align-items:center;font-weight:800;cursor:pointer}",
     ".hhq-fold{border-top:1px solid #e6ebf2}",
     ".hhq-fold > summary{min-height:48px;display:flex;align-items:center;font-weight:700;cursor:pointer}",
-    ".hhq-today .warn{margin:0 0 8px}"
+    ".hhq-today .warn{margin:0 0 8px}",
+    "@media(min-width:1024px){",
+    "#uxHero.hhq-home{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(260px,.95fr);gap:16px;align-items:stretch}",
+    "#uxHero.hhq-home>.hhq-today,#uxHero.hhq-home>.hhq-urgent,#uxHero.hhq-home>.hhq-actions{margin:0}",
+    "#uxHero.hhq-home>.hhq-actions{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}",
+    "#uxHero.hhq-home:not(:has(.hhq-urgent)){grid-template-columns:minmax(260px,.9fr) minmax(0,1.2fr)}",
+    "#uxHero.hhq-home:not(:has(.hhq-urgent))>.hhq-today{grid-column:1;grid-row:1}",
+    "#uxHero.hhq-home:not(:has(.hhq-urgent))>.hhq-actions{grid-column:2;grid-row:1;align-content:start}",
+    "#hhqMore{margin-top:16px}",
+    "}"
   ].join("");
   document.head.appendChild(css);
 

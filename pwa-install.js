@@ -232,7 +232,7 @@
     "#pwaGuide{display:inline-flex;align-items:center;min-height:44px;margin-top:4px;font-weight:700;color:#14365d}" +
     "a.pwa-menu{display:flex;align-items:center;justify-content:center;margin-top:8px;min-height:44px;border-radius:8px;background:#ffffff1f;color:#fff;font-weight:700;text-decoration:none;border:1px solid #ffffff66}" +
     "@media(max-width:520px){.pwa-steps li{font-size:12px;padding:8px 4px}}" +
-    "@media(display-mode:standalone){#pwaInstall{display:none!important}header#hdr{padding-top:calc(8px + env(safe-area-inset-top,0px))!important}nav#nav{padding-bottom:env(safe-area-inset-bottom,0px)}body{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}}" +
+    "@media (display-mode: standalone) and (max-width: 1023px){#pwaInstall{display:none!important}header#hdr{padding-top:calc(8px + env(safe-area-inset-top,0px))!important}nav#nav{padding-bottom:env(safe-area-inset-bottom,0px)}body{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}}" +
     "@media print{#pwaInstall,a.pwa-menu{display:none!important}}";
   document.head.appendChild(css);
 

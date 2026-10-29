@@ -76,6 +76,6 @@
     };
   }
   var css = document.createElement("style");
-  css.textContent = ".hhq-form label{display:block;margin:6px 0;font-weight:650}.hhq-form input,.hhq-form textarea,.hhq-form select{display:block;width:100%;box-sizing:border-box;margin-top:4px}";
+  css.textContent = ".hhq-form label{display:block;margin:6px 0;font-weight:650}.hhq-form input,.hhq-form textarea,.hhq-form select{display:block;width:100%;box-sizing:border-box;margin-top:4px}@media(min-width:1024px){.hhq-form{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;align-items:start}.hhq-form>button,.hhq-form>label:has(textarea){grid-column:1/-1}}";
   document.head.appendChild(css);
 })(typeof window !== "undefined" ? window : globalThis);
