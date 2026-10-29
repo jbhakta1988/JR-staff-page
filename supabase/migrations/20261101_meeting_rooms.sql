@@ -405,7 +405,7 @@ begin
   perform pg_catalog.set_config('meeting.sweeping', '1', true);
   v_local := v_now at time zone 'America/Chicago';
   v_day := v_local::date;
-  v_hour := pg_catalog.extract(hour from v_local)::integer;
+  v_hour := extract(hour from v_local)::integer;
 
   for b in
     select *
@@ -416,7 +416,7 @@ begin
       and starts_at <= v_now + interval '24 hours'
   loop
     perform private.meeting_send_alert(
-      'rem|' || b.id::text || '|' || pg_catalog.extract(epoch from b.starts_at)::text,
+      'rem|' || b.id::text || '|' || extract(epoch from b.starts_at)::text,
       'meeting_reminder',
       b.hotel,
       array['gm', 'agm'],
@@ -440,7 +440,7 @@ begin
       and starts_at <= v_now + interval '1 hour'
   loop
     perform private.meeting_send_alert(
-      'hour|' || b.id::text || '|' || pg_catalog.extract(epoch from b.starts_at)::text,
+      'hour|' || b.id::text || '|' || extract(epoch from b.starts_at)::text,
       'meeting_hour',
       b.hotel,
       array['front_desk'],
