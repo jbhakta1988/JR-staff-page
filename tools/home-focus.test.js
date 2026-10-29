@@ -55,6 +55,25 @@ test("empty cards hide and the sales-lead rollup stays under More", () => {
   assert.equal(home.slotFor("hhqActions"), "actions");
 });
 
+test("corporate home is data-forward and every other role stays operations-forward", () => {
+  assert.equal(home.homeMode("Above Property"), "data");
+  assert.equal(home.homeMode("JR Corporate"), "data");
+  ["GM", "AGM", "Front Desk", "Housekeeping", "Housekeeper", "Maintenance", "Shuttle Driver", "House Person", "Laundry Attendant", "Breakfast Attendant"].forEach((role) => {
+    assert.equal(home.homeMode(role), "ops", role);
+  });
+  const cards = home.dataCards({ occ: "81%", adr: null, revpar: null, laborVar: "+1.2h", openWo: "4", score: null, leads: "3", avgHours: "5.0" });
+  assert.deepEqual(cards.map((card) => card.id), ["occ", "labor", "wo", "leads", "response"]);
+  const cols = home.compareColumns([
+    { occ: "80%", adr: null, revpar: null, wo: "2", leads: "1", hours: null },
+    { occ: "70%", adr: null, revpar: null, wo: "0", leads: null, hours: null }
+  ]);
+  assert.deepEqual(cols.map((col) => col.id), ["occ", "wo", "leads"]);
+  assert.equal(home.sparkPath([68, 74, 88]).startsWith("M"), true);
+  assert.equal(home.sparkPath([88]), "");
+  assert.deepEqual(home.opsSections({ tasks: ["Lobby"], rooms: [], alerts: [], notes: [], orders: [{ id: 1 }], checks: [] }), ["tasks", "orders"]);
+  assert.deepEqual(home.opsSections({}), []);
+});
+
 test("home focus loads after the sales-lead rollup", () => {
   const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
   const sales = html.indexOf('src="sales-leads.js"');

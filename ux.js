@@ -134,12 +134,12 @@ render=function(){base.apply(this,arguments);if(!meUser()||meUser().pin_reset_re
 const css=document.createElement("style");css.textContent=`
 #app button,#app select,#app input:not([type=checkbox]):not([type=radio]),#app textarea,#app a.btn{min-height:44px}
 nav button{min-height:60px;font-size:12px}
-.ux-hero{background:linear-gradient(160deg,#14365d,#235a92);color:#fff;border-radius:16px;padding:14px;margin:4px 0 12px}
-.ux-hi{font-size:22px;font-weight:800;margin-bottom:10px}
-.ux-search{width:100%;text-align:left;background:#fff;color:#55606f;border:0;border-radius:12px;font-size:16px;padding:12px;margin-bottom:10px;min-height:48px}
+.ux-hero{background:transparent;color:inherit;border-radius:12px;padding:0;margin:4px 0 8px}
+.ux-hi{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.ux-search{width:100%;text-align:left;background:#fff;color:#5c6570;border:1px solid #e6e8ee;border-radius:12px;font-size:16px;padding:12px;margin-bottom:10px;min-height:48px}
 .ux-acts{display:grid;gap:8px}
-.ux-act{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#ffffff1f;color:#fff;border:1px solid #ffffff40;border-radius:12px;padding:10px 12px;min-height:56px;font-size:16px}
-.ux-act.pri{background:#f9c74f;color:#14365d;border-color:#f9c74f}
+.ux-act{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;color:#1c1f26;border:1px solid #e6e8ee;border-radius:12px;padding:10px 12px;min-height:56px;font-size:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.ux-act.pri{background:#3b5bdb;color:#fff;border-color:#3b5bdb}
 .ux-act .ic{font-size:24px}.ux-act span:nth-child(2){flex:1}.ux-act small{display:block;font-weight:400;opacity:.85;font-size:13px}.ux-act .chev{font-size:24px;opacity:.7}
 .ux-sec{margin:8px 2px;color:#55606f;font-size:14px;text-transform:uppercase;letter-spacing:.5px}
 .ux-top{position:sticky;top:64px;z-index:4;display:flex;align-items:center;gap:8px;background:#f3f5f9;padding:6px 0;margin-bottom:6px}
@@ -168,7 +168,7 @@ nav button{min-height:60px;font-size:12px}
 .ux-good{color:#2e7d4f;font-weight:700;margin-top:6px}
 .ux-hire{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:0;border-bottom:1px solid #eef0f3;background:none;padding:8px 0;min-height:64px}.ux-hire>span:first-child{flex:1}
 .ux-back2{margin-bottom:8px}
-#uxHelpBtn{position:fixed;right:12px;bottom:74px;width:48px;height:48px;border-radius:50%;border:0;background:#14365d;color:#fff;font-size:22px;font-weight:800;z-index:6;box-shadow:0 2px 8px #0004}
+#uxHelpBtn{position:fixed;right:12px;bottom:96px;width:48px;height:48px;border-radius:50%;border:0;background:#3b5bdb;color:#fff;font-size:22px;font-weight:800;z-index:6;box-shadow:0 8px 20px rgba(16,24,40,.18)}
 #uxTour{position:fixed;inset:0;z-index:200}
 .ux-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px #000a;border:3px solid #f9c74f;pointer-events:none}
 .ux-tip{position:fixed;left:12px;right:12px;background:#fff;border-radius:14px;padding:14px;font-size:16px}.ux-tip p{margin:6px 0 10px}
