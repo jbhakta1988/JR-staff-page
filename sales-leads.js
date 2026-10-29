@@ -4,7 +4,8 @@
    With Supabase on, save_sales_lead writes the row, then the sales-lead-email
    function asks Resend to mail the hotel's sales manager. A failed send keeps
    the lead and flags it "Email not sent". A reply stores responded_at and shows
-   a Responded badge. JR Corporate sees Sales Leads by Hotel on the home screen. */
+   a Responded badge. JR Corporate's Sales Leads by Hotel card is built here and
+   home-focus.js parks it under More, not on the home surface. */
 (function (root) {
   "use strict";
 
@@ -1154,6 +1155,7 @@
         var card = document.getElementById("slHome");
         var app = document.getElementById("app");
         if (!app || typeof S === "undefined" || S.tab !== "home") return result;
+        if (document.getElementById("hhqFocus")) return result;
         if (roll && app.firstChild !== roll) app.insertAdjacentElement("afterbegin", roll);
         if (card && card.previousElementSibling !== roll) {
           if (roll && roll.parentNode === app) roll.insertAdjacentElement("afterend", card);
