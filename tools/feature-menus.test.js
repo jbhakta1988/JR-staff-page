@@ -33,8 +33,11 @@ test("parking and meeting rooms stay with front desk, AGM, GM, and corporate", (
 
 test("the menu migration adds switches without deleting rows", () => {
   const sql = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261103_feature_menus.sql"), "utf8");
-  const names = fs.readdirSync(path.join(__dirname, "../supabase/migrations")).filter((name) => name.endsWith(".sql")).sort();
-  assert.equal(names[names.length - 1], "20261103_feature_menus.sql");
+  const dir = path.join(__dirname, "../supabase/migrations");
+  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".sql")).sort();
+  const checks = names.filter((name) => fs.readFileSync(path.join(dir, name), "utf8").includes("hotel_features_feature_check"));
+  assert.equal(checks[checks.length - 1], "20261103_feature_menus.sql");
+  assert.ok(names.indexOf("20261104_lead_responses.sql") > names.indexOf("20261103_feature_menus.sql"));
   assert.match(sql, /'parking', 'sales_leads', 'greetings', 'guest_scores'/);
   assert.match(sql, /'shuttle', 'meetings', 'winter'/);
   assert.match(sql, /hotel = any \(\(select private\.my_hotels\(\)\)::text\[\]\)/);
