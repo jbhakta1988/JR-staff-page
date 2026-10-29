@@ -118,7 +118,8 @@ render=function(){base.apply(this,arguments);if(!meUser()||meUser().pin_reset_re
  if(S.tab!=="onb")S.obSel=S.obSel||"";
  const ok=allowed(),main=(NAV5[S.role]||navFor(S.role)).filter(x=>ok.includes(x)).slice(0,4);
  const inMain=main.includes(S.tab);
- nav.innerHTML=main.map(id=>`<button class="${S.tab==id?"on":""}" onclick="go('${id}')" ${S.tab==id?'aria-current="page"':""}><span>${M[id][0]}</span>${E(lbl(id))}</button>`).join("")+`<button id="uxMoreBtn" class="${inMain?"":"on"}" onclick="uxSheet('more')"><span>☰</span>${L("More","Más")}</button>`;
+ const desk=typeof rMode==="function"?rMode()==="desk":innerWidth>=1024;
+ if(!desk)nav.innerHTML=main.map(id=>`<button class="${S.tab==id?"on":""}" onclick="go('${id}')" ${S.tab==id?'aria-current="page"':""}><span>${M[id][0]}</span>${E(lbl(id))}</button>`).join("")+`<button id="uxMoreBtn" class="${inMain?"":"on"}" onclick="uxSheet('more')"><span>☰</span>${L("More","Más")}</button>`;
  if(typeof paintReqBadges==="function")paintReqBadges();
  if(S.tab==="home"){app.insertAdjacentHTML("afterbegin",hero().replace('<section class="ux-hero"','<section class="ux-hero" id="uxHero"'))}
  else if(app.querySelector(".pgbar")){const pb=app.querySelector(".pgbar");pb.classList.add("ux-sticky");if(!pb.querySelector(".ux-srch"))pb.insertAdjacentHTML("beforeend",`<button class="ux-bk ux-srch" onclick="uxSheet('search')" aria-label="${L("Search","Buscar")}">🔎</button>`)}
@@ -171,6 +172,13 @@ nav button{min-height:60px;font-size:12px}
 #uxTour{position:fixed;inset:0;z-index:200}
 .ux-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px #000a;border:3px solid #f9c74f;pointer-events:none}
 .ux-tip{position:fixed;left:12px;right:12px;background:#fff;border-radius:14px;padding:14px;font-size:16px}.ux-tip p{margin:6px 0 10px}
+@media(min-width:1024px){
+.ux-overlay{align-items:center;justify-content:center;padding:24px}
+.ux-sheet{width:min(640px,100%);max-height:min(80vh,760px);border-radius:16px;box-shadow:0 24px 70px #0006}
+.ux-sheet .row{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.ux-tip{left:50%;right:auto;width:min(480px,calc(100vw - 48px));transform:translateX(-50%)}
+#uxHelpBtn{bottom:24px;right:24px}
+}
 `;document.head.appendChild(css);
 render();
 })();
