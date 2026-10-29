@@ -1,6 +1,7 @@
 /* HotelHQ · Quore parity pack (guest requests, search & history, log sheets, room notices,
-   deep cleans, corporate reports, audit trail, Quore CSV import). EN/ES. localStorage for now;
-   Supabase design in supabase/migrations/20261027_quore_parity.sql (not applied).
+   deep cleans, corporate reports, audit trail, Quore CSV import). EN/ES.
+   Signed-in hotels read and write the shared Supabase tables. Demo mode (no session)
+   keeps the EXAMPLE rows in localStorage and does not call the database.
    No real guest names: guests are stored by room + last initial only. */
 (function(){
 "use strict";
@@ -40,7 +41,8 @@ const GR_PRI=[["low","Low","Baja",45],["med","Medium","Media",25],["high","High"
 const GR_ST=[["open","Open","Abierta"],["ack","Acknowledged","Recibida"],["done","Resolved","Resuelta"]];
 const DEPT_ROLES={Housekeeping:["Housekeeping","Housekeeper","House Person"],Maintenance:["Maintenance"],"Front Desk":["Front Desk"],Breakfast:["Breakfast Attendant"],GM:["GM","AGM"]};
 const slaMin=r=>f4(GR_PRI,r.pri)[3];
-function grList(h){const q=Q(h);if(!q.gr){const n=(S.h[h||S.hotel].rooms||[]);const rm=i=>String((n[i]||{}).n||100+i);
+function qpDemo(){return !(typeof useRemote==="function"&&useRemote())}
+function grList(h){const q=Q(h);if(!q.gr){if(!qpDemo()){q.gr=[];return q.gr}const n=(S.h[h||S.hotel].rooms||[]);const rm=i=>String((n[i]||{}).n||100+i);
   q.gr=[{id:1,type:"request",room:rm(3),ini:"K",cat:"towels",pri:"med",dept:"Housekeeping",to:"",note:"2 extra bath towels and a blanket",at:agoIso(34),st:"open",ex:1},
   {id:2,type:"complaint",room:rm(9),ini:"M",cat:"temp",pri:"high",dept:"Maintenance",to:"",note:"Room too warm, thermostat not responding",at:agoIso(55),ackAt:agoIso(48),st:"ack",cb:{at:new Date(Date.now()+10*60000).toISOString(),done:false},ex:1},
   {id:3,type:"request",room:rm(14),ini:"R",cat:"amen",pri:"low",dept:"Housekeeping",to:"",note:"Toothbrush kit",at:agoIso(26*60),ackAt:agoIso(26*60-6),doneAt:agoIso(26*60-14),st:"done",res:"Delivered",rec:"none",ex:1},
@@ -110,27 +112,27 @@ const LS_DEF=[
 function lsTpl(h){const q=Q(h);if(!q.tpl)q.tpl=JSON.parse(JSON.stringify(LS_DEF));return q.tpl}
 const lsSeeSens=()=>isMgr();
 const lsCan=s=>isMgr()||s.roles.includes(AR());
-function lsRows(h){const q=Q(h);if(!q.logs){q.logs={keys:[{id:1,at:agoIso(90),by:"Front desk (EX)",v:{room:"214",ini:"K",qty:"2",why:"new",id:true},ex:1}],pkg:[{id:1,at:agoIso(200),by:"Front desk (EX)",v:{room:"118",ini:"R",car:"ups",trk:"4417",out:false},ex:1}],wake:[{id:1,at:agoIso(600),by:"Night audit (EX)",v:{room:"305",ini:"M",time:"05:30",done:true},ex:1}],
+function lsRows(h){const q=Q(h);if(!q.logs){if(!qpDemo()){q.logs={keys:[],pkg:[],wake:[],cash:[],pool:[],meter:[],vendor:[]};return q.logs}q.logs={keys:[{id:1,at:agoIso(90),by:"Front desk (EX)",v:{room:"214",ini:"K",qty:"2",why:"new",id:true},ex:1}],pkg:[{id:1,at:agoIso(200),by:"Front desk (EX)",v:{room:"118",ini:"R",car:"ups",trk:"4417",out:false},ex:1}],wake:[{id:1,at:agoIso(600),by:"Night audit (EX)",v:{room:"305",ini:"M",time:"05:30",done:true},ex:1}],
   cash:[{id:1,at:agoIso(300),by:"Front desk (EX)",v:{drawer:"fd1",shift:"am",exp:"200",cnt:"200",wit:"GM"},ex:1},{id:2,at:agoIso(1500),by:"Night audit (EX)",v:{drawer:"fd1",shift:"na",exp:"200",cnt:"185",wit:""},ex:1}],
   pool:[{id:1,at:agoIso(120),by:"Maintenance (EX)",v:{body:"pool",cl:"3",ph:"7.5",alk:"100",temp:"82"},ex:1},{id:2,at:agoIso(125),by:"Maintenance (EX)",v:{body:"spa",cl:"2.5",ph:"8.0",alk:"90",temp:"102"},ex:1},{id:3,at:agoIso(1560),by:"Maintenance (EX)",v:{body:"pool",cl:"2.8",ph:"7.4",alk:"95",temp:"81"},ex:1}],
   meter:[{id:1,at:agoIso(1440*7+60),by:"Maintenance (EX)",v:{m:"elec",v:"482110",n:""},ex:1},{id:2,at:agoIso(60),by:"Maintenance (EX)",v:{m:"elec",v:"489935",n:""},ex:1},{id:3,at:agoIso(70),by:"Maintenance (EX)",v:{m:"water",v:"1203340",n:""},ex:1}],
   vendor:[{id:1,at:agoIso(240),by:"Front desk (EX)",v:{co:"Elevator service (EX)",who:"Sam",why:"Monthly elevator PM",in:"09:10",out:"10:25",coi:true},ex:1}]}}return q.logs}
 function lsOut(f,v){if(v==null||v===""||f.t!=="num")return false;return (f.min!=null&&+v<f.min)||(f.max!=null&&+v>f.max)}
 function lsVal(f,v){if(f.sens&&!lsSeeSens())return "•••";if(f.t==="chk")return v?"✅":"—";if(f.t==="sel"){const o=(f.o||[]).find(x=>x[0]===v);return o?H(B(o[1],o[2])):H(v||"")}return H(v==null?"":v)}
-function lsCash(e){const d=(+e.v.cnt||0)-(+e.v.exp||0);if(d===0)return `<span class="pill VC">${B("Balanced","Cuadrada")}</span>`;return lsSeeSens()?`<span class="pill VD">${d>0?"+":""}${d.toFixed(2)}</span>`:`<span class="pill VD">${B("Variance — GM notified","Diferencia — GM avisado")}</span>`}
+function lsCash(e){if(e.balanced===true)return `<span class="pill VC">${B("Balanced","Cuadrada")}</span>`;if(e.balanced===false&&!lsSeeSens())return `<span class="pill VD">${B("Variance — GM notified","Diferencia — GM avisado")}</span>`;const d=(+e.v.cnt||0)-(+e.v.exp||0);if(d===0)return `<span class="pill VC">${B("Balanced","Cuadrada")}</span>`;return lsSeeSens()?`<span class="pill VD">${d>0?"+":""}${d.toFixed(2)}</span>`:`<span class="pill VD">${B("Variance — GM notified","Diferencia — GM avisado")}</span>`}
 function lsField(f){const id="ls_"+f.k,lb=H(B(f.l[0],f.l[1]))+(f.req?" *":"");if(f.t==="chk")return `<label class="qp-f qp-chk"><input type="checkbox" id="${id}"> ${lb}</label>`;
   if(f.t==="sel")return `<label class="qp-f"><small>${lb}</small><select id="${id}">${f.o.map(o=>`<option value="${o[0]}">${H(B(o[1],o[2]))}</option>`).join("")}</select></label>`;
   return `<label class="qp-f"><small>${lb}${f.sens?" 🔒":""}</small><input id="${id}" ${f.t==="num"?'inputmode="decimal" type="number" step="any"':f.t==="time"?'type="time"':f.t==="ini"?'maxlength="1"':""}></label>`}
 function lsView(){const T=lsTpl().filter(s=>!s.off&&lsCan(s)),cur=T.find(s=>s.id===S.lsId)||T[0];if(!cur)return `<h2>📒 ${B("Log Sheets","Bitácoras")}</h2><div class="card">${B("No log sheets for your role.","No hay bitácoras para tu puesto.")}</div>`;
   const rows=(lsRows()[cur.id]||[]),q=(S.lsq||"").toLowerCase(),vis=rows.filter(e=>!q||JSON.stringify(e.v).toLowerCase().includes(q)||String(e.by).toLowerCase().includes(q));
-  const head=cur.f.map(f=>`<th>${H(B(f.l[0],f.l[1]))}</th>`).join("")+(cur.id==="cash"?`<th>${B("Result","Resultado")}</th>`:"");
+  const head=`<th>${B("When","Cuándo")}</th><th>${B("By","Quién")}</th><th>${B("Example","Ejemplo")}</th>`+cur.f.map(f=>`<th>${H(B(f.l[0],f.l[1]))}</th>`).join("")+(cur.id==="cash"?`<th>${B("Result","Resultado")}</th>`:"");
   const flag=e=>cur.f.some(f=>lsOut(f,e.v[f.k]));
-  const tbl=vis.map(e=>`<tr class="${flag(e)?"qp-bad":""}"><td>${H(fmt(e.at))}<br><small>${H(e.by)}</small>${exPill(e)}</td>${cur.f.map(f=>`<td data-l="${H(B(f.l[0],f.l[1]))}" class="${lsOut(f,e.v[f.k])?"bad":""}">${lsVal(f,e.v[f.k])}${lsOut(f,e.v[f.k])?" ⚠️":""}${f.t==="chk"&&!e.v[f.k]&&(f.k==="out"||f.k==="done")&&!isCorp()?` <button class="chip" aria-label="${H(B("Mark done","Marcar hecho"))}" onclick="QP.lsTick('${cur.id}',${e.id},'${f.k}')">✓</button>`:""}</td>`).join("")}${cur.id==="cash"?`<td data-l="${H(B("Result","Resultado"))}">${lsCash(e)}</td>`:""}</tr>`).join("");
+  const tbl=vis.map(e=>`<tr class="${flag(e)?"qp-bad":""}"><td data-l="${H(B("When","Cuándo"))}">${H(fmt(e.at))}</td><td data-l="${H(B("By","Quién"))}">${H(e.by||"")}</td><td data-l="${H(B("Example","Ejemplo"))}">${e.ex?B("EXAMPLE","EJEMPLO"):""}</td>${cur.f.map(f=>`<td data-l="${H(B(f.l[0],f.l[1]))}" class="${lsOut(f,e.v[f.k])?"bad":""}">${lsVal(f,e.v[f.k])}${lsOut(f,e.v[f.k])?" ⚠️":""}${f.t==="chk"&&!e.v[f.k]&&(f.k==="out"||f.k==="done")&&!isCorp()?` <button class="chip" aria-label="${H(B("Mark done","Marcar hecho"))}" onclick="QP.lsTick('${cur.id}',${e.id},'${f.k}')">✓</button>`:""}</td>`).join("")}${cur.id==="cash"?`<td data-l="${H(B("Result","Resultado"))}">${lsCash(e)}</td>`:""}</tr>`).join("");
   const gmEdit=isMgr();
   return `<h2>📒 ${B("Log Sheets","Bitácoras")}</h2><div class="chips" role="tablist">${T.map(s=>`<button class="chip ${s===cur?"on":""}" role="tab" aria-selected="${s===cur}" onclick="S.lsId='${s.id}';S.lsEd=0;render()">${s.ic} ${H(B(s.n[0],s.n[1]))} <small>(${(lsRows()[s.id]||[]).length})</small></button>`).join("")}</div>
   <div class="qp-2"><div class="card" id="lsForm"><h3>${cur.ic} ${B("New entry","Nueva entrada")}</h3>${isCorp()?`<small>${B("Corporate view is read-only.","Vista corporativa: solo lectura.")}</small>`:`<div class="qp-fs">${cur.f.map(lsField).join("")}</div>${cur.id==="cash"&&!lsSeeSens()?`<small>🔒 ${B("Amounts are hidden after saving. Only the GM/AGM sees them.","Los montos se ocultan al guardar. Solo GM/AGM los ve.")}</small>`:""}${cur.id==="pool"?`<small>${B("Targets: chlorine 1–10 ppm, pH 7.2–7.8, alkalinity 80–120, spa ≤104 °F. Out of range turns red and alerts the GM.","Rangos: cloro 1–10 ppm, pH 7.2–7.8, alcalinidad 80–120, spa ≤104 °F. Fuera de rango se marca en rojo y avisa al GM.")}</small>`:""}<div class="bad" id="lsErr" role="alert"></div><button class="btn" style="width:100%" onclick="QP.lsAdd('${cur.id}')">${B("Save entry","Guardar")}</button>`}
   ${gmEdit?`<button class="btn2" style="width:100%;margin-top:8px" onclick="S.lsEd=!S.lsEd;render()">✏️ ${B("Edit template","Editar plantilla")}</button>`:""}</div>
-  <div>${S.lsEd&&gmEdit?lsEditor(cur):""}<div class="card"><input type="search" style="width:100%" placeholder="🔍 ${H(B("Search this log…","Buscar en esta bitácora…"))}" value="${H(S.lsq||"")}" oninput="S.lsq=this.value;QP.keep('lsq')" id="lsq" aria-label="${H(B("Search this log","Buscar en esta bitácora"))}"><div class="qp-tw"><table class="qp-t"><thead><tr><th>${B("When / by","Cuándo / quién")}</th>${head}</tr></thead><tbody>${tbl||`<tr><td colspan="9"><small>${B("No entries yet.","Sin entradas.")}</small></td></tr>`}</tbody></table></div></div></div></div>`}
+  <div>${S.lsEd&&gmEdit?lsEditor(cur):""}<div class="card"><input type="search" style="width:100%" placeholder="🔍 ${H(B("Search this log…","Buscar en esta bitácora…"))}" value="${H(S.lsq||"")}" oninput="S.lsq=this.value;QP.keep('lsq')" id="lsq" aria-label="${H(B("Search this log","Buscar en esta bitácora"))}"><div class="qp-tw"><table class="qp-t"><thead><tr>${head}</tr></thead><tbody>${tbl||`<tr><td colspan="12"><small>${B("No entries yet.","Sin entradas.")}</small></td></tr>`}</tbody></table></div></div></div></div>`}
 function lsEditor(s){const hidden=lsTpl().filter(x=>x.off);return `<div class="card" id="lsEditor" style="background:#f4f7fb"><h3>✏️ ${B("Template","Plantilla")}: ${H(B(s.n[0],s.n[1]))}</h3><small>${B("GM/AGM can rename, add or remove fields for this hotel. Changes go to the audit trail.","GM/AGM puede renombrar, agregar o quitar campos para este hotel. Los cambios quedan en el historial.")}</small>
   ${s.f.map((f,i)=>`<div class="row" style="flex-wrap:wrap"><input aria-label="EN" value="${H(f.l[0])}" onchange="QP.lsRen('${s.id}',${i},0,this.value)"><input aria-label="ES" value="${H(f.l[1])}" onchange="QP.lsRen('${s.id}',${i},1,this.value)"><small style="flex:0 0 auto">${f.t}${f.sens?" 🔒":""}</small>${f.req||f.sens?"":`<button class="chip" aria-label="${H(B("Remove field","Quitar campo"))}" onclick="QP.lsDel('${s.id}',${i})">✕</button>`}</div>`).join("")}
   <div class="row" style="flex-wrap:wrap"><input id="lsNewEn" placeholder="${H(B("New field (English)","Campo nuevo (inglés)"))}"><input id="lsNewEs" placeholder="${H(B("New field (Spanish)","Campo nuevo (español)"))}"><select id="lsNewT" aria-label="${H(B("Field type","Tipo"))}"><option value="text">${B("Text","Texto")}</option><option value="num">${B("Number","Número")}</option><option value="time">${B("Time","Hora")}</option><option value="chk">${B("Checkbox","Casilla")}</option></select><button class="btn" onclick="QP.lsNew('${s.id}')">＋ ${B("Add","Agregar")}</button></div>
@@ -151,7 +153,7 @@ QP.lsReset=id=>{const T=lsTpl(),i=T.findIndex(x=>x.id===id);T[i]=JSON.parse(JSON
 
 /* ---------- (5) room notices ---------- */
 const RN=[["eci","🕐","Early check-in","Llegada temprana","VC"],["lco","🕓","Late checkout","Salida tarde","OC"],["vip","⭐","VIP","VIP","RFI"],["dnd","🚫","DND","No molestar","VD"],["ada","♿","Accessibility","Accesibilidad","OD"],["oth","📌","Other","Otro","OD"]];
-function rnList(h){const q=Q(h);if(!q.nt){const n=(S.h[h||S.hotel].rooms||[]),rm=i=>String((n[i]||{}).n||101+i),t=new Date();const at=(hh,m)=>{const d=new Date(t);d.setHours(hh,m||0,0,0);return d.toISOString()};const tm=hh=>{const d=new Date(t);d.setDate(d.getDate()+1);d.setHours(hh,0,0,0);return d.toISOString()};
+function rnList(h){const q=Q(h);if(!q.nt){if(!qpDemo()){q.nt=[];return q.nt}const n=(S.h[h||S.hotel].rooms||[]),rm=i=>String((n[i]||{}).n||101+i),t=new Date();const at=(hh,m)=>{const d=new Date(t);d.setHours(hh,m||0,0,0);return d.toISOString()};const tm=hh=>{const d=new Date(t);d.setDate(d.getDate()+1);d.setHours(hh,0,0,0);return d.toISOString()};
   q.nt=[{id:1,room:rm(1),ty:"eci",note:"Arriving 11 AM — clean first",until:at(23,0),at:agoIso(60),by:"Front desk (EX)",ex:1},{id:2,room:rm(5),ty:"lco",note:"Checkout 1 PM approved",until:tm(13),at:agoIso(120),by:"Front desk (EX)",ex:1},{id:3,room:rm(10),ty:"vip",note:"Top-tier member, welcome amenity",until:tm(12),at:agoIso(200),by:"GM (EX)",ex:1},{id:4,room:rm(12),ty:"ada",note:"Hearing-accessible kit in room",until:tm(12),at:agoIso(300),by:"Front desk (EX)",ex:1},{id:5,room:rm(4),ty:"dnd",note:"",until:at(23,59),at:agoIso(30),by:"Housekeeper (EX)",ex:1},{id:6,room:rm(7),ty:"lco",note:"Expired example",until:agoIso(300),at:agoIso(1500),by:"Front desk (EX)",ex:1}]}return q.nt}
 function rnActive(r,h){return rnList(h).filter(x=>new Date(x.until)>new Date()&&(r==null||String(x.room)===String(r)))}
 const rnCanAdd=()=>["GM","AGM","Front Desk","Housekeeping","Housekeeper"].includes(AR());
@@ -170,7 +172,7 @@ QP.rnAdd=()=>{const room=$("rnRoom").value.trim(),u=$("rnUntil").value,ty=(docum
 QP.rnEnd=id=>{const x=rnList().find(y=>y.id===id);if(!x)return;x.until=nowIso();audit("notice",id,"cleared","",x.ty,"Rm "+x.room);save();render()};
 
 /* ---------- (6) deep cleans ---------- */
-function dcState(h){const q=Q(h);if(!q.dc){const rooms=(S.h[h||S.hotel].rooms||[]),t=today();
+function dcState(h){const q=Q(h);if(!q.dc){if(!qpDemo()){q.dc={cycle:90,rooms:{},hist:[],ex:0};return q.dc}const rooms=(S.h[h||S.hotel].rooms||[]),t=today();
   q.dc={cycle:90,rooms:{},hist:[],ex:1};rooms.forEach((r,i)=>{const age=[5,20,48,71,84,88,93,104,120,62,33,15][i%12]+(i>11?3:0);q.dc.rooms[r.n]={last:addDays(t,-age),st:"",who:""}});
   if((h||S.hotel)==="MSPAM")Object.keys(q.dc.rooms).slice(0,3).forEach(n=>{q.dc.rooms[n].last=addDays(t,-1);q.dc.hist.push({n,d:addDays(t,-1),by:"Housekeeping (EX)"})})}return q.dc}
 function dcLeft(n,h){const s=dcState(h),r=s.rooms[n];if(!r)return null;return dayDiff(addDays(r.last,s.cycle),today())}
@@ -251,7 +253,7 @@ function auView(){const q0=Q();if(!q0.auSeed){q0.auSeed=1;q0.au.push({at:agoIso(
   const e=S.aue||"all",q=(S.auq||"").toLowerCase();A=A.filter(x=>(e==="all"||x.ent===e)&&(!q||JSON.stringify(x).toLowerCase().includes(q))).sort((a,b)=>b.at.localeCompare(a.at));
   return `<h2>🧾 ${B("Audit Trail","Historial de cambios")}</h2><small>${B("Who changed what, and when. Visible to GM, AGM and corporate only.","Quién cambió qué y cuándo. Solo GM, AGM y corporativo.")}</small>
   <div class="card"><input id="auq" type="search" style="width:100%" placeholder="🔍 ${H(B("Search person, room, record…","Buscar persona, cuarto, registro…"))}" value="${H(S.auq||"")}" oninput="S.auq=this.value;QP.keep('auq')" aria-label="${H(B("Search audit trail","Buscar historial"))}"><div class="row" style="flex-wrap:wrap"><select aria-label="${H(B("Record type","Tipo"))}" onchange="S.aue=this.value;render()">${["all"].concat(Object.keys(AU_ENT)).map(k=>`<option value="${k}" ${e===k?"selected":""}>${k==="all"?B("All records","Todos"):H(B(AU_ENT[k][0],AU_ENT[k][1]))}</option>`).join("")}</select>${isCorp()?`<button class="chip ${S.auh==="all"?"on":""}" onclick="S.auh=S.auh==='all'?'':'all';render()">🏨 ${B("All hotels","Todos los hoteles")}</button>`:""}</div><small>${A.length} ${B("changes","cambios")}</small></div>
-  <div class="card"><div class="qp-tw"><table class="qp-t" id="auTbl"><thead><tr><th>${B("When","Cuándo")}</th><th>${B("Who","Quién")}</th>${hs.length>1?"<th>Hotel</th>":""}<th>${B("Record","Registro")}</th><th>${B("Change","Cambio")}</th></tr></thead><tbody>${A.slice(0,300).map(x=>`<tr><td data-l="${H(B("When","Cuándo"))}">${H(fmt(x.at))}</td><td data-l="${H(B("Who","Quién"))}">${H(x.by)} <small>${H(x.role?roleName(x.role):"")}</small></td>${hs.length>1?`<td data-l="Hotel">${x.hotel}</td>`:""}<td data-l="${H(B("Record","Registro"))}">${H(AU_ENT[x.ent]?B(AU_ENT[x.ent][0],AU_ENT[x.ent][1]):x.ent)} ${H(x.id)}</td><td data-l="${H(B("Change","Cambio"))}"><span><b>${H(x.act)}</b>${x.from||x.to?` <small>${H(x.from||"—")} → ${H(x.to||"—")}</small>`:""}${x.note?`<br><small class="raw">${H(x.note)}</small>`:""}</span></td></tr>`).join("")||`<tr><td colspan="5"><small>${B("No changes yet.","Sin cambios.")}</small></td></tr>`}</tbody></table></div></div>`}
+  <div class="card"><div class="qp-tw"><table class="qp-t" id="auTbl"><thead><tr><th>${B("When","Cuándo")}</th><th>${B("Who","Quién")}</th><th>${B("Role","Puesto")}</th>${hs.length>1?"<th>Hotel</th>":""}<th>${B("Record","Registro")}</th><th>${B("Id","Id")}</th><th>${B("Action","Acción")}</th><th>${B("From","De")}</th><th>${B("To","A")}</th><th>${B("Note","Nota")}</th></tr></thead><tbody>${A.slice(0,300).map(x=>`<tr><td data-l="${H(B("When","Cuándo"))}">${H(fmt(x.at))}</td><td data-l="${H(B("Who","Quién"))}">${H(x.by)}</td><td data-l="${H(B("Role","Puesto"))}">${H(x.role?roleName(x.role):"")}</td>${hs.length>1?`<td data-l="Hotel">${H(x.hotel||"")}</td>`:""}<td data-l="${H(B("Record","Registro"))}">${H(AU_ENT[x.ent]?B(AU_ENT[x.ent][0],AU_ENT[x.ent][1]):x.ent)}</td><td data-l="Id">${H(x.id)}</td><td data-l="${H(B("Action","Acción"))}">${H(x.act)}</td><td data-l="${H(B("From","De"))}">${H(x.from||"")}</td><td data-l="${H(B("To","A"))}">${H(x.to||"")}</td><td data-l="${H(B("Note","Nota"))}">${H(x.note||"")}</td></tr>`).join("")||`<tr><td colspan="10"><small>${B("No changes yet.","Sin cambios.")}</small></td></tr>`}</tbody></table></div></div>`}
 
 /* ---------- (9) Quore CSV importer ---------- */
 const IMP={wo:{n:["Work order history","Historial de órdenes"],f:[["ext","Quore ID",["id","work order id","wo #","work order #","number","ticket"]],["room","Room / location",["room","location","area","room number"]],["title","Description",["description","title","issue","summary","task"]],["status","Status",["status","state"]],["at","Created",["created","created date","date created","opened","date"]],["done","Completed",["completed","completed date","closed","date completed","resolved"]],["who","Assigned to",["assigned","assigned to","technician","completed by"]]],req:["title"]},
@@ -304,6 +306,168 @@ const st=document.createElement("style");st.textContent=`.qp-rn{display:flex;fle
 @media(max-width:560px){.qp-t thead{display:none}.qp-t tr{display:block;border-bottom:1px solid #e3e8ef;padding:6px 0}.qp-t td{display:flex;gap:8px;border:0;padding:2px 4px}.qp-t td[data-l]::before{content:attr(data-l);font-size:12px;color:#5b6b7f;min-width:110px;flex:none}}
 @media(min-width:768px){.qp-grid{grid-template-columns:1fr 1fr}}@media(min-width:1200px){.qp-grid{grid-template-columns:1fr 1fr 1fr}.qp-2{grid-template-columns:minmax(340px,420px) 1fr;align-items:start}.qp-2>.card:first-child{position:sticky;top:12px}}`;document.head.appendChild(st);
 setInterval(()=>{try{if(meUser()&&S.tab==="greq"&&!(document.activeElement&&document.activeElement.matches("input,textarea,select")))render()}catch(e){}},60000);
-window.QPX={audit,grList,lsRows,rnList,dcState,repHtml,csvParse,srcAll};
+/* Shared database. Demo rows (ex:1) never leave this device. */
+function qpSb(){try{return (typeof sb!=="undefined"&&sb)?sb:null}catch(e){return null}}
+const qpSent=new WeakMap();
+let qpChain=Promise.resolve();
+function grToDb(r){
+  const ini=String(r.ini||"").trim().toUpperCase();
+  const body={
+    hotel_id:S.hotel,
+    kind:r.type==="complaint"?"complaint":"request",
+    room:String(r.room||"").slice(0,40),
+    guest_initial:/^[A-Z]$/.test(ini)?ini:null,
+    category:String(r.cat||"other"),
+    priority:["low","med","high","urgent"].includes(r.pri)?r.pri:"med",
+    sla_minutes:+slaMin(r)||25,
+    note:r.note||"",
+    dept:r.dept||"",
+    assignee_label:r.to||"",
+    status:["open","ack","done"].includes(r.st)?r.st:"open",
+    callback_at:r.cb&&r.cb.at?r.cb.at:null,
+    callback_done_at:r.cb&&r.cb.done?(r.cb.doneAt||nowIso()):null,
+    recovery:r.rec&&r.rec!=="none"?r.rec:null,
+    resolution:r.res||null,
+    author_label:r.by||"",
+    example:false,
+    ack_at:r.ackAt||null,
+    done_at:r.doneAt||null,
+    escalated_at:r.esc?(r.escAt||r.ackAt||r.at||null):null
+  };
+  return body;
+}
+function grFromDb(row){
+  return {id:row.id,sb:row.id,type:row.kind,room:row.room,ini:row.guest_initial?String(row.guest_initial).trim():"",cat:row.category,pri:row.priority,dept:row.dept||"",to:row.assignee_label||"",note:row.note||"",at:row.created_at,st:row.status,ackAt:row.ack_at,doneAt:row.done_at,esc:row.escalated_at?1:0,escAt:row.escalated_at||"",res:row.resolution||"",rec:row.recovery||"none",by:row.author_label||"",cb:row.callback_at?{at:row.callback_at,done:!!row.callback_done_at,doneAt:row.callback_done_at||""}:null,ex:row.example?1:0};
+}
+function rnToDb(x){
+  const ended=x.until&&new Date(x.until)<=new Date();
+  return {hotel_id:S.hotel,room:String(x.room||""),kind:x.ty,note:x.note||"",expires_at:x.until,ended_at:ended?(x.ended||x.until):null,author_label:x.by||"",example:false};
+}
+function rnFromDb(row){
+  const until=row.ended_at||row.expires_at;
+  return {id:row.id,sb:row.id,room:row.room,ty:row.kind,note:row.note||"",until,at:row.created_at,by:row.author_label||"",ex:row.example?1:0,ended:row.ended_at||""};
+}
+function splitLog(sheet,e){
+  const s=lsTpl().find(x=>x.id===sheet),plain={},sens={};
+  (s?s.f:[]).forEach(f=>{if(f.sens)sens[f.k]=e.v[f.k];else plain[f.k]=e.v[f.k]});
+  const oor=(s?s.f:[]).some(f=>lsOut(f,e.v[f.k]));
+  let balanced=null;
+  if(sheet==="cash")balanced=(+e.v.cnt||0)===(+e.v.exp||0);
+  return {body:{hotel_id:S.hotel,sheet,data:plain,out_of_range:oor,balanced,author_label:e.by||"",example:false},sens,balanced};
+}
+async function qpPushGr(client){
+  for(const r of grList()){
+    if(r.ex)continue;
+    const body=grToDb(r),key=JSON.stringify(body)+"|"+(r.sb||"");
+    if(qpSent.get(r)===key)continue;
+    const res=r.sb?await client.from("guest_requests").update(body).eq("id",r.sb).select().single():await client.from("guest_requests").insert(body).select().single();
+    if(res.error){console.warn("guest_requests",res.error.message||res.error);continue}
+    if(res.data){r.sb=res.data.id;r.id=res.data.id}
+    qpSent.set(r,JSON.stringify(grToDb(r))+"|"+(r.sb||""));
+  }
+}
+async function qpPushLogs(client){
+  const logs=lsRows();
+  for(const sheet of Object.keys(logs)){
+    const fields=(lsTpl().find(x=>x.id===sheet)||{}).f||[];
+    for(const e of logs[sheet]){
+      if(e.ex)continue;
+      const pack=splitLog(sheet,e),key=JSON.stringify(pack.body)+"|"+(e.sb||"");
+      if(qpSent.get(e)===key)continue;
+      const res=e.sb?await client.from("log_entries").update(pack.body).eq("id",e.sb).select().single():await client.from("log_entries").insert(pack.body).select().single();
+      if(res.error){console.warn("log_entries",res.error.message||res.error);continue}
+      if(res.data){e.sb=res.data.id;e.id=res.data.id;e.balanced=pack.balanced}
+      if(Object.keys(pack.sens).length){
+        const ins=await client.from("log_entry_sensitive").insert({entry_id:e.sb,hotel_id:S.hotel,data:pack.sens});
+        if(ins.error&&!/duplicate|23505/i.test(String(ins.error.message||ins.error.code||"")))console.warn("log_entry_sensitive",ins.error.message||ins.error);
+        if(!lsSeeSens())Object.keys(pack.sens).forEach(k=>{e.v[k]=""})}
+      qpSent.set(e,JSON.stringify(splitLog(sheet,e).body)+"|"+(e.sb||""));
+    }
+  }
+}
+async function qpPushTpl(client){
+  const rows=lsTpl().filter(s=>s._dirty).map(s=>({hotel_id:S.hotel,sheet:s.id,fields:s.f,hidden:!!s.off}));
+  if(!rows.length)return;
+  const res=await client.from("log_templates").upsert(rows,{onConflict:"hotel_id,sheet"});
+  if(!res.error)lsTpl().forEach(s=>{s._dirty=0;s.sb=1});
+}
+async function qpEnsureTpl(client){
+  const got=await client.from("log_templates").select("sheet").eq("hotel_id",S.hotel);
+  if(got.error||(got.data&&got.data.length))return;
+  const rows=lsTpl().map(s=>({hotel_id:S.hotel,sheet:s.id,fields:s.f,hidden:!!s.off}));
+  await client.from("log_templates").upsert(rows,{onConflict:"hotel_id,sheet"});
+}
+async function qpPushRn(client){
+  for(const x of rnList()){
+    if(x.ex)continue;
+    const body=rnToDb(x),key=JSON.stringify(body)+"|"+(x.sb||"");
+    if(qpSent.get(x)===key)continue;
+    const res=x.sb?await client.from("room_notices").update(body).eq("id",x.sb).select().single():await client.from("room_notices").insert(body).select().single();
+    if(res.error){console.warn("room_notices",res.error.message||res.error);continue}
+    if(res.data){x.sb=res.data.id;x.id=res.data.id}
+    qpSent.set(x,JSON.stringify(rnToDb(x))+"|"+(x.sb||""));
+  }
+}
+function qpFlush(kind){
+  if(qpDemo())return;
+  qpChain=qpChain.then(()=>qpFlushNow(kind)).catch(e=>console.warn("qp",e));
+}
+async function qpFlushNow(kind){
+  const client=qpSb();if(!client||qpDemo())return;
+  if(!kind||kind==="gr")await qpPushGr(client);
+  if(!kind||kind==="log")await qpPushLogs(client);
+  if(!kind||kind==="tpl")await qpPushTpl(client);
+  if(!kind||kind==="rn")await qpPushRn(client);
+}
+async function qpPull(){
+  if(qpDemo())return;
+  const client=qpSb();if(!client)return;
+  const h=S.hotel;
+  const [gr,tpl,en,sens,rn]=await Promise.all([
+    client.from("guest_requests").select("*").eq("hotel_id",h).order("created_at",{ascending:false}),
+    client.from("log_templates").select("*").eq("hotel_id",h),
+    client.from("log_entries").select("*").eq("hotel_id",h).order("created_at",{ascending:false}),
+    client.from("log_entry_sensitive").select("*").eq("hotel_id",h),
+    client.from("room_notices").select("*").eq("hotel_id",h).order("created_at",{ascending:false})
+  ]);
+  const q=Q();
+  if(!gr.error)q.gr=(gr.data||[]).map(grFromDb).concat((q.gr||[]).filter(r=>!r.ex&&!r.sb));
+  if(!tpl.error&&tpl.data&&tpl.data.length){
+    const base=JSON.parse(JSON.stringify(LS_DEF));
+    tpl.data.forEach(row=>{
+      let s=base.find(x=>x.id===row.sheet);
+      if(!s){s={id:row.sheet,ic:"📒",n:[row.sheet,row.sheet],roles:["GM","AGM"],f:[]};base.push(s)}
+      if(Array.isArray(row.fields)&&row.fields.length)s.f=row.fields;
+      s.off=row.hidden?1:0;s.sb=1;
+    });
+    q.tpl=base;
+  }
+  if(!en.error){
+    const by={};(en.data||[]).forEach(row=>{
+      const extra=(sens.data||[]).find(s=>s.entry_id===row.id);
+      const v=Object.assign({},row.data||{},extra&&extra.data||{});
+      (by[row.sheet]=by[row.sheet]||[]).push({id:row.id,sb:row.id,at:row.created_at,by:row.author_label||"",v,ex:row.example?1:0,balanced:row.balanced});
+    });
+    ["keys","pkg","wake","cash","pool","meter","vendor"].forEach(k=>{if(!by[k])by[k]=[]});
+    const pending={};
+    Object.keys(q.logs||{}).forEach(k=>{(q.logs[k]||[]).forEach(e=>{if(!e.ex&&!e.sb)(pending[k]=pending[k]||[]).push(e)})});
+    Object.keys(pending).forEach(k=>{by[k]=(pending[k]||[]).concat(by[k]||[])});
+    q.logs=by;
+  }
+  if(!rn.error)q.nt=(rn.data||[]).map(rnFromDb).concat((q.nt||[]).filter(x=>!x.ex&&!x.sb));
+  try{await qpEnsureTpl(client)}catch(e){}
+}
+function qpWatch(name,kind){const fn=QP[name];if(typeof fn!=="function")return;QP[name]=function(){const out=fn.apply(this,arguments);qpFlush(kind);return out}}
+["grPost","grAck","grAssign","grCb","grDone"].forEach(n=>qpWatch(n,"gr"));
+["lsAdd","lsTick"].forEach(n=>qpWatch(n,"log"));
+["rnAdd","rnEnd"].forEach(n=>qpWatch(n,"rn"));
+function markTpl(id){const s=lsTpl().find(x=>x.id===id);if(s)s._dirty=1}
+["lsRen","lsDel","lsNew","lsOff","lsReset"].forEach(function(name){
+  const fn=QP[name];
+  QP[name]=function(){const out=fn.apply(this,arguments);markTpl(arguments[0]);qpFlush("tpl");return out};
+});
+if(typeof hydrate==="function"){const _hy=hydrate;hydrate=async function(){const out=await _hy.apply(this,arguments);try{await qpPull();render()}catch(e){console.warn(e)}return out}}
+if(typeof go==="function"){const _go=go;go=function(t){const out=_go.apply(this,arguments);if(!qpDemo()&&(t==="greq"||t==="logs"||t==="notice"||t==="dc"))qpPull().then(()=>{try{render()}catch(e){}});return out}}
+window.QPX={audit,grList,lsRows,rnList,dcState,repHtml,csvParse,srcAll,qpDemo,qpPull,qpFlush};
 try{if(meUser())render()}catch(e){}
 })();
