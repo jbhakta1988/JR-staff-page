@@ -432,7 +432,7 @@ function fillScores(n, pct) {
     var u = null;
     try { u = meUser(); } catch (e) { u = null; }
     if (u && u.hotel) return u.hotel;
-    return (typeof S !== "undefined" && S.hotel) || "MSPWE";
+    return (typeof S !== "undefined" && HOTELS.indexOf(S.hotel) >= 0) ? S.hotel : "";
   }
   function hotelsFor(role) {
     if (normalize(role) === "above_property") return HOTELS.slice();
@@ -649,7 +649,7 @@ function fillScores(n, pct) {
     var chosen = (S.gsMetric && list.some(function (m) { return m.id === S.gsMetric; })) ? S.gsMetric : "itr";
     var chosenMeta = metricById(chosen);
     var editable = normalize(role) === "above_property";
-    var hotelButtons = hotels.map(function (hotel) {
+    var hotelButtons = hotels.length < 2 ? "" : hotels.map(function (hotel) {
       var sum = summarize(mine.length && hotel === detail ? mine : surveys, data.today, hotel, "itr", "topbox");
       return '<button type="button" class="' + (hotel === detail ? "on" : "") + '" onclick="gsPickHotel(\'' + hotel + '\')"><b>' + esc(hotel + " · " + BRAND[hotel]) + "</b>" + kpi(sum) + "</button>";
     }).join("");
@@ -674,7 +674,7 @@ function fillScores(n, pct) {
     return '<div class="gs" id="gsRoot"><h2>' + esc(tx("Guest scores", "Calificaciones de huéspedes")) + "</h2>" +
       sampleNote(data.origin) +
       '<p class="gs-note">' + esc(tx("Top-box is the share of scores that are 9 or 10 out of 10. Google and TripAdvisor are star averages. ITR is the headline.", "La caja alta es la parte de notas de 9 o 10 sobre 10. Google y TripAdvisor son promedios de estrellas. ITR es la cifra principal.")) + " · " + esc(waveTitle(data.today)) + "</p>" +
-      '<div class="gs-hotels">' + hotelButtons + "</div>" +
+      (hotelButtons ? '<div class="gs-hotels">' + hotelButtons + "</div>" : "") +
       '<div class="card"><h3>' + esc(detail + " · " + BRAND[detail]) + " · " + esc(tx("All metrics", "Todas las métricas")) + "</h3>" + grid + "</div>" +
       '<div class="card" id="gsGoal"><h3>' + esc(labelOf(chosenMeta)) + " · " + esc(tx("Goal vs actual", "Meta contra real")) + "</h3>" +
       '<div class="wlseg">' + chips + "</div>" + chart(rows, chosenMeta.kind) +

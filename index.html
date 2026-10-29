@@ -308,6 +308,7 @@ table[data-sp] .rt-sort{padding:6px 4px;font-size:13px;white-space:nowrap}
 <script src="data/places.js"></script>
 <script src="config.js"></script>
 <script src="auth-pin.js"></script>
+<script src="hotel-scope.js"></script>
 <script>
 const HOTELS={MSPWE:"MSPWE · HIE&S Golden Valley",MSPAM:"MSPAM · Hampton Inn & Suites MSP Airport/MOA",MSPMS:"MSPMS · SpringHill Suites MSP Airport/MOA"};
 // Example directory only. Demo mode uses this list and never calls Supabase.
@@ -739,7 +740,8 @@ async function hydrate(){
     if(!USERS.some(u=>u.user_id===p.user_id||u.id===p.user_id))USERS.push(row);
   });
   const names={};profiles.forEach(p=>{names[p.user_id]=p.name});
-  for(const h of Object.keys(HOTELS)){
+  const keepHotel=id=>authRole()==="Above Property"||id===S.hotel;
+  for(const h of HotelScope.hotelsToLoad(authRole(), S.hotel)){
     if(!S.h[h])continue;
     const d=S.h[h];
     const rooms=await dbSelect("rooms",{eq:{hotel_id:h}});
@@ -801,9 +803,9 @@ async function hydrate(){
       if(days.some(day=>by.has(ymd(day))))d.fc=days.map((day,i)=>{const row=by.get(ymd(day));const cur=(d.fc||[])[i]||{d:i,occ:0,arr:0};return row?{d:i,occ:Number(row.occupied_rooms)||0,arr:Number(row.arrivals)||0}:cur});
     }
   }
-  S.sbSignups=await dbSelect("shuttle_signups");
-  const plans=await dbSelect("labor_plans");
-  const punches=await dbSelect("time_punches");
+  S.sbSignups=(await dbSelect("shuttle_signups")).filter(s=>HotelScope.shuttlePaxVisible(authRole(), S.hotel, s.hotel_id));
+  const plans=(await dbSelect("labor_plans")).filter(r=>keepHotel(r.hotel_id));
+  const punches=(await dbSelect("time_punches")).filter(r=>keepHotel(r.hotel_id));
   if((plans.length||punches.length)&&typeof weekDates==="function"){
     const days=weekDates(0).map(ymd);
     plans.forEach(r=>{
@@ -829,7 +831,7 @@ async function hydrate(){
       remoteLabor=true;
     });
   }
-  const shifts=await dbSelect("schedule_shifts");
+  const shifts=(await dbSelect("schedule_shifts")).filter(s=>keepHotel(s.hotel_id));
   if(shifts.length){
     S.shifts=shifts.map(s=>({id:"sb"+s.id,sb_id:s.id,scope:s.department==="shuttle"?"SHUTTLE":s.hotel_id,pos:s.position||"",who:names[s.employee]||"",date:String(s.shift_date).slice(0,10),start:String(s.start_time||"").slice(0,5),end:String(s.end_time||"").slice(0,5)}));
     S.pub=S.pub||{};
@@ -844,6 +846,7 @@ function mergeSbSignups(k){
   if(!block||block.sbMerged||!(S.sbSignups||[]).length)return;
   block.sbMerged=1;
   (S.sbSignups||[]).forEach(s=>{
+    if(!HotelScope.shuttlePaxVisible(authRole(), S.hotel, s.hotel_id))return;
     if(String(s.run_at||"").slice(0,10)!==k)return;
     let run=(block.runs||[]).find(r=>(r.to||"")===(s.destination||"")&&hhmm(s.run_at)===r.t);
     if(!run){run={t:hhmm(s.run_at)||"Saved",to:s.destination||"Shuttle",type:"Saved",st:s.status||"Booked",cap:14,pax:[]};block.runs.push(run)}
@@ -1469,12 +1472,13 @@ return ""},
 lreq(){const d=D(),roles=reqTargetsFor(S.role),R=(d.reqs||[]).filter(x=>x.day==ld()&&roles.some(t=>reqIs(x,t))),openN=R.filter(q=>q.st!="Done").length;return `<h2>Houseperson help</h2><div class="card"><h3>New request</h3><select id="rr" style="width:100%">${roles.map(x=>`<option value="${x}">${reqOptionLabel(x)}</option>`).join("")}</select><input id="rt" style="width:100%;margin-top:6px" placeholder="Task (e.g. Lobby trash run, linen to 3rd floor)"><button class="btn" style="width:100%;margin-top:6px" onclick="addReq()">Send (auto-assigns on-shift)</button><small>Houseperson help alerts the house person and the shuttle driver at this hotel.</small>${S.role!="Housekeeping"&&SHH.includes(S.hotel)?'<small>Shuttle pickups: use the 🚐 Shuttle sign-up sheet.</small>':''}</div>
 <div class="card"><h3>Completion today</h3><table><tr><th>Role</th><th>Checklist</th><th>Requests done</th></tr>${roles.map(x=>{const a=(d.reqs||[]).filter(q=>q.day==ld()&&reqIs(q,x));return `<tr><td>${reqOptionLabel(x)}</td><td>${lpct(reqChecklistRole(x))}%</td><td>${a.filter(q=>q.st=="Done").length}/${a.length}</td></tr>`}).join("")}</table></div>
 <div class="card" id="lreqList"><h3>Requests <span class="badge${openN?"":" zero"}">${openN}</span></h3>${R.map(q=>`<div class="li"><span style="flex:1"><b>${q.text}</b><br><small>${reqOptionLabel(q.kind||q.role)} · ${q.who} · from ${q.by}</small></span><span class="pill ${q.st=='Done'?'VC':q.st=='Started'?'OD':'VD'}">${q.st}${q.t1?" "+q.t1:q.t0?" "+q.t0:""}</span></div>`).join("")||"None yet"}</div>`},
-shut(){if(!SHH.includes(S.hotel))return '<h2>Shuttle</h2><div class="card">No shuttle at this property.</div>';const X=SH(),drv=S.role=="Shuttle Driver",hn=h=>h=="MSPAM"?"Hampton (MSPAM)":"SpringHill (MSPMS)",seats=r=>r.pax.reduce((a,p)=>a+p.n,0);
-const use=["MSPAM","MSPMS"].map(h=>X.runs.reduce((a,r)=>a+r.pax.filter(p=>p.h==h).reduce((b,p)=>b+p.n,0),0));
-return `<h2>${drv?"Driver Manifest":"Shared Shuttle"}</h2><div class="card"><small>One shuttle shared by Hampton (MSPAM) & SpringHill (MSPMS). Sign-ups from both front desks.</small><div class="kpi" style="margin-top:6px"><div><b>${use[0]}</b>MSPAM pax</div><div><b>${use[1]}</b>MSPMS pax</div><div><b>${use[0]+use[1]}</b>Combined</div></div>${S.role=="GM"?`<small>${X.runs.filter(r=>r.st=="Complete").length}/${X.runs.length} runs complete · ${X.miles.reduce((a,m)=>a+m.b-m.a,0)} mi logged</small>`:""}</div>
+shut(){if(!SHH.includes(S.hotel))return '<h2>Shuttle</h2><div class="card">No shuttle at this property.</div>';const X=SH(),drv=S.role=="Shuttle Driver",shared=HotelScope.seesSharedShuttle(authRole(), S.hotel),hotels=shared?["MSPAM","MSPMS"]:[S.hotel],hn=h=>h=="MSPAM"?"Hampton (MSPAM)":"SpringHill (MSPMS)",vis=p=>HotelScope.shuttlePaxVisible(authRole(), S.hotel, p&&p.h),seats=r=>r.pax.filter(vis).reduce((a,p)=>a+(Number(p.n)||0),0);
+const use=hotels.map(h=>X.runs.reduce((a,r)=>a+r.pax.filter(p=>p.h==h&&vis(p)).reduce((b,p)=>b+(Number(p.n)||0),0),0));
+const note=shared?"One shuttle shared by Hampton (MSPAM) & SpringHill (MSPMS). Sign-ups from both front desks.":"Shuttle sign-ups for this hotel.";
+return `<h2>${drv?"Driver Manifest":(shared?"Shared Shuttle":"Shuttle")}</h2><div class="card"><small>${note}</small><div class="kpi" style="margin-top:6px">${hotels.map((h,i)=>`<div><b>${use[i]}</b>${h} pax</div>`).join("")}${shared?`<div><b>${use[0]+use[1]}</b>Combined</div>`:""}</div>${S.role=="GM"?`<small>${X.runs.filter(r=>r.st=="Complete").length}/${X.runs.length} runs complete · ${X.miles.reduce((a,m)=>a+m.b-m.a,0)} mi logged</small>`:""}</div>
 ${!drv&&S.role!="GM"?`<div class="card"><h3>Sign up guest · pickup at ${hn(S.hotel)}</h3><select id="sr" style="width:100%">${X.runs.map((r,i)=>`<option value="${i}">${r.t} → ${r.to} (${r.cap-seats(r)} seats left)</option>`).join("")}</select><div class="row"><input id="sg" placeholder="Guest name"><input id="sm" placeholder="Room" style="max-width:80px"><input id="sn" type="number" value="1" style="max-width:64px"></div><input id="snote" style="width:100%" placeholder="Shuttle note"><button class="btn" style="width:100%" onclick="signUp()">Add to run</button><small id="smsg"></small><div class="row"><input id="ot" placeholder="On-demand time e.g. 2:15 PM"><input id="od" placeholder="Destination"><button class="btn2" style="flex:0 0 90px" onclick="addRun()">Add run</button></div></div>`:""}
 ${X.runs.map((r,i)=>`<div class="card"><div class="row"><b style="flex:2">${r.t} → ${r.to}</b><span class="pill ${seats(r)>=r.cap?'VD':'VC'}">${seats(r)}/${r.cap}</span></div><small>${r.type} · ${r.st}${r.t0?" · left "+r.t0:""}${r.t1?" · done "+r.t1:""}</small>
-${["MSPAM","MSPMS"].map(h=>{const P=r.pax.map((p,j)=>({p,j})).filter(o=>o.p.h==h);return P.length?`<div style="margin-top:6px"><b>Pickup: ${hn(h)}</b>${P.map(o=>`<label class="li"><input type="checkbox" ${o.p.b?'checked':''} onchange="SH().runs[${i}].pax[${o.j}].b=this.checked;save();render()"><span style="flex:1;min-width:0">${o.p.g} · Rm ${o.p.r} · ${o.p.n} pax ${o.p.b?'<small class=good>boarded</small>':''}${noteHtml("pax"+i+"_"+o.j,o.p,"")}</span></label>`).join("")}</div>`:""}).join("")}
+${hotels.map(h=>{const P=r.pax.map((p,j)=>({p,j})).filter(o=>o.p.h==h&&vis(o.p));return P.length?`<div style="margin-top:6px"><b>Pickup: ${hn(h)}</b>${P.map(o=>`<label class="li"><input type="checkbox" ${o.p.b?'checked':''} onchange="SH().runs[${i}].pax[${o.j}].b=this.checked;save();render()"><span style="flex:1;min-width:0">${o.p.g} · Rm ${o.p.r} · ${o.p.n} pax ${o.p.b?'<small class=good>boarded</small>':''}${noteHtml("pax"+i+"_"+o.j,o.p,"")}</span></label>`).join("")}</div>`:""}).join("")}
 ${drv?(r.st=="Pending"?`<button class="btn" style="width:100%" onclick="runSt(${i})">Start trip</button>`:r.st=="En route"?`<button class="btn" style="width:100%" onclick="runSt(${i})">Complete trip</button>`:''):''}</div>`).join("")}`},
 myrooms(){return myRoomsPage()},lf(){const d=D();d.lf=d.lf||[{it:"Black iPhone charger",room:"214",by:"Maria (EX)",at:"10/25",st:"Holding"},{it:"Child's jacket (blue)",room:"305",by:"Rosa (EX)",at:"10/24",st:"Holding"}];return `<h2>Lost & Found</h2><div class="card"><input id="lfi" style="width:100%" placeholder="Item description"><div class="row"><input id="lfr" placeholder="Room/area"><input id="lfb" placeholder="Found by"></div><button class="btn" style="width:100%" onclick="D().lf.unshift({it:$('lfi').value||'-',room:$('lfr').value||'-',by:$('lfb').value||cw(),at:new Date().toLocaleDateString(localeTag()),st:'Holding'});save();render()">Log item</button></div><div class="card">${d.lf.map((x,i)=>`<div class="li"><span style="flex:1"><b>${x.it}</b><br><small>Rm ${x.room} · ${x.by} · ${x.at}</small></span><select style="max-width:120px" onchange="D().lf[${i}].st=this.value;save()">${["Holding","Claimed","Shipped","Disposed"].map(o=>`<option ${o==x.st?'selected':''}>${o}</option>`).join("")}</select></div>`).join("")}</div>`},
 esc(){const d=D(),E2=d.esc||[];return `<h2>Escalations</h2>${alertsCard()}<small>DND / Refused rooms and housekeeper issues land here.</small>${E2.map((x,i)=>`<div class="card"><div class="row"><b style="flex:2">${t("Rm")} ${x.room} · ${t(x.ty)}</b><span class="pill ${x.st=='Resolved'||x.st=='Acknowledged'?'VC':'VD'}">${x.st}</span></div><small>${escH(x.by)} · ${escH(x.at)}${x.note?" · <span class=raw>"+escH(x.note)+"</span>":""}</small>${x.st!="Resolved"&&x.st!="Acknowledged"?`<div class="row"><button type="button" class="btn" onclick="ackEsc(${i})">Acknowledge</button><button class="btn2" onclick="D().esc[${i}].st='Called guest/FD';save();render()">Called guest / FD</button><button class="btn2" onclick="D().esc[${i}].st='Resolved';save();render()">Resolve</button></div>`:""}</div>`).join("")||'<div class="card">No escalations.</div>'}`},
@@ -1773,12 +1777,12 @@ function chkNoteCard(){const d=D(),rows=(d.chkNotes||[]).map((n,i)=>`<div class=
 function addChkNote(){const el=$("ckn");if(!el)return;const text=el.value.trim();if(!text)return;const d=D();d.chkNotes=d.chkNotes||[];d.chkNotes.unshift(Object.assign({by:cw(),at:now(),text},ftCapture(text)));save();render()}
 function walkIss(i,v){const d=D();d.walk[i][2]=v;if(v)d.wo.unshift({id:d.wo.length+1,room:d.walk[i][0],t:v+" (from property walk)",p:"Med",s:"Open",photo:""});save()}
 function mkO(){const d=D(),low=d.inv.filter(x=>x.oh<x.par*.5);if(!low.length)return;d.orders.unshift({at:new Date().toLocaleDateString(localeTag()),st:"Pending GM approval",items:low.map(x=>`${x.it} ×${x.par-x.oh}`).join(", ")});save();render()}
+I18N.es["No hotel is assigned to this sign-in."]="Esta entrada no tiene un hotel asignado.";
 function enforceAccess(){
   // Client-side filtering only, not real security, until a backend with real auth is added.
   const u=meUser();
   if(!u){S.uid="";return}
-  if(u.role!="Above Property")S.hotel=u.hotel;
-  if(!HOTELS[S.hotel])S.hotel=u.hotel||"MSPWE";
+  S.hotel=HotelScope.assignedHotel(u.role, u.hotel, S.hotel);
   if(!leader())S.role=u.role;
   else if(!ROLES.includes(S.role))S.role="GM";
 }
@@ -1848,7 +1852,7 @@ function paintDots(){
 }
 function enterApp(u){
   sset(LAST_SITE,loginSite);
-  S.uid=u.id;S.hotel=u.hotel||(HOTELS[S.hotel]?S.hotel:"MSPWE");S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";
+  S.uid=u.id;S.hotel=HotelScope.assignedHotel(u.role, u.hotel, S.hotel);S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";
   loginPin="";loginErr="";loginUid="";applyUserLanguage(u);
 }
 async function signIn(){
@@ -1976,6 +1980,11 @@ function render(){
   if(!u){renderLogin();return}
   if(u.pin_reset_required){if(!setPinMode)setPinMode="new";renderSetPin();return}
   enforceAccess();
+  if(!HOTELS[S.hotel]){
+    $("hdr").hidden=false;$("hotel").hidden=true;$("hpanel").hidden=true;$("nav").innerHTML="";
+    $("app").innerHTML='<div class="card">'+escH(t("No hotel is assigned to this sign-in."))+'</div>';
+    return;
+  }
   stampBilingual();
   ensureDemoText();
   ensureEquipAll();
@@ -2090,7 +2099,9 @@ function schedPos(){const r=authRole();if(r==="Housekeeping")return ["HK Lead","
 function canEditSched(){return schedPos().length>0}
 function canPublish(){const r=authRole();return r==="Above Property"||r==="GM"||r==="AGM"}
 function schedScope(pos){return pos==="Shuttle Driver"?"SHUTTLE":S.hotel}
-function schedPeople(pos){if(pos==="Shuttle Driver")return USERS.filter(u=>u.role==="Shuttle Driver").sort((a,b)=>a.hotel.localeCompare(b.hotel));const role=pos==="HK Lead"?"Housekeeping":pos;return USERS.filter(u=>u.hotel===S.hotel&&u.role===role)}
+function schedPeople(pos){if(pos==="Shuttle Driver"){const rows=USERS.filter(u=>u.role==="Shuttle Driver"&&u.active!==false);const mine=authRole()==="Above Property"?rows:rows.filter(u=>u.hotel===S.hotel);return mine.sort((a,b)=>String(a.hotel||"").localeCompare(String(b.hotel||""))||a.name.localeCompare(b.name))}const role=pos==="HK Lead"?"Housekeeping":pos;return USERS.filter(u=>u.hotel===S.hotel&&u.role===role)}
+function driverHotel(name){const u=USERS.find(x=>x.name===name&&x.role==="Shuttle Driver");return u?u.hotel:""}
+function shiftVisible(s){return !s?false:HotelScope.ownShift(authRole(), S.hotel, s, driverHotel(s.who))}
 function heBucket(pos){return pos==="Shuttle Driver"?"SHUTTLE":S.hotel}
 function escH(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function ensureSched(){
@@ -2121,7 +2132,7 @@ function ensureSched(){
   S.shifts.push({id:sid(),scope:"MSPWE",pos:"Front Desk",who:"Jordan Lee",date:thu,start:"19:00",end:"23:30"});
   S.schedSeed=1;save();
 }
-function shiftTimes(pos,date){return (S.shifts||[]).filter(s=>s.scope===schedScope(pos)&&s.pos===pos&&s.date===date)}
+function shiftTimes(pos,date){return (S.shifts||[]).filter(s=>s.scope===schedScope(pos)&&s.pos===pos&&s.date===date&&shiftVisible(s))}
 function sumHrs(list){return list.reduce((a,s)=>a+shHrs(s.start,s.end),0)}
 function setWeek(d){S.wk=(S.wk||0)+d;S.editId="";S.hePick=null;S.heClear=0;SCHED_NOTE="";save();render()}
 function setPos(p){if(!schedPos().includes(p))return;S.spos=p;S.editId="";SCHED_NOTE="";save();render()}
@@ -2593,10 +2604,10 @@ function hePlan(pos,di){
   return row?Number(row[di])||0:0;
 }
 function heDaySched(positions,date){
-  return sumHrs((S.shifts||[]).filter(s=>positions.includes(s.pos)&&s.date===date&&s.scope===schedScope(s.pos)));
+  return sumHrs((S.shifts||[]).filter(s=>positions.includes(s.pos)&&s.date===date&&s.scope===schedScope(s.pos)&&shiftVisible(s)));
 }
 function heCellShifts(pos,date,who){
-  return (S.shifts||[]).filter(s=>s.pos===pos&&s.date===date&&s.scope===schedScope(pos)&&(who?s.who===who:!s.who)).sort((a,b)=>a.start.localeCompare(b.start)||String(a.id).localeCompare(String(b.id)));
+  return (S.shifts||[]).filter(s=>s.pos===pos&&s.date===date&&s.scope===schedScope(pos)&&(who?s.who===who:!s.who)&&shiftVisible(s)).sort((a,b)=>a.start.localeCompare(b.start)||String(a.id).localeCompare(String(b.id)));
 }
 function heFlags(people){
   const clopen=new Set(), double=new Set();
@@ -3622,7 +3633,7 @@ function board(per){const me=(meUser()||{}).name||"";const myF=String(me).split(
   return `<table class=t><tr><th>#</th><th>${t("Name")}</th><th>${t("Level")}</th>${view?`<th>${t("Badges")}</th>`:""}<th>${t("pts")}</th></tr>${rows.map((r,k)=>`<tr${r[3]?' style="background:#fff3cd;font-weight:600"':""}><td>${k<3?["🥇","🥈","🥉"][k]:k+1}</td><td><span style="display:flex;align-items:center;gap:6px">${window.avHTML?avHTML(r[3]?null:r[0],32):""}${escH(r[0])}</span></td><td>${r[2]+1}</td>${view?`<td>${bdg(r)||"–"}</td>`:""}<td>${r[1]}</td></tr>`).join("")}</table>`}
 M.pts=["⭐","Points"];
 function ptsViewOnly(){S.ptab=S.ptab||"wk";
-  const hs=Object.keys(HOTELS).map(k=>`<button type="button" class="${k==S.hotel?"on":""}" aria-pressed="${k==S.hotel}" style="${k==S.hotel?"background:#1f2a44;color:#fff;font-weight:700":""}" onclick="setHotel('${k}');go('pts')">${k}</button>`).join("");
+  const hs=authRole()==="Above Property"?Object.keys(HOTELS).map(k=>`<button type="button" class="${k==S.hotel?"on":""}" aria-pressed="${k==S.hotel}" style="${k==S.hotel?"background:#1f2a44;color:#fff;font-weight:700":""}" onclick="setHotel('${k}');go('pts')">${k}</button>`).join(""):"";
   return `<h2>🏁 ${t("Leaderboard")}</h2><div class=card><small>${escH(LANG==="es"?"Solo lectura. Muestra a los asociados del hotel elegido, no tus propios puntos.":"View only. Shows associates at the selected hotel, not your own points.")}</small><div style="display:flex;gap:6px;margin-top:8px" role="group" aria-label="${escH(t("Property"))}">${hs}</div></div>
   <div class=card><b>🏁 ${t("Leaderboard")}</b> · ${escH(S.hotel)}<div style="display:flex;gap:6px;margin:8px 0">${[["wk","This week"],["mo","This month"]].map(x=>`<button class="${S.ptab==x[0]?"on":""}" onclick="S.ptab='${x[0]}';render()">${t(x[1])}</button>`).join("")}</div>${board(S.ptab)}<small>${t("Badges")}: ${BADGES.map(b=>b[2]+" "+escH(LANG==="es"?b[1]:b[0])).join(" · ")}<br>🥉 Bronze · 🥈 Silver · 🥇 Gold</small></div>
   <div class=card><b>📈 ${t("How to earn")}</b><table class=t>${RULES.map(r=>`<tr><td>${escH(LANG==="es"?r[1]:r[0])}</td><td>${r[2]}</td></tr>`).join("")}</table></div>`}
