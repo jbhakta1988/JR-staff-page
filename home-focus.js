@@ -89,13 +89,82 @@
     return items;
   }
 
+  function homeMode(role) {
+    var key = role == null ? "" : String(role);
+    var alias = { "JR Corporate": "Above Property", corporate: "Above Property", above_property: "Above Property" };
+    key = alias[key] || key;
+    return key === "Above Property" ? "data" : "ops";
+  }
+  function dataCards(input) {
+    input = input || {};
+    var cards = [];
+    function add(id, value, en, es, hint) {
+      if (value == null || value === "") return;
+      cards.push({ id: id, value: String(value), en: en, es: es, hint: hint || "" });
+    }
+    add("occ", input.occ, "Occupancy", "Ocupación", input.occHint);
+    add("adr", input.adr, "ADR", "ADR", input.adrHint);
+    add("revpar", input.revpar, "RevPAR", "RevPAR", input.revparHint);
+    add("labor", input.laborVar, "Labor vs plan", "Labor contra el plan", input.laborHint);
+    add("wo", input.openWo, "Open work orders", "Órdenes abiertas", input.woHint);
+    add("score", input.score, "Guest score", "Calificación", input.scoreHint);
+    add("leads", input.leads, "Sales leads", "Prospectos", input.leadsHint);
+    add("response", input.avgHours, "Avg response hrs", "Horas de respuesta", input.responseHint);
+    return cards;
+  }
+  function compareColumns(rows) {
+    var cols = [
+      { id: "occ", en: "Occ", es: "Ocup." },
+      { id: "adr", en: "ADR", es: "ADR" },
+      { id: "revpar", en: "RevPAR", es: "RevPAR" },
+      { id: "labor", en: "Labor vs plan", es: "Labor vs plan" },
+      { id: "wo", en: "Open WOs", es: "Órdenes" },
+      { id: "score", en: "Guest score", es: "Calificación" },
+      { id: "leads", en: "Leads", es: "Prospectos" },
+      { id: "hours", en: "Avg response", es: "Respuesta" }
+    ];
+    return cols.filter(function (col) {
+      return (rows || []).some(function (row) { return row && row[col.id] != null && row[col.id] !== ""; });
+    });
+  }
+  function sparkPath(values, w, h) {
+    var nums = (values || []).map(Number).filter(function (n) { return isFinite(n); });
+    if (nums.length < 2) return "";
+    var min = Math.min.apply(null, nums);
+    var max = Math.max.apply(null, nums);
+    var span = max - min || 1;
+    var width = w || 112;
+    var height = h || 28;
+    return nums.map(function (n, i) {
+      var x = (i / (nums.length - 1)) * width;
+      var y = height - ((n - min) / span) * (height - 4) - 2;
+      return (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+    }).join(" ");
+  }
+  function opsSections(input) {
+    input = input || {};
+    var out = [];
+    if (input.tasks && input.tasks.length) out.push("tasks");
+    if (input.rooms && input.rooms.length) out.push("rooms");
+    if (input.alerts && input.alerts.length) out.push("alerts");
+    if (input.notes && input.notes.length) out.push("notes");
+    if (input.orders && input.orders.length) out.push("orders");
+    if (input.checks && input.checks.length) out.push("checks");
+    return out;
+  }
+
   var api = {
     todayModel: todayModel,
     portfolioRow: portfolioRow,
     hotelsFor: hotelsFor,
     slotFor: slotFor,
     cardIsEmpty: cardIsEmpty,
-    urgentItems: urgentItems
+    urgentItems: urgentItems,
+    homeMode: homeMode,
+    dataCards: dataCards,
+    compareColumns: compareColumns,
+    sparkPath: sparkPath,
+    opsSections: opsSections
   };
   root.HHQHome = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -328,20 +397,298 @@
   function kpiHtml(model) {
     if (model.noteEn) return "<p class=\"hhq-note\">" + esc(L(model.noteEn, model.noteEs)) + "</p>";
     if (!model.items.length) return "";
-    return "<div class=\"hhq-kpis\">" + model.items.map(function (item) {
+    return "<div class=\"hhq-kpis hhq-slim\">" + model.items.map(function (item) {
       return "<div><b>" + esc(item.n) + "</b><span>" + esc(L(item.en, item.es)) + "</span></div>";
+    }).join("") + "</div>";
+  }
+  function finite(v) {
+    if (v == null || v === "") return null;
+    var n = Number(v);
+    return isFinite(n) ? n : null;
+  }
+  function avgOf(list) {
+    var nums = (list || []).map(finite).filter(function (n) { return n != null; });
+    if (!nums.length) return null;
+    return nums.reduce(function (s, n) { return s + n; }, 0) / nums.length;
+  }
+  function fmtSignedHours(n) {
+    if (n == null || !isFinite(Number(n))) return null;
+    var v = Math.round(Number(n) * 10) / 10;
+    return (v > 0 ? "+" : "") + v + "h";
+  }
+  function fmtPct(n) {
+    if (n == null || !isFinite(Number(n))) return null;
+    return String(Math.round(Number(n))) + "%";
+  }
+  function money(n) {
+    if (n == null || !isFinite(Number(n))) return null;
+    return "$" + (Math.round(Number(n) * 100) / 100).toFixed(2);
+  }
+  var scoreMemo = null;
+  var leadMemo = null;
+  function scoreBundle() {
+    var day = new Date().toISOString().slice(0, 10);
+    if (scoreMemo && scoreMemo.day === day) return scoreMemo.data;
+    if (!root.GuestScores || !GuestScores.buildDemo) return null;
+    try {
+      scoreMemo = { day: day, data: GuestScores.buildDemo(day) };
+      return scoreMemo.data;
+    } catch (e) { return null; }
+  }
+  function leadBundle() {
+    var day = new Date().toISOString().slice(0, 10);
+    if (leadMemo && leadMemo.day === day) return leadMemo.data;
+    if (!root.SalesLeads || !SalesLeads.buildDemo || !SalesLeads.rollup) return null;
+    try {
+      leadMemo = { day: day, data: SalesLeads.buildDemo(day) };
+      return leadMemo.data;
+    } catch (e2) { return null; }
+  }
+  function hotelFacts(code) {
+    var bag = (typeof S !== "undefined" && S.h) ? (S.h[code] || {}) : {};
+    var fc = bag.fc || [];
+    var first = fc[0] || {};
+    var occ = first.occ != null && first.occ !== "" ? finite(first.occ) : null;
+    var adr = first.adr != null && first.adr !== "" ? finite(first.adr) : (bag.adr != null ? finite(bag.adr) : null);
+    var revpar = first.revpar != null && first.revpar !== "" ? finite(first.revpar) : (bag.revpar != null ? finite(bag.revpar) : null);
+    var series = fc.map(function (row) { return row && row.occ != null ? finite(row.occ) : null; }).filter(function (n) { return n != null; });
+    var labor = null;
+    if (bag.labor && bag.labor.length) {
+      labor = bag.labor.reduce(function (sum, row) {
+        return sum + (finite(row.a) || 0) - (finite(row.p) || 0);
+      }, 0);
+    }
+    var openWo = bag.wo ? bag.wo.filter(function (w) { return w && w.s !== "Done"; }).length : null;
+    var score = null;
+    var goal = null;
+    if (featureOn(code, "guest_scores")) {
+      var packed = scoreBundle();
+      if (packed && root.GuestScores && GuestScores.summarize) {
+        var today = scoreMemo.day;
+        var sum = GuestScores.summarize(packed.surveys, today, code, "itr", "topbox");
+        if (sum && sum.wave && sum.wave.n > 0 && sum.wave.value != null) score = sum.wave.value;
+        if (GuestScores.monthRows) {
+          var months = GuestScores.monthRows(packed.surveys, packed.goals, today, code, "itr", "topbox");
+          for (var i = months.length - 1; i >= 0; i--) {
+            if (months[i].goal != null) { goal = months[i].goal; break; }
+          }
+        }
+      }
+    }
+    var leads = null;
+    var hours = null;
+    if (featureOn(code, "sales_leads")) {
+      var leadsData = leadBundle();
+      if (leadsData) {
+        var rolled = SalesLeads.rollup(leadsData.leads, [code]);
+        var row = rolled && rolled[0];
+        if (row) {
+          leads = row.total;
+          hours = row.avgHours;
+        }
+      }
+    }
+    return {
+      code: code,
+      occ: occ,
+      adr: adr,
+      revpar: revpar,
+      series: series,
+      labor: labor,
+      openWo: openWo,
+      score: score,
+      goal: goal,
+      leads: leads,
+      hours: hours
+    };
+  }
+  function dataBoardHtml() {
+    var hotels = seenHotels();
+    var facts = hotels.map(hotelFacts);
+    var cards = dataCards({
+      occ: fmtPct(avgOf(facts.map(function (f) { return f.occ; }))),
+      adr: money(avgOf(facts.map(function (f) { return f.adr; }))),
+      revpar: money(avgOf(facts.map(function (f) { return f.revpar; }))),
+      laborVar: fmtSignedHours((function () {
+        var rows = facts.filter(function (f) { return f.labor != null; });
+        if (!rows.length) return null;
+        return rows.reduce(function (s, f) { return s + f.labor; }, 0);
+      })()),
+      openWo: (function () {
+        var rows = facts.filter(function (f) { return f.openWo != null; });
+        if (!rows.length) return null;
+        return String(rows.reduce(function (s, f) { return s + f.openWo; }, 0));
+      })(),
+      score: (function () {
+        var n = avgOf(facts.map(function (f) { return f.score; }));
+        return n == null ? null : (Math.round(n * 10) / 10).toFixed(1) + "%";
+      })(),
+      scoreHint: (function () {
+        var n = avgOf(facts.map(function (f) { return f.goal; }));
+        return n == null ? "" : L("Goal", "Meta") + " " + (Math.round(n * 10) / 10).toFixed(1) + "%";
+      })(),
+      leads: (function () {
+        var rows = facts.filter(function (f) { return f.leads != null; });
+        if (!rows.length) return null;
+        return String(rows.reduce(function (s, f) { return s + f.leads; }, 0));
+      })(),
+      avgHours: (function () {
+        var n = avgOf(facts.map(function (f) { return f.hours; }));
+        if (n == null) return null;
+        return root.SalesLeads && SalesLeads.formatHours ? SalesLeads.formatHours(n) : (Math.round(n * 10) / 10).toFixed(1);
+      })()
+    });
+    var display = facts.map(function (f) {
+      var full = (typeof HOTELS !== "undefined" && HOTELS[f.code]) || f.code;
+      var parts = String(full).split(" · ");
+      var scoreText = f.score == null ? null : (Math.round(f.score * 10) / 10).toFixed(1) + "%";
+      if (scoreText && f.goal != null) scoreText += " · " + (Math.round(f.goal * 10) / 10).toFixed(1) + "%";
+      return {
+        code: f.code,
+        name: parts[1] || "",
+        series: f.series,
+        occ: f.occ == null ? null : f.occ + "%",
+        adr: money(f.adr),
+        revpar: money(f.revpar),
+        labor: fmtSignedHours(f.labor),
+        wo: f.openWo == null ? null : String(f.openWo),
+        score: scoreText,
+        leads: f.leads == null ? null : String(f.leads),
+        hours: f.hours == null ? null : (root.SalesLeads && SalesLeads.formatHours ? SalesLeads.formatHours(f.hours) : String(f.hours))
+      };
+    });
+    var cols = compareColumns(display);
+    var kpi = cards.length ? "<div class=\"hhq-kpis hhq-stat\" id=\"hhqStat\">" + cards.map(function (card) {
+      return "<div data-kpi=\"" + esc(card.id) + "\"><b>" + esc(card.value) + "</b><span>" + esc(L(card.en, card.es)) + "</span>" + (card.hint ? "<small>" + esc(card.hint) + "</small>" : "") + "</div>";
+    }).join("") + "</div>" : "";
+    var sparks = display.filter(function (row) { return sparkPath(row.series); });
+    var spark = sparks.length ? "<div class=\"hhq-sparks\" id=\"hhqSparks\">" + sparks.map(function (row) {
+      var d = sparkPath(row.series);
+      return "<button type=\"button\" class=\"hhq-spark\" onclick=\"hhqOpenHotel('" + esc(row.code) + "')\"><b>" + esc(row.code) + "</b><svg viewBox=\"0 0 112 28\" width=\"112\" height=\"28\" aria-hidden=\"true\"><path d=\"" + d + "\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span>" + esc(row.occ || "") + "</span></button>";
+    }).join("") + "</div>" : "";
+    var table = display.length ? "<div class=\"hhq-scroll\"><table class=\"hhq-cmp\" id=\"hhqCompare\"><thead><tr><th>" + esc(L("Hotel", "Hotel")) + "</th>" + cols.map(function (col) {
+      return "<th>" + esc(L(col.en, col.es)) + "</th>";
+    }).join("") + "</tr></thead><tbody>" + display.map(function (row) {
+      return "<tr><td><button type=\"button\" class=\"hhq-hotel-link\" onclick=\"hhqOpenHotel('" + esc(row.code) + "')\"><b>" + esc(row.code) + "</b><small>" + esc(row.name) + "</small></button></td>" + cols.map(function (col) {
+        var val = row[col.id];
+        return "<td>" + esc(val == null || val === "" ? "—" : val) + "</td>";
+      }).join("") + "</tr>";
+    }).join("") + "</tbody></table></div>" : "";
+    if (!kpi && !spark && !table) return "";
+    return "<div class=\"hhq-board\" id=\"hhqData\"><p class=\"hhq-day\">" + esc(L("Portfolio", "Portafolio")) + "</p>" + kpi + spark + table + "</div>";
+  }
+  function labelOf(it) {
+    var label = it && it.label;
+    try { if (typeof bi === "function") return String(bi(label) || ""); } catch (e) {}
+    if (Array.isArray(label)) return String(label[0] || "");
+    if (label && typeof label === "object") return String(label.en || label.es || "");
+    return String(label || "");
+  }
+  function opsModel() {
+    var bag = (S.h || {})[S.hotel] || {};
+    var tasks = [];
+    try {
+      if (typeof myReqs === "function") {
+        myReqs().filter(function (row) { return row && row.st !== "Done"; }).slice(0, 4).forEach(function (row) {
+          tasks.push(String(row.text || row.t || L("Request", "Solicitud")));
+        });
+      }
+    } catch (e) {}
+    if (S.role === "Housekeeper") {
+      var me = "";
+      try { me = cw(); } catch (e2) { me = ""; }
+      (bag.rooms || []).filter(function (room) {
+        return room.hk === me && (/D$|RFI/.test(room.s || "")) && !room.t1;
+      }).slice(0, 4).forEach(function (room) {
+        tasks.push(L("Room", "Cuarto") + " " + room.n);
+      });
+    }
+    var checks = [];
+    if (typeof ITEMS === "function" && typeof isD === "function") {
+      checks = ITEMS().filter(function (it) {
+        if (S.role !== "GM" && String(it.key || "").indexOf("GM-") === 0) return false;
+        var grp = String(it.grp || "");
+        var mine = it.def === S.role || grp.indexOf(S.role) === 0 || (S.role === "GM" && grp.indexOf("GM") === 0);
+        if (!mine) return false;
+        try { return !isD(it.key, it.per); } catch (err) { return false; }
+      }).slice(0, 4).map(labelOf).filter(Boolean);
+    }
+    var notes = (bag.notes || []).slice(0, 2).map(function (note) {
+      return { title: String(note.sh || ""), text: String(note.t || "") };
+    }).filter(function (note) { return note.text; });
+    var orders = (bag.wo || []).filter(function (row) { return row && row.s !== "Done"; }).slice(0, 4).map(function (row) {
+      return { room: String(row.room || ""), text: String(row.t || ""), status: String(row.s || ""), pri: String(row.p || "") };
+    });
+    var rooms = bag.rooms || [];
+    return { tasks: tasks, rooms: rooms, notes: notes, orders: orders, checks: checks };
+  }
+  function opsPanelHtml() {
+    var model = opsModel();
+    var keys = opsSections(model);
+    if (!keys.length) return "";
+    var statusName = {
+      VC: ["Vacant clean", "Vacío limpio"],
+      VD: ["Vacant dirty", "Vacío sucio"],
+      OC: ["Occupied clean", "Ocupado limpio"],
+      OD: ["Occupied dirty", "Ocupado sucio"],
+      OOO: ["Out of order", "Fuera de servicio"],
+      RFI: ["Ready to inspect", "Listo p/ inspección"]
+    };
+    function jump(id, en, es) {
+      return "<button type=\"button\" class=\"hhq-jump\" onclick=\"go('" + id + "')\">" + esc(L(en, es)) + "</button>";
+    }
+    var blocks = {
+      tasks: function () {
+        return "<section id=\"hhqTasks\"><div class=\"hhq-hd\"><h3>" + esc(L("Today's tasks", "Tareas de hoy")) + "</h3>" + jump("my", "Open", "Abrir") + "</div><ul>" + model.tasks.map(function (line) {
+          return "<li>" + esc(line) + "</li>";
+        }).join("") + "</ul></section>";
+      },
+      rooms: function () {
+        var counts = {};
+        model.rooms.forEach(function (room) {
+          var key = room.s || "";
+          if (!key) return;
+          counts[key] = (counts[key] || 0) + 1;
+        });
+        var pills = Object.keys(counts).map(function (key) {
+          var name = statusName[key] || [key, key];
+          return "<span class=\"pill " + esc(key) + "\">" + esc(counts[key] + " " + L(name[0], name[1])) + "</span>";
+        }).join("");
+        if (!pills) return "";
+        return "<section id=\"hhqRooms\"><div class=\"hhq-hd\"><h3>" + esc(L("Room status", "Estado de cuartos")) + "</h3>" + jump("rooms", "Board", "Tablero") + "</div><div class=\"hhq-pills\">" + pills + "</div></section>";
+      },
+      notes: function () {
+        return "<section id=\"hhqNotes\"><div class=\"hhq-hd\"><h3>" + esc(L("Shift notes", "Notas de turno")) + "</h3>" + jump("notes", "Open", "Abrir") + "</div>" + model.notes.map(function (note) {
+          return "<p><b>" + esc(note.title) + "</b> " + esc(note.text) + "</p>";
+        }).join("") + "</section>";
+      },
+      orders: function () {
+        return "<section id=\"hhqOrders\"><div class=\"hhq-hd\"><h3>" + esc(L("Work orders", "Órdenes")) + "</h3>" + jump("wo", "Open", "Abrir") + "</div><ul>" + model.orders.map(function (row) {
+          var cls = row.status === "Done" ? "VC" : row.status === "In Progress" ? "OD" : (row.pri === "High" ? "VD" : "OC");
+          var pill = "<span class=\"pill " + cls + "\">" + esc(row.status || row.pri || "") + "</span> ";
+          return "<li>" + pill + "<b>" + esc(row.room) + "</b> " + esc(row.text) + "</li>";
+        }).join("") + "</ul></section>";
+      },
+      checks: function () {
+        return "<section id=\"hhqChecks\"><div class=\"hhq-hd\"><h3>" + esc(L("Checklists", "Listas")) + "</h3>" + jump("check", "Open", "Abrir") + "</div><ul>" + model.checks.map(function (line) {
+          return "<li>" + esc(line) + "</li>";
+        }).join("") + "</ul></section>";
+      }
+    };
+    return "<div class=\"hhq-ops\" id=\"hhqOps\">" + keys.map(function (key) {
+      return blocks[key] ? blocks[key]() : "";
     }).join("") + "</div>";
   }
   function buildTop(hi, search) {
     var section = document.createElement("section");
     section.id = "uxHero";
-    section.className = "hhq-home";
+    section.className = "hhq-home " + (corporatePortfolio() ? "hhq-data-home" : "hhq-ops-home");
     var today = document.createElement("div");
     today.className = "hhq-today";
     today.id = "hhqToday";
     if (hi) today.appendChild(hi);
     if (corporatePortfolio()) {
-      today.insertAdjacentHTML("beforeend", "<div class=\"hhq-hotels\" id=\"hhqHotels\">" + hotelButtons() + "</div>");
+      today.insertAdjacentHTML("beforeend", dataBoardHtml());
     } else {
       if (can("see.allHotels") && S.hhqDrill) {
         today.insertAdjacentHTML("beforeend", "<button type=\"button\" class=\"hhq-back\" onclick=\"hhqPortfolio()\">‹ " + esc(L("All hotels", "Todos los hoteles")) + "</button>");
@@ -391,6 +738,7 @@
       shell.id = "hhqFocus";
       var top = buildTop(hi, search);
       placeActions(top, actions);
+      if (!corporatePortfolio()) top.insertAdjacentHTML("beforeend", opsPanelHtml());
       shell.appendChild(top);
       var more = document.createElement("details");
       more.id = "hhqMore";
@@ -494,6 +842,44 @@
     "#uxHero.hhq-home:not(:has(.hhq-urgent))>.hhq-today{grid-column:1;grid-row:1}",
     "#uxHero.hhq-home:not(:has(.hhq-urgent))>.hhq-actions{grid-column:2;grid-row:1;align-content:start}",
     "#hhqMore{margin-top:16px}",
+    "#uxHero.hhq-home>.hhq-ops{grid-column:1/-1}",
+    "#uxHero.hhq-home.hhq-data-home>.hhq-today{grid-column:1/-1}",
+    "}",
+    ".hhq-today,.hhq-urgent,#hhqMore,.hhq-ops section{background:var(--surface,#fff);border:1px solid var(--line,#e6e8ee);box-shadow:var(--shadow,0 1px 2px rgba(16,24,40,.05))}",
+    ".hhq-urgent{background:var(--warn-bg,#fff7ed);border-color:var(--warn-line,#fed7aa)}",
+    ".hhq-stat{grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px}",
+    ".hhq-stat div,.hhq-slim div{background:var(--surface-2,#f7f8fa);border:1px solid var(--line,#e6e8ee);border-radius:12px;padding:12px 8px}",
+    ".hhq-stat small{display:block;margin-top:4px;color:var(--muted,#5c6570);font-size:12px;font-weight:650}",
+    ".hhq-slim{margin-top:8px}",
+    ".hhq-ops-home .hhq-actions{margin-top:8px}",
+    ".hhq-ops-home .ux-act{min-height:88px;font-size:16px}",
+    "#hhqFocus .ux-act{background:var(--surface,#fff);color:var(--ink,#1c1f26);border:1px solid var(--line,#e6e8ee)}",
+    "#hhqFocus .ux-act.pri{background:var(--accent,#3b5bdb);color:#fff;border-color:transparent}",
+    "#hhqFocus .ux-hi{color:var(--ink,#1c1f26)}",
+    "#hhqFocus .ux-search{background:var(--surface-2,#f7f8fa);color:var(--ink,#1c1f26);border:1px solid var(--line,#e6e8ee)}",
+    ".hhq-board{display:flex;flex-direction:column;gap:12px}",
+    ".hhq-sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}",
+    ".hhq-spark{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--surface,#fff);border:1px solid var(--line,#e6e8ee);border-radius:12px;min-height:48px;padding:8px 10px;color:var(--accent,#3b5bdb)}",
+    ".hhq-spark b{min-width:64px}",
+    ".hhq-spark span{margin-left:auto;color:var(--ink,#1c1f26);font-weight:700}",
+    ".hhq-scroll{overflow:auto;border:1px solid var(--line,#e6e8ee);border-radius:12px}",
+    ".hhq-cmp{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}",
+    ".hhq-cmp th{position:sticky;top:0;background:var(--surface-2,#f7f8fa);color:var(--muted,#5c6570);font-size:12px;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--line,#e6e8ee)}",
+    ".hhq-cmp td{padding:8px 12px;border-bottom:1px solid var(--line,#e6e8ee);vertical-align:middle}",
+    ".hhq-cmp tbody tr:nth-child(even) td{background:var(--zebra,#fafbfc)}",
+    ".hhq-hotel-link{display:flex;flex-direction:column;align-items:flex-start;background:transparent;border:0;padding:0;min-height:44px;color:inherit;font-weight:700}",
+    ".hhq-hotel-link small{color:var(--muted,#5c6570);font-weight:600}",
+    ".hhq-ops{display:grid;gap:8px;margin-top:8px}",
+    ".hhq-ops section{border-radius:12px;padding:8px 12px 12px}",
+    ".hhq-hd{display:flex;align-items:center;justify-content:space-between;gap:8px}",
+    ".hhq-ops h3{margin:8px 0;font-size:15px}",
+    ".hhq-ops ul{margin:0;padding-left:18px}",
+    ".hhq-ops li,.hhq-ops p{margin:0 0 8px;line-height:1.4}",
+    ".hhq-pills{display:flex;flex-wrap:wrap;gap:8px}",
+    ".hhq-jump{background:var(--surface-2,#f7f8fa);border:1px solid var(--line,#e6e8ee);border-radius:10px;min-height:36px;font-weight:700;padding:0 12px}",
+    "@media(min-width:1024px){",
+    ".hhq-ops{grid-template-columns:1fr 1fr}",
+    ".hhq-ops section:last-child:nth-child(odd){grid-column:1/-1}",
     "}"
   ].join("");
   document.head.appendChild(css);
