@@ -2,8 +2,8 @@
    The property and the staff name are filled in. The guest needs a phone or an
    email. Demo rows use fake contacts (example.test, 555-010 numbers) and say so.
    With Supabase on, save_sales_lead writes the row, then the sales-lead-email
-   function asks Resend to mail the hotel's sales manager. A failed send keeps
-   the lead and flags it "Email not sent". A reply stores responded_at and shows
+   function mails the hotel's sales manager through Gmail SMTP. A failed send
+   keeps the lead and flags it "Email not sent". A reply stores responded_at and shows
    a Responded badge. JR Corporate's Sales Leads by Hotel card is built here and
    home-focus.js parks it under More, not on the home surface. */
 (function (root) {
@@ -64,8 +64,8 @@
     "Email sent": "Correo enviado",
     "The demo does not send mail.": "La demostración no envía correo.",
     "No sales manager email is set for this hotel.": "Este hotel no tiene correo del gerente de ventas.",
-    "The Resend key is not set.": "Falta la clave de Resend.",
-    "The sender address is not set.": "Falta la dirección del remitente.",
+    "The Gmail app password is not set.": "Falta la contraseña de aplicación de Gmail.",
+    "The Gmail login is not set.": "Falta el correo de acceso de Gmail.",
     "The email service did not accept it.": "El servicio de correo no lo aceptó.",
     "Add another lead": "Agregar otro prospecto",
     "See sales leads": "Ver prospectos",
@@ -81,7 +81,7 @@
     "Loading sales leads…": "Cargando prospectos…",
     "Sales manager emails": "Correos del gerente de ventas",
     "One address per line. Up to five. GM and JR Corporate can change these.": "Un correo por línea. Hasta cinco. El gerente y JR Corporate pueden cambiarlos.",
-    "Jay sets the Supabase secrets RESEND_API_KEY and SALES_LEAD_FROM. Do not put a real address in the public repo.": "Jay configura los secretos de Supabase RESEND_API_KEY y SALES_LEAD_FROM. No pongas un correo real en el repositorio público.",
+    "Jay sets the Supabase secrets HOTELHQ_GMAIL_USER and HOTELHQ_GMAIL_APP_PASSWORD. Do not put a real address in the public repo.": "Jay configura los secretos de Supabase HOTELHQ_GMAIL_USER y HOTELHQ_GMAIL_APP_PASSWORD. No pongas un correo real en el repositorio público.",
     "Add email": "Agregar correo",
     "Save emails": "Guardar correos",
     "No sales manager email yet.": "Todavía no hay correo del gerente de ventas.",
@@ -126,8 +126,9 @@
   var EMAIL_REASON = {
     demo: "The demo does not send mail.",
     no_route: "No sales manager email is set for this hotel.",
-    no_key: "The Resend key is not set.",
-    no_from: "The sender address is not set.",
+    no_password: "The Gmail app password is not set.",
+    no_key: "The Gmail app password is not set.",
+    no_from: "The Gmail login is not set.",
     provider: "The email service did not accept it.",
     config: "The email service did not accept it.",
     busy: "The email service did not accept it."
@@ -534,7 +535,7 @@
     return "<section class=\"card\" id=\"slSettings\"><button type=\"button\" class=\"btn2\" id=\"slSettingsBtn\" onclick=\"slSettings(" + (ctx.settingsOpen ? "0" : "1") + ")\">" +
       esc(label("Sales manager emails", lang)) + "</button><div id=\"slSettingsBody\"" + open + ">" +
       "<p class=\"sl-note\">" + esc(label("One address per line. Up to five. GM and JR Corporate can change these.", lang)) + "</p>" +
-      "<p class=\"sl-note\">" + esc(label("Jay sets the Supabase secrets RESEND_API_KEY and SALES_LEAD_FROM. Do not put a real address in the public repo.", lang)) + "</p>" +
+      "<p class=\"sl-note\">" + esc(label("Jay sets the Supabase secrets HOTELHQ_GMAIL_USER and HOTELHQ_GMAIL_APP_PASSWORD. Do not put a real address in the public repo.", lang)) + "</p>" +
       demo + inputs +
       "<button type=\"button\" class=\"btn2\" onclick=\"slRouteAdd()\">" + esc(label("Add email", lang)) + "</button>" +
       "<button type=\"button\" class=\"btn\" id=\"slSaveEmails\" onclick=\"slSaveEmails()\">" + esc(label("Save emails", lang)) + "</button></div></section>";

@@ -62,10 +62,10 @@ comment on table public.sales_leads is
   'One sales lead: hotel, created_by, contact fields, status (New, Contacted, Won, Lost), and timestamps. No sample rows.';
 
 comment on column public.sales_leads.email_status is
-  'pending or sending or failed means the sales email was not sent. sent means Resend accepted it.';
+  'pending or sending or failed means the sales email was not sent. sent means the mail server accepted it.';
 
 comment on column public.sales_leads.email_error is
-  'Short code only, such as no_route or provider. Never an API key or a response body.';
+  'Short code only, such as no_route or provider. Never a mailbox password or a response body.';
 
 create table if not exists public.sales_lead_routes (
   hotel text primary key check (hotel in ('MSPWE', 'MSPAM', 'MSPMS')),

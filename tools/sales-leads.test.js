@@ -46,10 +46,19 @@ test("a lead needs a real name plus a phone or a valid email", () => {
 test("the subject names the hotel and the contact", () => {
   assert.equal(sl.subjectLine("MSPWE", "Alex\n", " Example "), "New sales lead - MSPWE - Alex Example");
   assert.match(fn, /New sales lead - \$\{hotel\} - \$\{contact\}/);
-  assert.match(fn, /Deno\.env\.get\("RESEND_API_KEY"\)/);
-  assert.match(fn, /Deno\.env\.get\("SALES_LEAD_FROM"\)/);
+  assert.match(fn, /Deno\.env\.get\("HOTELHQ_GMAIL_USER"\)/);
+  assert.match(fn, /Deno\.env\.get\("HOTELHQ_GMAIL_APP_PASSWORD"\)/);
+  assert.match(fn, /smtp\.gmail\.com/);
+  assert.match(fn, /port:\s*465/);
+  assert.match(fn, /tls:\s*true/);
+  assert.match(fn, /sales_lead_routes/);
+  assert.match(fn, /email_status/);
+  assert.match(fn, /emailed_at/);
+  assert.match(fn, /email_error/);
   assert.match(fn, /&lt;/);
+  assert.doesNotMatch(fn, /RESEND_API_KEY|SALES_LEAD_FROM|api\.resend\.com/);
   assert.doesNotMatch(fn, /re_[A-Za-z0-9]{8,}/);
+  assert.doesNotMatch(fn, /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
 });
 
 test("demo contacts are fake and this week's new count is one per hotel", () => {

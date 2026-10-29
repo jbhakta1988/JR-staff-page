@@ -4,12 +4,17 @@
 // fails, it marks the row failed and the screen says "Email not sent".
 // The lead is never deleted here.
 //
-// Jay sets these Supabase Edge Function secrets. Do not commit the values.
-// Dashboard → Edge Functions → Secrets, or: supabase secrets set NAME=value
+// Mail goes out through Gmail SMTP (smtp.gmail.com, port 465, TLS) with
+// denomailer. Jay sets these Supabase Edge Function secrets. Do not commit
+// the values. Dashboard → Edge Functions → Secrets, or:
+//   supabase secrets set NAME=value
 //
-//   RESEND_API_KEY    Resend API key from https://resend.com/api-keys
-//   SALES_LEAD_FROM   Verified sender, for example HotelHQ <leads@your-domain>
-//                     Verify that domain in Resend before the first real lead.
+//   HOTELHQ_GMAIL_USER          Mailbox login. This is also the From address.
+//   HOTELHQ_GMAIL_APP_PASSWORD  Google app password for that mailbox.
+//                               It is not the normal mailbox password.
+//
+// Recipients are public.sales_lead_routes.emails for the lead's hotel.
+// Do not put a real address or a password in this public repo.
 //
 // Supabase already provides SUPABASE_URL plus either SUPABASE_SECRET_KEYS and
 // SUPABASE_PUBLISHABLE_KEYS, or the legacy SUPABASE_SERVICE_ROLE_KEY and
@@ -22,6 +27,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const HOTEL_NAME: Record<string, string> = {
   MSPWE: "MSPWE · HIE&S Golden Valley",
@@ -76,11 +82,6 @@ function oneLine(value: unknown): string {
 
 function isEmail(value: string): boolean {
   return value.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function fromOk(value: string): boolean {
-  const wrapped = value.match(/<([^>]+)>/);
-  return isEmail((wrapped ? wrapped[1] : value).trim());
 }
 
 function subjectLine(hotel: string, contact: string): string {
@@ -177,32 +178,43 @@ Deno.serve(async (req) => {
   const subject = subjectLine(hotel, contact);
   let reason = "";
   let sent = false;
-  const apiKey = Deno.env.get("RESEND_API_KEY") || "";
-  const from = oneLine(Deno.env.get("SALES_LEAD_FROM") || "");
+  const from = oneLine(Deno.env.get("HOTELHQ_GMAIL_USER") || "");
+  const password = (Deno.env.get("HOTELHQ_GMAIL_APP_PASSWORD") || "").replace(/[\r\n]/g, "").trim();
   const { data: route } = await admin.from("sales_lead_routes").select("emails").eq("hotel", hotel).maybeSingle();
   const to = ((route && route.emails) || []).map((item: unknown) => oneLine(item).toLowerCase()).filter(isEmail);
 
   try {
-    if (!apiKey) reason = "no_key";
-    else if (!fromOk(from)) reason = "no_from";
+    if (!isEmail(from)) reason = "no_from";
+    else if (!password) reason = "no_password";
     else if (!to.length) reason = "no_route";
     else {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
+      const client = new SMTPClient({
+        connection: {
+          hostname: "smtp.gmail.com",
+          port: 465,
+          tls: true,
+          auth: {
+            username: from,
+            password
+          }
+        }
+      });
+      try {
+        await client.send({
           from,
           to,
           subject,
-          html: htmlBody(lead),
-          text: textBody(lead)
-        })
-      });
-      if (res.ok) sent = true;
-      else reason = "provider";
+          content: textBody(lead),
+          html: htmlBody(lead)
+        });
+        sent = true;
+      } finally {
+        try {
+          await client.close();
+        } catch (_close) {
+          /* The send result is what gets stored. */
+        }
+      }
     }
   } catch (_e) {
     reason = "provider";
