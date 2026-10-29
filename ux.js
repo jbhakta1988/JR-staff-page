@@ -114,7 +114,7 @@ window.uxTour=function(force){if(force){if(S.tab!=="home"){S.tab="home";render()
 window.TI_=d=>{TI+=d;uxTour()};
 /* ---------- render wrap ---------- */
 const base=render;
-render=function(){base.apply(this,arguments);if(!meUser())return;const app=document.getElementById("app"),nav=document.getElementById("nav");
+render=function(){base.apply(this,arguments);if(!meUser()||meUser().pin_reset_required)return;const app=document.getElementById("app"),nav=document.getElementById("nav");
  if(S.tab!=="onb")S.obSel=S.obSel||"";
  const ok=allowed(),main=(NAV5[S.role]||navFor(S.role)).filter(x=>ok.includes(x)).slice(0,4);
  const inMain=main.includes(S.tab);
