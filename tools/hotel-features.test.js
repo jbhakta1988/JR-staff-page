@@ -14,7 +14,20 @@ test("parking starts off at Golden Valley and other modules stay on", () => {
   ["sales_leads", "greetings", "guest_scores"].forEach((feature) => {
     hf.HOTELS.forEach((hotel) => assert.equal(hf.defaultOn(hotel, feature), true, hotel + " " + feature));
   });
-  assert.equal(hf.defaultOn("MSPWE", "unknown"), false);
+  assert.equal(hf.defaultOn("MSPWE", "unknown"), true);
+  assert.deepEqual(hf.list().map((row) => row.id), []);
+  hf.register({ id: "guest_scores", en: "Guest scores", es: "Calificaciones de huéspedes", order: 20 });
+  hf.register({ id: "parking", en: "Parking", es: "Estacionamiento", order: 10 });
+  hf.register({ id: "parking", en: "Parking", es: "Estacionamiento", order: 10 });
+  assert.deepEqual(hf.list().map((row) => row.id), ["parking", "guest_scores"]);
+  const html = hf.sectionHtml("en");
+  assert.match(html, /Hotel Features/);
+  assert.match(html, /Parking/);
+  assert.match(html, /Guest scores/);
+  assert.equal(html.includes("Sales leads"), false);
+  assert.equal(html.includes("Greetings"), false);
+  assert.match(html, /aria-label="Parking, MSPWE" onchange/);
+  assert.match(html, /aria-label="Parking, MSPAM" checked/);
   assert.equal(pk.defaultSettings("MSPWE").parkingEnabled, false);
   assert.equal(pk.parkingOn(pk.buildDemo("2026-10-28T18:00:00.000Z"), "MSPWE"), false);
   assert.equal(pk.parkingOn(pk.buildDemo("2026-10-28T18:00:00.000Z"), "MSPMS"), true);

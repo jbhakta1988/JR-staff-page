@@ -1800,4 +1800,8 @@
     "@media(max-width:1200px){.pk-t thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.pk-t,.pk-t tbody,.pk-t tr,.pk-t td{display:block;width:100%}.pk-t tr{border:1px solid #e1e6ee;border-radius:12px;margin:0 0 10px;padding:6px 8px;background:#fff}.pk-t td{display:grid;grid-template-columns:46% 54%;gap:6px;border:0;padding:4px 0}.pk-t td:before{content:attr(data-label);font-weight:700;color:#3c4658}.pk-over{background:#fde2e1}.pk-unk{background:#f6f0fb}}"
   ].join("");
   document.head.appendChild(style);
+  (function (spec) {
+    if (root.HotelFeatures && root.HotelFeatures.register) root.HotelFeatures.register(spec);
+    else (root.HF_QUEUE = root.HF_QUEUE || []).push(spec);
+  })({ id: "parking", en: "Parking", es: "Estacionamiento", order: 10 });
 })(typeof window !== "undefined" ? window : globalThis);
