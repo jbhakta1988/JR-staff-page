@@ -164,7 +164,27 @@
     if (code === "t1") return label("Airport T1", lang);
     if (code === "t2") return label("Airport T2", lang);
     if (code === "moa") return label("Mall of America", lang);
-    return label("Other", lang);
+    if (code === "other") return label("Other", lang);
+    return code || label("Other", lang);
+  }
+  function canonStatus(value) {
+    var s = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+    if (s === "complete" || s === "completed") return "done";
+    if (s === "noshow") return "no_show";
+    if (s === "en_route") return "boarded";
+    if (s === "boarded" || s === "no_show" || s === "done" || s === "booked") return s;
+    return "booked";
+  }
+  function canonDest(code, note) {
+    var raw = String(code || "").trim();
+    var c = raw.toLowerCase();
+    var extra = note || "";
+    if (c === "t1" || c === "terminal 1" || c === "terminal1" || c === "msp t1" || c === "msp terminal 1") return { destination: "t1", note: extra };
+    if (c === "t2" || c === "terminal 2" || c === "terminal2" || c === "msp t2" || c === "msp terminal 2") return { destination: "t2", note: extra };
+    if (c === "moa" || c === "mall" || c === "mall of america") return { destination: "moa", note: extra };
+    if (c === "other") return { destination: "other", note: extra };
+    if (!raw) return { destination: "t1", note: extra };
+    return { destination: "other", note: extra || raw };
   }
   function statusName(status, lang) {
     if (status === "boarded") return label("Boarded", lang);
@@ -1118,19 +1138,23 @@
     return { origin: "loading", features: defaultFeatures(), settings: settings, signups: [] };
   }
   function mapSignup(row) {
+    // The shared select grant exposes the sign-up columns. The migration copies
+    // run_at into depart_at, hotel_id into hotel, and guest_name or room_number
+    // into guest_label, and leaves the older columns in place.
+    var dest = canonDest(row.destination, row.destination_note || "");
     return {
       id: String(row.id),
-      hotel: row.hotel,
-      destination: row.destination,
-      destinationNote: row.destination_note || "",
-      departAt: row.depart_at,
+      hotel: row.hotel || "",
+      destination: dest.destination,
+      destinationNote: dest.note,
+      departAt: row.depart_at || "",
       guestLabel: row.guest_label || "",
-      labelKind: row.label_kind || "name",
+      labelKind: row.label_kind === "room" ? "room" : "name",
       partySize: Number(row.party_size) || 1,
       bags: Number(row.bags) || 0,
       notes: row.notes || "",
       flightTime: row.flight_time || "",
-      status: row.status || "booked",
+      status: canonStatus(row.status),
       statusAt: row.status_at || "",
       boardedAt: row.boarded_at || "",
       noshowAt: row.noshow_at || "",

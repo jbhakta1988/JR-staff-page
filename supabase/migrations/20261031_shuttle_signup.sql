@@ -13,9 +13,13 @@
 -- whose hotels overlap the airport pool see both MSPAM and MSPMS sign-ups.
 -- That branch still requires the row's hotel to be in the shuttle pool.
 -- Golden Valley is not in the pool, so MSPWE never sees this queue.
--- No other HotelHQ table is widened. These rows store only the sign-up fields:
--- hotel, destination, time, last name or room, party, bags, notes, flight time,
--- and status. No phone, billing, rate, or plate.
+-- No other HotelHQ table is widened. Sign-up rows store hotel, destination, time,
+-- last name or room, party, bags, notes, flight time, and status.
+-- No phone, billing, rate, or plate.
+-- public.shuttle_signups may already exist with the older columns
+-- (hotel_id, department, run_at, direction, destination, guest_name, room_number, ...).
+-- This migration does not drop that table, those columns, or any rows.
+-- It adds the new sign-up columns beside the old ones and copies run_at into depart_at.
 -- Seat totals come from shuttle_day_counts, which returns a number per departure.
 
 create schema if not exists private;
@@ -53,32 +57,182 @@ comment on table public.shuttle_settings is
 comment on column public.shuttle_settings.tracking_code is
   'Code the guest types into TrackMyShuttle. Hampton seed 2860. SpringHill seed 2871. Not a phone number.';
 
+-- Fresh databases get both the older columns and the sign-up columns.
+-- An existing shuttle_signups table is left in place; missing columns are added below.
 create table if not exists public.shuttle_signups (
   id bigint generated always as identity primary key,
-  hotel text not null check (hotel in ('MSPAM', 'MSPMS')),
-  destination text not null check (destination in ('t1', 't2', 'moa', 'other')),
-  destination_note text check (destination_note is null or char_length(btrim(destination_note)) between 1 and 80),
-  depart_at timestamptz not null,
-  guest_label text not null check (char_length(btrim(guest_label)) between 1 and 40),
-  label_kind text not null check (label_kind in ('name', 'room')),
-  party_size integer not null check (party_size between 1 and 14),
-  bags integer not null default 0 check (bags between 0 and 20),
-  notes text check (notes is null or char_length(notes) <= 200),
-  flight_time text check (flight_time is null or flight_time ~ '^[0-2][0-9]:[0-5][0-9]$'),
-  status text not null default 'booked' check (status in ('booked', 'boarded', 'no_show', 'done')),
+  hotel_id text,
+  hotel text,
+  department text not null default 'shuttle',
+  run_at timestamptz,
+  depart_at timestamptz,
+  direction text,
+  destination text,
+  destination_note text,
+  guest_name text,
+  guest_label text,
+  room_number text,
+  label_kind text,
+  party_size integer default 1,
+  bags integer default 0,
+  notes text,
+  flight_time text,
+  status text default 'booked',
   status_at timestamptz,
   boarded_at timestamptz,
   noshow_at timestamptz,
   done_at timestamptz,
-  parking_visit_id bigint references public.parking_visits (id) on delete set null,
+  driver uuid,
+  parking_visit_id bigint,
   created_by uuid default auth.uid(),
   created_at timestamptz not null default pg_catalog.now(),
-  check (destination <> 'other' or destination_note is not null),
-  check (guest_label !~ '[0-9]{7,}')
+  i18n jsonb not null default '{}'::jsonb
 );
 
+-- information_schema is the source of truth for which columns already exist.
+-- ADD COLUMN IF NOT EXISTS is a no-op when the live table already has the column.
+alter table public.shuttle_signups add column if not exists hotel_id text;
+alter table public.shuttle_signups add column if not exists hotel text;
+alter table public.shuttle_signups add column if not exists department text default 'shuttle';
+alter table public.shuttle_signups add column if not exists run_at timestamptz;
+alter table public.shuttle_signups add column if not exists depart_at timestamptz;
+alter table public.shuttle_signups add column if not exists direction text;
+alter table public.shuttle_signups add column if not exists destination text;
+alter table public.shuttle_signups add column if not exists destination_note text;
+alter table public.shuttle_signups add column if not exists guest_name text;
+alter table public.shuttle_signups add column if not exists guest_label text;
+alter table public.shuttle_signups add column if not exists room_number text;
+alter table public.shuttle_signups add column if not exists label_kind text;
+alter table public.shuttle_signups add column if not exists party_size integer default 1;
+alter table public.shuttle_signups add column if not exists bags integer default 0;
+alter table public.shuttle_signups add column if not exists notes text;
+alter table public.shuttle_signups add column if not exists flight_time text;
+alter table public.shuttle_signups add column if not exists status text default 'booked';
+alter table public.shuttle_signups add column if not exists status_at timestamptz;
+alter table public.shuttle_signups add column if not exists boarded_at timestamptz;
+alter table public.shuttle_signups add column if not exists noshow_at timestamptz;
+alter table public.shuttle_signups add column if not exists done_at timestamptz;
+alter table public.shuttle_signups add column if not exists driver uuid;
+alter table public.shuttle_signups add column if not exists parking_visit_id bigint;
+alter table public.shuttle_signups add column if not exists created_by uuid default auth.uid();
+alter table public.shuttle_signups add column if not exists created_at timestamptz default pg_catalog.now();
+alter table public.shuttle_signups add column if not exists i18n jsonb default '{}'::jsonb;
+
+do $shuttle_backfill$
+declare
+  has_run boolean;
+  has_depart boolean;
+  has_hotel boolean;
+  has_hotel_id boolean;
+  has_guest_name boolean;
+  has_guest_label boolean;
+  has_room boolean;
+  has_kind boolean;
+begin
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'run_at'
+  ) into has_run;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'depart_at'
+  ) into has_depart;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'hotel'
+  ) into has_hotel;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'hotel_id'
+  ) into has_hotel_id;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'guest_name'
+  ) into has_guest_name;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'guest_label'
+  ) into has_guest_label;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'room_number'
+  ) into has_room;
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'label_kind'
+  ) into has_kind;
+
+  if has_run and has_depart then
+    update public.shuttle_signups
+      set depart_at = run_at
+      where depart_at is null
+        and run_at is not null;
+  end if;
+
+  if has_hotel and has_hotel_id then
+    update public.shuttle_signups
+      set hotel = hotel_id
+      where hotel is null
+        and hotel_id is not null;
+  end if;
+
+  if has_guest_label and has_guest_name then
+    update public.shuttle_signups
+      set guest_label = guest_name
+      where guest_label is null
+        and guest_name is not null
+        and btrim(guest_name) <> '';
+  end if;
+
+  if has_guest_label and has_room then
+    update public.shuttle_signups
+      set guest_label = room_number
+      where guest_label is null
+        and room_number is not null
+        and btrim(room_number) <> '';
+  end if;
+
+  if has_kind and has_room and has_guest_label then
+    update public.shuttle_signups
+      set label_kind = 'room'
+      where label_kind is null
+        and guest_label is not null
+        and room_number is not null
+        and guest_label = room_number;
+  end if;
+
+  if has_kind and has_guest_label then
+    update public.shuttle_signups
+      set label_kind = 'name'
+      where label_kind is null
+        and guest_label is not null;
+  end if;
+end
+$shuttle_backfill$;
+
+do $shuttle_parking_fk$
+begin
+  if to_regclass('public.parking_visits') is not null
+     and exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'shuttle_signups' and column_name = 'parking_visit_id'
+     )
+     and not exists (
+       select 1
+       from pg_constraint c
+       where c.conrelid = 'public.shuttle_signups'::regclass
+         and c.contype = 'f'
+         and pg_catalog.pg_get_constraintdef(c.oid) ilike '%parking_visits%'
+     ) then
+    alter table public.shuttle_signups
+      add constraint shuttle_signups_parking_visit_id_fkey
+      foreign key (parking_visit_id) references public.parking_visits (id) on delete set null;
+  end if;
+end
+$shuttle_parking_fk$;
+
 comment on table public.shuttle_signups is
-  'Outbound ride leaving the hotel. guest_label is a last name or a room number. No phone number.';
+  'Outbound ride leaving the hotel. guest_label is a last name or a room number. Older columns (hotel_id, run_at, guest_name, room_number, direction) stay. No phone number.';
 
 create index if not exists shuttle_signups_depart_idx on public.shuttle_signups (depart_at);
 create index if not exists shuttle_signups_hotel_depart_idx on public.shuttle_signups (hotel, depart_at);
@@ -403,10 +557,16 @@ begin
     raise exception 'full';
   end if;
   insert into public.shuttle_signups (
-    hotel, destination, destination_note, depart_at, guest_label, label_kind,
+    hotel, hotel_id, destination, destination_note, depart_at, run_at,
+    guest_label, guest_name, room_number, label_kind, direction,
     party_size, bags, notes, flight_time, status, parking_visit_id, created_by
   ) values (
-    p_hotel, p_destination, v_note, p_depart, v_label, p_label_kind,
+    p_hotel, p_hotel, p_destination, v_note, p_depart, p_depart,
+    v_label,
+    case when p_label_kind = 'name' then v_label else null end,
+    case when p_label_kind = 'room' then v_label else null end,
+    p_label_kind,
+    'outbound',
     p_party, p_bags, v_notes, v_flight, 'booked', p_parking_visit, auth.uid()
   ) returning id into v_id;
   return v_id;
