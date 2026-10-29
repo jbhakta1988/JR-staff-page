@@ -36,6 +36,7 @@
   function defaultOn(hotel, feature) {
     if (HOTELS.indexOf(hotel) < 0) return false;
     if (feature === "parking" && hotel === "MSPWE") return false;
+    if (feature === "shuttle" && hotel === "MSPWE") return false;
     return true;
   }
   function key(hotel, feature) { return hotel + "|" + feature; }

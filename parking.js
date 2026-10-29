@@ -27,6 +27,7 @@
     "Avg stay": "Estadía promedio",
     "Overstays today": "Excedidos hoy",
     "Park & Fly": "Estaciona y vuela",
+    "Shuttle signup": "Anotar en el shuttle",
     "Returning today": "Regresan hoy",
     "Returning tomorrow": "Regresan mañana",
     "Off": "Apagado",
@@ -1384,6 +1385,7 @@
     var over = c.overstay === label("Yes", lang);
     var cls = over ? "pk-over" : (visit.unknown ? "pk-unk" : "");
     var out = withOut ? "<td data-label=\"" + esc(label("Out", lang)) + "\"><button type=\"button\" class=\"btn2 pk-out\" onclick=\"pkOut('" + esc(visit.id) + "')\">" + esc(label("Mark out", lang)) + "</button></td>" : "";
+    var shuttle = shuttleCell(visit, lang);
     return "<tr class=\"" + cls + "\">" + [
       td(label("Plate", lang), c.plate),
       td(label("Stall", lang), c.stall),
@@ -1401,10 +1403,17 @@
       td(label("Color", lang), c.color),
       td(label("Permit", lang), c.permit),
       td(label("Paid", lang), c.paid)
-    ].join("") + out + "</tr>";
+    ].join("") + shuttle + out + "</tr>";
+  }
+  function shuttleCell(visit, lang) {
+    if (typeof root.shParkingAction !== "function") return "";
+    var html = "";
+    try { html = root.shParkingAction(visit, lang) || ""; } catch (e) { html = ""; }
+    return "<td data-label=\"" + esc(label("Shuttle signup", lang)) + "\">" + html + "</td>";
   }
   function liveHeaders(lang, withOut) {
     var h = ["Plate", "Stall", "Parked", "Room", "Overstay", "Unknown", "Type", "Checkout", "Pickup", "State", "Lot", "Make", "Model", "Color", "Permit", "Paid"].map(function (k) { return label(k, lang); });
+    if (typeof root.shParkingAction === "function") h.push(label("Shuttle signup", lang));
     if (withOut) h.push(label("Out", lang));
     return h;
   }
@@ -1608,9 +1617,11 @@
         td(label("Confirmation", lang), v.pfConfirm),
         td(label("Days", lang), v.pfDays),
         td(label("Extra", lang), v.pfExtra)
-      ].join("") + "</tr>";
+      ].join("") + shuttleCell(v, lang) + "</tr>";
     });
-    return table(["Plate", "Stall", "Pickup", "Flight", "Confirmation", "Days", "Extra"].map(function (k) { return label(k, lang); }), body);
+    var heads = ["Plate", "Stall", "Pickup", "Flight", "Confirmation", "Days", "Extra"].map(function (k) { return label(k, lang); });
+    if (typeof root.shParkingAction === "function") heads.push(label("Shuttle signup", lang));
+    return table(heads, body);
   }
   function renderHistory(model, state, now, lang) {
     var rows = model.history.map(function (v) { return liveRow(v, state, now, lang, false); });
