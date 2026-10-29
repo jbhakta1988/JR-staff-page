@@ -30,6 +30,10 @@ test("chicago clock and park-and-fly defaults", () => {
   assert.equal(pk.defaultSettings("MSPAM").maxHoursWithoutRoom, 72);
   assert.equal(pk.defaultSettings("MSPAM").longTermNights, 7);
   assert.equal(pk.defaultSettings("MSPAM").parkFlyGraceHours, 2);
+  assert.equal(pk.defaultSettings("MSPWE").parkingEnabled, false);
+  assert.equal(pk.defaultSettings("MSPAM").parkingEnabled, true);
+  assert.equal(pk.parkingOn(demo(), "MSPWE"), false);
+  assert.equal(pk.parkingOn(demo(), "MSPAM"), true);
 });
 
 test("roles and hotels", () => {
@@ -134,7 +138,12 @@ test("live list, stats, search, and history", () => {
   assert.equal(pk.pageModel(state, gm, NOW, "MSPAM", { q: "2104" }).live.length, 1);
   assert.equal(pk.pageModel(state, gm, NOW, "MSPAM", { q: "2108" }).history[0].plate, "EXA2108");
 
-  const summary = pk.homeSummary(state, corp, NOW, "es");
+  const hidden = pk.homeSummary(state, corp, NOW, "es");
+  assert.equal(hidden.length, 2);
+  assert.equal(hidden.some((row) => row.hotel === "MSPWE"), false);
+  const shown = demo();
+  shown.settings.MSPWE.parkingEnabled = true;
+  const summary = pk.homeSummary(shown, corp, NOW, "es");
   assert.equal(summary.length, 3);
   assert.equal(summary[0].parkFly, "Apagado");
   assert.equal(summary[1].parkFly, "4");
@@ -226,10 +235,17 @@ test("one value per cell, both languages, and sample labeling", () => {
   const cellsHtml = [...en.matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map((m) => m[1]);
   assert.ok(cellsHtml.length > 5);
   cellsHtml.forEach((text) => assert.equal(text.includes(" · "), false, text));
-  const we = pk.renderParking(state, { actor: { role: "GM", hotel: "MSPWE" }, now: NOW, hotel: "MSPWE", lang: "en", ui: { screen: "board" } });
+  const weOff = pk.renderParking(state, { actor: { role: "GM", hotel: "MSPWE" }, now: NOW, hotel: "MSPWE", lang: "en", ui: { screen: "board" } });
+  assert.match(weOff, /id="pkOff"/);
+  assert.equal(weOff.includes("id=\"pkBoard\""), false);
+  const weState = demo();
+  weState.settings.MSPWE.parkingEnabled = true;
+  const we = pk.renderParking(weState, { actor: { role: "GM", hotel: "MSPWE" }, now: NOW, hotel: "MSPWE", lang: "en", ui: { screen: "board" } });
   assert.equal(we.includes("Returning today"), false);
   assert.match(we, />Off</);
-  const log = pk.renderParking(state, { actor: fd, now: NOW, hotel: "MSPWE", lang: "es", ui: { screen: "log", draft: { room: "102", vehicleType: "guest", state: "MN" } } });
+  const logState = demo();
+  logState.settings.MSPWE.parkingEnabled = true;
+  const log = pk.renderParking(logState, { actor: fd, now: NOW, hotel: "MSPWE", lang: "es", ui: { screen: "log", draft: { room: "102", vehicleType: "guest", state: "MN" } } });
   assert.match(log, /id="pkSaveBtn"/);
   assert.equal(log.includes("id=\"pkSave\""), false);
   assert.match(log, /onsubmit="window.pkSave\(event\)"/);
@@ -239,7 +255,7 @@ test("one value per cell, both languages, and sample labeling", () => {
   const home = pk.homeCardHtml(state, corp, NOW, "en");
   assert.match(home, /id="pkHome"/);
   assert.match(home, /EXAMPLE/);
-  assert.match(home, /MSPWE/);
+  assert.equal(home.includes(">MSPWE<"), false);
   assert.match(home, /MSPAM/);
   assert.match(home, /MSPMS/);
 

@@ -155,7 +155,9 @@
     "Status": "Estatus",
     "This stay uses the long-term stalls.": "Esta estadía usa los cajones de larga estancia.",
     "Leave the stall blank to keep the suggestion. Pick another open stall to override it.": "Deja el cajón en blanco para usar la sugerencia. Elige otro cajón libre si quieres cambiarlo.",
-    "Not flagged when the guest checks out of the room. Flagged only after pickup, plus the grace hours.": "No se marca cuando el huésped sale del cuarto. Se marca solo después de la recogida, más las horas de gracia."
+    "Not flagged when the guest checks out of the room. Flagged only after pickup, plus the grace hours.": "No se marca cuando el huésped sale del cuarto. Se marca solo después de la recogida, más las horas de gracia.",
+    "Parking is off at this hotel.": "El estacionamiento está apagado en este hotel.",
+    "JR Corporate can turn it on.": "JR Corporate puede activarlo."
   };
   var ERRORS = {
     role: "You can't change parking.",
@@ -202,8 +204,17 @@
       maxHoursWithoutRoom: 72,
       longTermNights: 7,
       parkFlyEnabled: hotel === "MSPAM" || hotel === "MSPMS",
-      parkFlyGraceHours: 2
+      parkFlyGraceHours: 2,
+      parkingEnabled: hotel !== "MSPWE"
     };
+  }
+  function parkingOn(state, hotel) {
+    try {
+      if (typeof HotelFeatures !== "undefined" && HotelFeatures && HotelFeatures.on) return !!HotelFeatures.on(hotel, "parking");
+    } catch (e) {}
+    var row = state && state.settings && state.settings[hotel];
+    if (!row || row.parkingEnabled == null) return hotel !== "MSPWE";
+    return !!row.parkingEnabled;
   }
   function chicagoParts(iso) {
     var d = new Date(iso);
@@ -508,12 +519,14 @@
     if (!Number.isInteger(nights) || nights < 1 || nights > 365) return { ok: false, error: "note" };
     if (!Number.isInteger(grace) || grace < 0 || grace > 72) return { ok: false, error: "note" };
     var next = clone(state);
+    var prev = (state.settings && state.settings[input.hotel]) || defaultSettings(input.hotel);
     next.settings[input.hotel] = {
       hotel: input.hotel,
       maxHoursWithoutRoom: hours,
       longTermNights: nights,
       parkFlyEnabled: !!input.parkFlyEnabled,
-      parkFlyGraceHours: grace
+      parkFlyGraceHours: grace,
+      parkingEnabled: prev.parkingEnabled == null ? input.hotel !== "MSPWE" : !!prev.parkingEnabled
     };
     return { ok: true, state: next };
   }
@@ -689,7 +702,9 @@
     };
   }
   function homeSummary(state, actor, now, lang) {
-    return hotelsFor(actor.role, actor.hotel).map(function (hotel) {
+    return hotelsFor(actor.role, actor.hotel).filter(function (hotel) {
+      return parkingOn(state, hotel);
+    }).map(function (hotel) {
       var s = stats(state, hotel, now);
       var settings = state.settings[hotel] || defaultSettings(hotel);
       return {
@@ -880,7 +895,8 @@
       maxHoursWithoutRoom: Number(row.max_hours_without_room),
       longTermNights: Number(row.long_term_nights),
       parkFlyEnabled: !!row.park_fly_enabled,
-      parkFlyGraceHours: Number(row.park_fly_grace_hours)
+      parkFlyGraceHours: Number(row.park_fly_grace_hours),
+      parkingEnabled: row.parking_enabled == null ? row.hotel !== "MSPWE" : !!row.parking_enabled
     };
   }
   function mapZone(row) {
@@ -1023,6 +1039,9 @@
     var now = opts.now;
     var ui = opts.ui || { screen: "board", q: "" };
     var hotel = opts.hotel;
+    if (hotel && !parkingOn(state, hotel)) {
+      return "<div class=\"raw pk\" id=\"pkRoot\"><h2>" + esc(label("Parking", lang)) + "</h2><p id=\"pkOff\">" + esc(label("Parking is off at this hotel.", lang)) + "</p><p class=\"pk-note\">" + esc(label("JR Corporate can turn it on.", lang)) + "</p></div>";
+    }
     if (!canLog(actor.role) || !hotel) {
       return "<div class=\"raw pk\" id=\"pkRoot\"><h2>" + esc(label("Parking", lang)) + "</h2><p>" + esc(label("You can't change parking.", lang)) + "</p></div>";
     }
@@ -1298,6 +1317,7 @@
     mapRange: mapRange,
     mapVisit: mapVisit,
     renderParking: renderParking,
+    parkingOn: parkingOn,
     homeCardHtml: homeCardHtml,
     atLocal: atLocal,
     shift: shift
@@ -1351,7 +1371,7 @@
     if (!remoteOn() || remoteState === "loading" || remoteState === "ready" || remoteState === "demo") return;
     remoteState = "loading";
     Promise.all([
-      sb.from("parking_settings").select("hotel,max_hours_without_room,long_term_nights,park_fly_enabled,park_fly_grace_hours"),
+      sb.from("parking_settings").select("hotel,max_hours_without_room,long_term_nights,park_fly_enabled,park_fly_grace_hours,parking_enabled"),
       sb.from("parking_zones").select("id,hotel,name,purpose,active,sort_order"),
       sb.from("parking_stalls").select("id,hotel,zone_id,stall_no,notes,active,sort_order"),
       sb.from("parking_stall_ranges").select("id,hotel,stall_id,room_lo,room_hi,floor,wing,rank,active"),
@@ -1725,8 +1745,21 @@
     var prevTiles = tilesFor;
     root.tilesFor = function (role) {
       var list = (prevTiles(role) || []).slice();
+      var hotel = "";
+      try { hotel = S.hotel; } catch (e) { hotel = ""; }
+      var on = true;
+      try { on = parkingOn(current(), hotel); } catch (e2) { on = hotel !== "MSPWE"; }
+      if (!on) return list.filter(function (id) { return id !== "parking"; });
       if ((role === "GM" || role === "Front Desk" || role === "Shuttle Driver") && list.indexOf("parking") < 0) list = list.concat(["parking"]);
       return list;
+    };
+    api.noteModule = function (hotel, enabled) {
+      try {
+        var state = current();
+        if (!state.settings || !state.settings[hotel]) return;
+        state.settings[hotel].parkingEnabled = !!enabled;
+        if (!remoteOn() && state.origin === "example") writeStore(state);
+      } catch (e) {}
     };
   }
   try { if (typeof RSEC !== "undefined") RSEC[0][2].push("parking"); } catch (e) {}
