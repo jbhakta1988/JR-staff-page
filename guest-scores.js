@@ -600,7 +600,7 @@ function fillScores(n, pct) {
 
   function lineCard(data, role) {
     var hotel = ownHotel();
-    if (HOTELS.indexOf(hotel) < 0) return "";
+    if (HOTELS.indexOf(hotel) < 0 || !guestScoresOn(hotel)) return "";
     var surveys = project(data.surveys, role, [hotel]);
     var list = metricList(hotel, role, surveys);
     if (!list.length) return "";
@@ -610,16 +610,24 @@ function fillScores(n, pct) {
     return '<div class="card gs" id="gsHome"><h3>' + esc(tx("Guest scores", "Calificaciones de huéspedes")) + "</h3>" + sampleNote(data.origin) + '<p class="gs-note">' + esc(hotel + " · " + BRAND[hotel]) + " · " + esc(tx("Scores for your department at this hotel.", "Calificaciones de tu departamento en este hotel.")) + " · " + esc(waveTitle(data.today)) + "</p>" + blocks + '<p class="gs-note">' + esc(tx("Top-box is 9–10 out of 10. The pale bar is the goal. Green met it. Red missed it.", "La caja alta es 9–10 de 10. La barra clara es la meta. Verde cumplió. Rojo no cumplió.")) + "</p></div>";
   }
   function leaderCard(data, role) {
-    var hotels = hotelsFor(role);
+    var hotels = hotelsFor(role).filter(guestScoresOn);
+    if (!hotels.length) return "";
     var bits = hotels.map(function (hotel) {
       var sum = summarize(data.surveys, data.today, hotel, "itr", "topbox");
       return '<button type="button" class="gs-jump" onclick="go(\'gscores\')"><b>' + esc(hotel + " · " + BRAND[hotel]) + "</b>" + kpi(sum) + "</button>";
     }).join("");
     return '<div class="card gs" id="gsHome"><div class="row"><h3 style="flex:1">' + esc(tx("Guest scores", "Calificaciones de huéspedes")) + '</h3><button type="button" class="btn2" onclick="go(\'gscores\')">' + esc(tx("See all", "Ver todo")) + "</button></div>" + sampleNote(data.origin) + '<p class="gs-note">ITR · ' + esc(tx("top-box 9–10", "caja alta 9–10")) + " · " + esc(waveTitle(data.today)) + "</p>" + bits + "</div>";
   }
+  function guestScoresOn(hotel) {
+    try {
+      if (typeof HotelFeatures !== "undefined" && HotelFeatures.on) return HotelFeatures.on(hotel, "guest_scores") !== false;
+    } catch (e) {}
+    return true;
+  }
   function homeCard() {
     var role = dbRole();
     if (!role) return "";
+    if (!guestScoresOn(ownHotel())) return "";
     var data = bundle();
     if (isLeader(role)) return leaderCard(data, role);
     if (!metricsForRole(role).length) return "";
@@ -745,7 +753,10 @@ function fillScores(n, pct) {
       var list = (prevTiles(role) || []).slice();
       var leader = false;
       try { leader = isLeader(authRole()); } catch (e) { leader = false; }
-      if (leader && role === "GM" && list.indexOf("gscores") < 0) list.splice(Math.min(2, list.length), 0, "gscores");
+      var hotel = "";
+      try { hotel = S.hotel; } catch (e) { hotel = ""; }
+      if (leader && role === "GM" && guestScoresOn(hotel) && list.indexOf("gscores") < 0) list.splice(Math.min(2, list.length), 0, "gscores");
+      if (!guestScoresOn(hotel)) list = list.filter(function (id) { return id !== "gscores"; });
       return list;
     };
   }
