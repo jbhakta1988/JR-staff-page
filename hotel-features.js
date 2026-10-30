@@ -147,8 +147,10 @@
   api.sectionHtml = sectionHtml;
 
   function pageHtml() {
-    if (!corporate()) return "<div class=\"raw hf\" id=\"hfSettings\"><h2>" + esc(L("Settings", "Ajustes")) + "</h2></div>";
-    return "<div class=\"raw hf\" id=\"hfSettings\"><h2>" + esc(L("Settings", "Ajustes")) + "</h2>" + sectionHtml((typeof LANG !== "undefined" && LANG === "es") ? "es" : "en") + "</div>";
+    var lang = (typeof LANG !== "undefined" && LANG === "es") ? "es" : "en";
+    var pref = (root.HHQMore && root.HHQMore.settingHtml) ? root.HHQMore.settingHtml(lang) : "";
+    var features = corporate() ? sectionHtml(lang) : "";
+    return "<div class=\"raw hf\" id=\"hfSettings\"><h2>" + esc(L("Settings", "Ajustes")) + "</h2>" + pref + features + "</div>";
   }
 
   if (typeof M !== "undefined") M.settings = ["⚙️", "Settings"];
@@ -158,7 +160,7 @@
     var prevTiles = tilesFor;
     root.tilesFor = function (role) {
       var list = (prevTiles(role) || []).slice();
-      if (corporate() && list.indexOf("settings") < 0) list.push("settings");
+      if (list.indexOf("settings") < 0) list.push("settings");
       return list;
     };
   }

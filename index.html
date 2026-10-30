@@ -1,7 +1,6 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#14365d">
-<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#101114" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f4f5f7">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="HotelHQ">
@@ -313,7 +312,6 @@ table[data-sp] .rt-sort{padding:6px 4px;font-size:13px;white-space:nowrap}
 /*RESP3_CSS_END*/
 /*LOOK_START*/
 :root{--bg:#f4f5f7;--surface:#fff;--surface-2:#f7f8fa;--ink:#1c1f26;--muted:#5c6570;--line:#e6e8ee;--accent:#3b5bdb;--accent-2:#2f4ac0;--accent-soft:#eef1fd;--shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.04);--radius:12px;--good:#0f7a3a;--bad:#b42318;--warn:#b54708;--warn-bg:#fff7ed;--warn-line:#fed7aa;--zebra:#fafbfc;--ring:rgba(59,91,219,.28);color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--bg:#101114;--surface:#181b22;--surface-2:#20242d;--ink:#eceef3;--muted:#a7b0bd;--line:#2c313c;--accent:#9aa8f5;--accent-2:#c3cbff;--accent-soft:#242a44;--shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.28);--good:#86efac;--bad:#fca5a5;--warn:#fdba74;--warn-bg:#2a2118;--warn-line:#5c3b1e;--zebra:#1c2028;--ring:rgba(154,168,245,.35);color-scheme:dark}}
 body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);letter-spacing:-.011em;line-height:1.45}
 header#hdr{background:var(--surface);color:var(--ink);border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
 #hbar{background:transparent;color:var(--ink);border:0;box-shadow:none}
@@ -364,10 +362,6 @@ table.rt tr.rt-r:nth-child(even) td{background:var(--zebra)}
 .demo-banner{background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn-line)}
 .sites button{background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .sites button.on{background:var(--accent);border-color:var(--accent);color:#fff}
-@media (prefers-color-scheme:dark){
-.VC{background:#123224;color:#86efac}.VD{background:#3b1717;color:#fca5a5}.OC{background:#1c2748;color:#c7d2fe}.OD{background:#3a2d12;color:#fdba74}.OOO{background:#2a2e36;color:#d5d8e0}.RFI{background:#2a2144;color:#ddd6fe}
-nav{box-shadow:0 -8px 24px rgba(0,0,0,.35)}
-}
 @media (min-width:1024px){
 header#hdr{display:flex;align-items:center;height:56px;padding:0 16px!important;position:sticky;top:0}
 #hbar{pointer-events:none;min-height:40px}
@@ -465,7 +459,7 @@ const ROLE_TO_DB={"Above Property":"above_property",GM:"gm",AGM:"agm","Front Des
 const DEPT_FOR_ROLE={"Front Desk":"front_desk",Housekeeping:"housekeeping",Housekeeper:"housekeeping",Maintenance:"maintenance","Shuttle Driver":"shuttle","House Person":"house_person","Laundry Attendant":"laundry","Breakfast Attendant":"breakfast",GM:"management",AGM:"management","Above Property":"management"};
 let sb=null,sbSession=null,sbPush=false,sbBase=null,pushChain=Promise.resolve(),directorySource="example",remoteLabor=false,Ssync="";
 let USERS=[];
-function exampleUsers(){const map=userLangs();return EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>{const saved=map[u.id];const language=(u.language==="en"||u.language==="es")?u.language:((saved==="en"||saved==="es")?saved:"");const row={...u,active:u.active!==false};if(language)row.language=language;return row})}
+function exampleUsers(){const map=userLangs();const more=userMoreMap();return EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>{const saved=map[u.id];const language=(u.language==="en"||u.language==="es")?u.language:((saved==="en"||saved==="es")?saved:"");const row={...u,active:u.active!==false,show_more_expanded:u.show_more_expanded===true||more[u.id]===true};if(language)row.language=language;return row})}
 function staffEmail(u){if(u.email)return u.email;return String(u.login_id||u.id)+"@"+STAFF_EMAIL_DOMAIN}
 function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||""))}
 function useRemote(){return !!(USE_SUPABASE&&sb&&sbSession)}
@@ -497,7 +491,9 @@ function mapDirectoryRow(r){
   const id=r.id||r.user_id;if(!id||!r.name)return null;
   const hotel=r.hotel_id===undefined?r.hotel:r.hotel_id;
   const live=authMode==="live";
-  return {id:String(id),user_id:r.user_id||(live?String(id):null),email:live?null:(r.email||null),name:r.name,pin:live?"":(r.pin||""),role:ROLE_FROM_DB[r.role]||r.role||"",hotel:hotel||null,shift:r.shift||"AM",days:Array.isArray(r.days)?r.days:DAYS,active:r.active!==false,he_employee_id:r.he_employee_id||null,language:(r.language==="en"||r.language==="es")?r.language:"",pin_reset_required:r.pin_reset_required===true,extra_hotels:Array.isArray(r.extra_hotels)?r.extra_hotels:[]};
+  const row={id:String(id),user_id:r.user_id||(live?String(id):null),email:live?null:(r.email||null),name:r.name,pin:live?"":(r.pin||""),role:ROLE_FROM_DB[r.role]||r.role||"",hotel:hotel||null,shift:r.shift||"AM",days:Array.isArray(r.days)?r.days:DAYS,active:r.active!==false,he_employee_id:r.he_employee_id||null,language:(r.language==="en"||r.language==="es")?r.language:"",pin_reset_required:r.pin_reset_required===true,extra_hotels:Array.isArray(r.extra_hotels)?r.extra_hotels:[]};
+  if(r.show_more_expanded===true||r.show_more_expanded===false)row.show_more_expanded=r.show_more_expanded===true;
+  return row;
 }
 let directoryError="";
 async function loadLiveDirectory(){
@@ -807,7 +803,9 @@ async function applySessionProfile(){
   let local=USERS.find(u=>u.user_id===uid||u.id===uid||u.id===row.id);
   if(!local){USERS.push(row);local=row}
   else Object.assign(local,{name:row.name,role:row.role,hotel:row.hotel,user_id:uid,he_employee_id:row.he_employee_id,active:row.active,language:(data.language==="en"||data.language==="es")?data.language:(local.language||""),pin_reset_required:data.pin_reset_required===true,pin:""});
+  if(data.show_more_expanded===true||data.show_more_expanded===false)local.show_more_expanded=data.show_more_expanded===true;
   if(local.language==="en"||local.language==="es"){LANG=local.language;document.documentElement.lang=LANG==="es"?"es":"en";const map=userLangs();map[local.id]=LANG;sset(USER_LANG_KEY,JSON.stringify(map))}
+  applyUserMore(local);
   S.uid=local.id;
   if(local.hotel)S.hotel=local.hotel;
   S.role=(local.role==="Above Property"||local.role==="GM"||local.role==="AGM")?"GM":local.role;
@@ -1014,6 +1012,7 @@ Object.assign(I18N.es,{
 });
 const LANG_KEY="jrportal_lang";
 const USER_LANG_KEY="jrportal_user_lang";
+const USER_MORE_KEY="jrportal_user_more";
 let LANG="en";
 let STAMPED=false;
 let PHRASES=null;
@@ -1122,6 +1121,28 @@ function ensureShuttleDemo(block){
 }
 function localeTag(){return LANG==="es"?"es-MX":"en-US"}
 function userLangs(){try{return JSON.parse(sget(USER_LANG_KEY)||"{}")}catch(e){return {}}}
+function userMoreMap(){try{const m=JSON.parse(sget(USER_MORE_KEY)||"{}");return m&&typeof m==="object"?m:{}}catch(e){return {}}}
+function moreExpandedOf(u){if(!u)return false;if(u.show_more_expanded===true||u.show_more_expanded===false)return u.show_more_expanded===true;return userMoreMap()[u.id]===true}
+function applyUserMore(u){
+  if(!u)return;
+  const map=userMoreMap();
+  if(u.show_more_expanded!==true&&u.show_more_expanded!==false)u.show_more_expanded=map[u.id]===true;
+  map[u.id]=!!u.show_more_expanded;
+  sset(USER_MORE_KEY,JSON.stringify(map));
+  const ex=EXAMPLE_USERS.find(x=>x.id===u.id);
+  if(ex)ex.show_more_expanded=!!u.show_more_expanded;
+}
+function setMoreExpanded(on){
+  const u=typeof meUser==="function"?meUser():null;
+  if(!u)return;
+  on=!!on;
+  u.show_more_expanded=on;
+  applyUserMore(u);
+  if(typeof useRemote==="function"&&useRemote()&&typeof sb!=="undefined"&&sb){
+    sb.rpc("set_my_more_expanded",{p_on:on}).then(function(){},function(){});
+  }
+  if(typeof render==="function")render();
+}
 function roleName(role){
   if(role==="Housekeeping") return t("HK Lead");
   return t(role||"");
@@ -1947,7 +1968,7 @@ function paintDots(){
 function enterApp(u){
   sset(LAST_SITE,loginSite);
   S.uid=u.id;S.hotel=HotelScope.assignedHotel(u.role, u.hotel, S.hotel);S.role=(u.role=="Above Property"||u.role=="GM"||u.role=="AGM")?"GM":u.role;S.tab="home";
-  loginPin="";loginErr="";loginUid="";applyUserLanguage(u);
+  loginPin="";loginErr="";loginUid="";applyUserLanguage(u);applyUserMore(u);
 }
 async function signIn(){
   const u=USERS.find(x=>x.id===loginUid&&x.active!==false);
@@ -5401,4 +5422,5 @@ const css=document.createElement("style");css.textContent=`
 <script src="feature-menus.js"></script>
 <script src="pwa-install.js"></script>
 <script src="icons.js"></script>
+<script src="more-menu.js"></script>
 <script src="home-focus.js"></script></body></html>
