@@ -732,13 +732,14 @@
       var hero = document.getElementById("uxHero");
       var hi = hero ? hero.querySelector(".ux-hi") : null;
       var search = hero ? hero.querySelector(".ux-search") : null;
-      var actions = hero ? [].slice.call(hero.querySelectorAll(".ux-act")) : [];
-      if (hero) hero.removeAttribute("id");
+      if (hero) {
+        [].slice.call(hero.querySelectorAll(".ux-act, .ux-acts")).forEach(function (node) { node.remove(); });
+        hero.removeAttribute("id");
+      }
       var shell = document.createElement("div");
       shell.id = "hhqFocus";
       var top = buildTop(hi, search);
-      placeActions(top, actions);
-      if (!corporatePortfolio()) top.insertAdjacentHTML("beforeend", opsPanelHtml());
+      if (window.HHQTiles && HHQTiles.homeHtml) top.insertAdjacentHTML("beforeend", HHQTiles.homeHtml());
       shell.appendChild(top);
       var more = document.createElement("details");
       more.id = "hhqMore";

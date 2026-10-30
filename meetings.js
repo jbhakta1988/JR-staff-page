@@ -1326,6 +1326,7 @@
     renderPage: renderPage,
     renderBeo: renderBeo,
     renderHome: renderHome,
+    dayEvents: dayEvents,
     renderTask: renderTask,
     defaultSettings: defaultSettings,
     fmtPhone: fmtPhone,
@@ -1382,6 +1383,7 @@
     mem = readStore() || buildDemo(nowISO());
     return mem;
   }
+  api.currentState = current;
   function showError(code) {
     ui.error = code || "save";
     ui.notice = "";

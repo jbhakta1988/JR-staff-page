@@ -459,7 +459,7 @@ const ROLE_TO_DB={"Above Property":"above_property",GM:"gm",AGM:"agm","Front Des
 const DEPT_FOR_ROLE={"Front Desk":"front_desk",Housekeeping:"housekeeping",Housekeeper:"housekeeping",Maintenance:"maintenance","Shuttle Driver":"shuttle","House Person":"house_person","Laundry Attendant":"laundry","Breakfast Attendant":"breakfast",GM:"management",AGM:"management","Above Property":"management"};
 let sb=null,sbSession=null,sbPush=false,sbBase=null,pushChain=Promise.resolve(),directorySource="example",remoteLabor=false,Ssync="";
 let USERS=[];
-function exampleUsers(){const map=userLangs();const more=userMoreMap();return EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>{const saved=map[u.id];const language=(u.language==="en"||u.language==="es")?u.language:((saved==="en"||saved==="es")?saved:"");const row={...u,active:u.active!==false,show_more_expanded:u.show_more_expanded===true||more[u.id]===true};if(language)row.language=language;return row})}
+function exampleUsers(){const map=userLangs();const more=userMoreMap();const tiles=userTilesMap();return EXAMPLE_USERS.filter(u=>u.active!==false).map(u=>{const saved=map[u.id];const language=(u.language==="en"||u.language==="es")?u.language:((saved==="en"||saved==="es")?saved:"");const row={...u,active:u.active!==false,show_more_expanded:u.show_more_expanded===true||more[u.id]===true};if(language)row.language=language;if(Array.isArray(tiles[u.id]))row.home_tiles=tiles[u.id];else if(tiles[u.id]===null)row.home_tiles=null;return row})}
 function staffEmail(u){if(u.email)return u.email;return String(u.login_id||u.id)+"@"+STAFF_EMAIL_DOMAIN}
 function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||""))}
 function useRemote(){return !!(USE_SUPABASE&&sb&&sbSession)}
@@ -493,6 +493,7 @@ function mapDirectoryRow(r){
   const live=authMode==="live";
   const row={id:String(id),user_id:r.user_id||(live?String(id):null),email:live?null:(r.email||null),name:r.name,pin:live?"":(r.pin||""),role:ROLE_FROM_DB[r.role]||r.role||"",hotel:hotel||null,shift:r.shift||"AM",days:Array.isArray(r.days)?r.days:DAYS,active:r.active!==false,he_employee_id:r.he_employee_id||null,language:(r.language==="en"||r.language==="es")?r.language:"",pin_reset_required:r.pin_reset_required===true,extra_hotels:Array.isArray(r.extra_hotels)?r.extra_hotels:[]};
   if(r.show_more_expanded===true||r.show_more_expanded===false)row.show_more_expanded=r.show_more_expanded===true;
+  if(Array.isArray(r.home_tiles)||r.home_tiles===null)row.home_tiles=r.home_tiles;
   return row;
 }
 let directoryError="";
@@ -804,6 +805,7 @@ async function applySessionProfile(){
   if(!local){USERS.push(row);local=row}
   else Object.assign(local,{name:row.name,role:row.role,hotel:row.hotel,user_id:uid,he_employee_id:row.he_employee_id,active:row.active,language:(data.language==="en"||data.language==="es")?data.language:(local.language||""),pin_reset_required:data.pin_reset_required===true,pin:""});
   if(data.show_more_expanded===true||data.show_more_expanded===false)local.show_more_expanded=data.show_more_expanded===true;
+  if(Array.isArray(data.home_tiles)||data.home_tiles===null)local.home_tiles=data.home_tiles;
   if(local.language==="en"||local.language==="es"){LANG=local.language;document.documentElement.lang=LANG==="es"?"es":"en";const map=userLangs();map[local.id]=LANG;sset(USER_LANG_KEY,JSON.stringify(map))}
   applyUserMore(local);
   S.uid=local.id;
@@ -1013,6 +1015,7 @@ Object.assign(I18N.es,{
 const LANG_KEY="jrportal_lang";
 const USER_LANG_KEY="jrportal_user_lang";
 const USER_MORE_KEY="jrportal_user_more";
+const USER_TILES_KEY="jrportal_user_tiles";
 let LANG="en";
 let STAMPED=false;
 let PHRASES=null;
@@ -1122,6 +1125,9 @@ function ensureShuttleDemo(block){
 function localeTag(){return LANG==="es"?"es-MX":"en-US"}
 function userLangs(){try{return JSON.parse(sget(USER_LANG_KEY)||"{}")}catch(e){return {}}}
 function userMoreMap(){try{const m=JSON.parse(sget(USER_MORE_KEY)||"{}");return m&&typeof m==="object"?m:{}}catch(e){return {}}}
+function userTilesMap(){try{const m=JSON.parse(sget(USER_TILES_KEY)||"{}");return m&&typeof m==="object"?m:{}}catch(e){return {}}}
+function homeTilesOf(u){if(!u)return null;if(Array.isArray(u.home_tiles)||u.home_tiles===null)return u.home_tiles;const saved=userTilesMap()[u.id];return Array.isArray(saved)||saved===null?saved:null}
+function setHomeTiles(ids){const u=typeof meUser==="function"?meUser():null;if(!u)return;const clean=ids==null?null:(Array.isArray(ids)?ids.filter((id,i)=>/^[a-z][a-z0-9_]{0,40}$/.test(id)&&ids.indexOf(id)===i).slice(0,8):null);u.home_tiles=clean;const map=userTilesMap();map[u.id]=clean;sset(USER_TILES_KEY,JSON.stringify(map));const ex=EXAMPLE_USERS.find(x=>x.id===u.id);if(ex)ex.home_tiles=clean;if(typeof useRemote==="function"&&useRemote()&&typeof sb!=="undefined"&&sb){sb.rpc("set_my_home_tiles",{p_tiles:clean}).then(function(){},function(){});}if(typeof render==="function")render()}
 function moreExpandedOf(u){if(!u)return false;if(u.show_more_expanded===true||u.show_more_expanded===false)return u.show_more_expanded===true;return userMoreMap()[u.id]===true}
 function applyUserMore(u){
   if(!u)return;
@@ -5423,4 +5429,6 @@ const css=document.createElement("style");css.textContent=`
 <script src="pwa-install.js"></script>
 <script src="icons.js"></script>
 <script src="more-menu.js"></script>
+<script src="quick-tiles.js"></script>
+<script src="daily-briefing.js"></script>
 <script src="home-focus.js"></script></body></html>

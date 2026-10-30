@@ -49,13 +49,14 @@
     "Last name": "Apellido",
     "Room number": "Número de cuarto",
     "Last name or room": "Apellido o cuarto",
+    "Number of guests": "Número de huéspedes",
     "Party size": "Personas",
     "Bags": "Maletas",
     "Flight time": "Hora del vuelo",
     "Optional": "Opcional",
     "Notes": "Notas",
     "Add to run": "Agregar al viaje",
-    "seats left": "lugares libres",
+    "seats left": "asientos libres",
     "Full": "Lleno",
     "Past": "Pasó",
     "That run is full.": "Ese viaje está lleno.",
@@ -110,7 +111,7 @@
     "New shuttle signup": "Nueva reserva de shuttle",
     "Park & Fly": "Estaciona y vuela",
     "Shuttle signup": "Anotar en el shuttle",
-    "From a Park & Fly car. Add a last name or room. The plate is not stored here.": "Desde un auto de Estaciona y vuela. Agrega un apellido o un cuarto. La placa no se guarda aquí.",
+    "From a Park & Fly car. Add a room number. The plate is not stored here.": "Desde un auto de Estaciona y vuela. Agrega el número de cuarto. La placa no se guarda aquí.",
     "Loading shuttle…": "Cargando el shuttle…",
     "Status": "Estatus",
     "Room": "Cuarto",
@@ -197,9 +198,9 @@
       hotel: hotel,
       trackingCode: SEED_CODE[hotel] || "",
       slotMinutes: 30,
-      seatCapacity: 14,
-      openMinute: 300,
-      closeMinute: 1380,
+      seatCapacity: 11,
+      openMinute: 0,
+      closeMinute: 1440,
       trackUrl: DEFAULT_URL,
       pickupOrder: ["MSPAM", "MSPMS"]
     };
@@ -289,7 +290,7 @@
     var step = Number(settings.slotMinutes) || 30;
     var out = [];
     if (!day || !(step > 0) || !(close > open)) return out;
-    for (var m = open; m <= close; m += step) {
+    for (var m = open; m < 1440 && m <= close; m += step) {
       var local = day + "T" + minuteToTime(m);
       var iso = fromChicagoLocal(local);
       if (!iso) continue;
@@ -309,7 +310,7 @@
     }, 0);
   }
   function seatsLeft(state, departAt) {
-    var cap = Number(poolSettings(state).seatCapacity) || 14;
+    var cap = Number(poolSettings(state).seatCapacity) || 11;
     var used = takenSeats(state.signups, departAt);
     var counts = state && state.dayCounts;
     if (counts && counts.length) {
@@ -391,7 +392,9 @@
 
   function book(state, input, actor, nowIso) {
     var next = cloneState(state);
-    var hotel = input && input.hotel;
+    var role = normRole(actor && actor.role);
+    var hotel = role === "Above Property" ? (input && input.hotel) : (actor && actor.hotel);
+    if (!hotel) hotel = input && input.hotel;
     if (!canBook(actor && actor.role)) return { ok: false, error: "role" };
     if (!featureOn(next, hotel)) return { ok: false, error: "feature" };
     if (actorHotels(actor, next).indexOf(hotel) < 0) return { ok: false, error: "hotel" };
@@ -401,15 +404,13 @@
     if (dest === "other") {
       if (!note || note.length > 80) return { ok: false, error: "destination" };
     } else note = "";
-    var kind = input.labelKind === "room" ? "room" : "name";
-    var guest = kind === "room" ? validRoom(input.guestLabel) : validName(input.guestLabel);
-    if (!guest) {
-      if (/[0-9]{7,}/.test(String(input.guestLabel || ""))) return { ok: false, error: "phone" };
-      return { ok: false, error: kind === "room" ? "room" : "name" };
-    }
+    var rawLabel = String((input && (input.room || input.guestLabel)) || "");
+    if (/[0-9]{7,}/.test(rawLabel)) return { ok: false, error: "phone" };
+    var guest = validRoom(rawLabel);
+    if (!guest) return { ok: false, error: "room" };
     var party = Number(input.partySize);
     var bags = input.bags == null || input.bags === "" ? 0 : Number(input.bags);
-    if (!Number.isInteger(party) || party < 1 || party > 14) return { ok: false, error: "party" };
+    if (!Number.isInteger(party) || party < 1 || party > 30) return { ok: false, error: "party" };
     if (!Number.isInteger(bags) || bags < 0 || bags > 20) return { ok: false, error: "bags" };
     var flight = String(input.flightTime || "").trim();
     if (flight && !/^[0-2][0-9]:[0-5][0-9]$/.test(flight)) return { ok: false, error: "flight" };
@@ -426,8 +427,8 @@
       return String(s.parkingVisitId || "") === parkingId && (s.status === "booked" || s.status === "boarded");
     })) return { ok: false, error: "already" };
     var seat = seatsLeft(next, input.departAt);
-    if (seat.full) return { ok: false, error: "full" };
-    if (seat.used + party > seat.capacity) return { ok: false, error: "seats" };
+    if (seat.full || seat.left < 1) return { ok: false, error: "full" };
+    if (party > seat.left) return { ok: false, error: "seats" };
     var row = {
       id: "s" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
       hotel: hotel,
@@ -435,7 +436,7 @@
       destinationNote: note,
       departAt: input.departAt,
       guestLabel: guest,
-      labelKind: kind,
+      labelKind: "room",
       partySize: party,
       bags: bags,
       notes: notes,
@@ -534,7 +535,7 @@
       hotel: visit && visit.hotel,
       destination: "t1",
       destinationNote: "",
-      labelKind: room ? "room" : "name",
+      labelKind: "room",
       guestLabel: room,
       partySize: 1,
       bags: 1,
@@ -572,7 +573,7 @@
       return Object.assign({
         destinationNote: "", bags: 1, notes: "", flightTime: "", status: "booked",
         statusAt: "", boardedAt: "", noshowAt: "", doneAt: "", parkingVisitId: "",
-        createdAt: now, ex: true, labelKind: "name"
+        createdAt: now, ex: true, labelKind: "room"
       }, partial);
     }
     return {
@@ -580,12 +581,12 @@
       features: defaultFeatures(),
       settings: settings,
       signups: [
-        row({ id: "ex1", hotel: "MSPAM", destination: "moa", departAt: at(12, 0), guestLabel: "Olson (EX)", partySize: 3, bags: 4, status: "done", statusAt: at(12, 40), doneAt: at(12, 40), boardedAt: at(12, 8) }),
-        row({ id: "ex2", hotel: "MSPMS", destination: "t1", departAt: at(9, 0), guestLabel: "Hayes (EX)", partySize: 2, bags: 2, status: "no_show", statusAt: at(9, 12), noshowAt: at(9, 12) }),
-        row({ id: "ex3", hotel: "MSPAM", destination: "t1", departAt: at(17, 0), guestLabel: "Nguyen (EX)", partySize: 2, bags: 2, flightTime: "19:10", status: "booked" }),
-        row({ id: "ex4", hotel: "MSPMS", destination: "t2", departAt: at(17, 0), guestLabel: "Garcia (EX)", partySize: 1, bags: 1, status: "boarded", statusAt: at(17, 6), boardedAt: at(17, 6) }),
-        row({ id: "ex5", hotel: "MSPAM", destination: "t2", departAt: at(18, 0), guestLabel: "Keller (EX)", partySize: 4, bags: 5, flightTime: "20:05", status: "booked" }),
-        row({ id: "ex6", hotel: "MSPMS", destination: "other", destinationNote: "Light rail", departAt: at(18, 0), guestLabel: "Walsh (EX)", partySize: 1, bags: 0, status: "booked" })
+        row({ id: "ex1", hotel: "MSPAM", destination: "moa", departAt: at(12, 0), guestLabel: "412", partySize: 3, bags: 4, status: "done", statusAt: at(12, 40), doneAt: at(12, 40), boardedAt: at(12, 8) }),
+        row({ id: "ex2", hotel: "MSPMS", destination: "t1", departAt: at(9, 0), guestLabel: "308", partySize: 2, bags: 2, status: "no_show", statusAt: at(9, 12), noshowAt: at(9, 12) }),
+        row({ id: "ex3", hotel: "MSPAM", destination: "t1", departAt: at(17, 0), guestLabel: "118", partySize: 2, bags: 2, flightTime: "19:10", status: "booked" }),
+        row({ id: "ex4", hotel: "MSPMS", destination: "t2", departAt: at(17, 0), guestLabel: "220", partySize: 1, bags: 1, status: "boarded", statusAt: at(17, 6), boardedAt: at(17, 6) }),
+        row({ id: "ex5", hotel: "MSPAM", destination: "t2", departAt: at(18, 0), guestLabel: "214", partySize: 4, bags: 5, flightTime: "20:05", status: "booked" }),
+        row({ id: "ex6", hotel: "MSPMS", destination: "other", destinationNote: "Light rail", departAt: at(18, 0), guestLabel: "109", partySize: 1, bags: 0, status: "booked" })
       ]
     };
   }
@@ -852,23 +853,55 @@
     var view = normRole(actor && (actor.view || actor.role));
     return view === DRIVER;
   }
+  function seatTone(left) {
+    var n = Number(left);
+    if (!(n > 0)) return "full";
+    if (n <= 3) return "low";
+    return "ok";
+  }
   function slotLabel(slot, seat, now, lang) {
     var when = formatTime(slot.departAt, lang);
     var past = Date.parse(slot.departAt) < Date.parse(now) - 10 * 60 * 1000;
     if (past) return when + " · " + label("Past", lang);
-    if (seat.full) return when + " · " + label("Full", lang);
+    if (seatTone(seat.left) === "full") return when + " · " + label("Full", lang);
     return when + " · " + seat.left + " " + label("seats left", lang);
   }
+  function guestBits(row, lang) {
+    var room = validRoom(row && row.guestLabel);
+    var guests = Number(row && row.partySize) || 0;
+    var parts = [hotelName(row && row.hotel, lang)];
+    if (room) parts.push(label("Room", lang) + " " + room);
+    parts.push(guests + " " + label("guests", lang));
+    return parts.join(" · ");
+  }
   function guestLine(row, lang) {
-    var who = row.labelKind === "room" ? label("Room", lang) + " " + row.guestLabel : row.guestLabel;
-    var dest = hotelName(row.hotel, lang) + " · " + destName(row.destination, lang);
+    var dest = destName(row.destination, lang);
     if (row.destination === "other" && row.destinationNote) dest += " · " + row.destinationNote;
-    var extra = row.partySize + " " + label("guests", lang) + " · " + row.bags + " " + label("bags", lang);
+    var extra = row.bags + " " + label("bags", lang);
     if (row.flightTime) extra += " · " + label("Flight", lang) + " " + row.flightTime;
     if (row.notes) extra += " · " + row.notes;
     var stamp = row.statusAt ? " · " + formatTime(row.statusAt, lang) : "";
     var ex = row.ex ? " <span class=\"ex\">" + esc(label("EXAMPLE", lang)) + "</span>" : "";
-    return "<b>" + esc(who) + "</b> " + ex + "<br><small>" + esc(dest) + " · " + esc(extra) + " · " + esc(statusName(row.status, lang)) + esc(stamp) + "</small>";
+    return "<b>" + esc(guestBits(row, lang)) + "</b> " + ex + "<br><small>" + esc(dest) + " · " + esc(extra) + " · " + esc(statusName(row.status, lang)) + esc(stamp) + "</small>";
+  }
+  function slotCard(slot, seat, signups, lang, opts) {
+    opts = opts || {};
+    var tone = seatTone(seat.left);
+    var past = !!opts.past;
+    var disabled = past || tone === "full";
+    var selected = !!opts.selected && !disabled;
+    var pct = seat.capacity ? Math.max(0, Math.min(100, Math.round((100 * seat.used) / seat.capacity))) : 0;
+    var big = tone === "full" ? label("Full", lang) : String(seat.left);
+    var small = tone === "full" ? label("Full", lang) : label("seats left", lang);
+    var people = (signups || []).map(function (row) {
+      return "<li>" + esc(guestBits(row, lang)) + "</li>";
+    }).join("");
+    return "<label class=\"sh-slot sh-" + tone + (past ? " sh-past" : "") + (selected ? " is-on" : "") + "\">" +
+      "<input type=\"radio\" name=\"shSlotPick\" value=\"" + esc(slot.departAt) + "\"" + (selected ? " checked" : "") + (disabled ? " disabled" : "") + " onchange=\"shDraft('departAt', this.value)\">" +
+      "<span class=\"sh-slot-top\"><span class=\"sh-slot-time\">" + esc(formatTime(slot.departAt, lang)) + "</span>" +
+      "<span class=\"sh-slot-left\"><b>" + esc(big) + "</b> <span>" + esc(small) + "</span></span></span>" +
+      "<span class=\"sh-bar\" aria-hidden=\"true\"><i style=\"width:" + pct + "%\"></i></span>" +
+      (people ? "<ul class=\"sh-slot-pax\">" + people + "</ul>" : "") + "</label>";
   }
   function pickupCard(settings, hotel, lang, suffix) {
     var tail = suffix ? "-" + suffix : "";
@@ -930,36 +963,39 @@
   function renderForm(state, now, hotel, lang, ui) {
     var draft = ui.draft || {};
     var cfg = poolSettings(state);
-    var slots = slotsFor(cfg, chicagoDate(now));
+    var day = chicagoDate(now);
+    var slots = slotsFor(cfg, day);
     var future = slots.filter(function (s) { return Date.parse(s.departAt) >= Date.parse(now) - 10 * 60 * 1000; });
-    var selected = draft.departAt || (future[0] && future[0].departAt) || "";
-    var seat = selected ? seatsLeft(state, selected) : { left: 0, full: false, capacity: cfg.seatCapacity, used: 0 };
-    var options = slots.map(function (slot) {
+    var openSlots = future.filter(function (s) { return seatTone(seatsLeft(state, s.departAt).left) !== "full"; });
+    var selected = draft.departAt || (openSlots[0] && openSlots[0].departAt) || "";
+    var selectedOpen = openSlots.some(function (s) { return sameSlot(s.departAt, selected); });
+    if (!selectedOpen) selected = (openSlots[0] && openSlots[0].departAt) || "";
+    var seat = selected ? seatsLeft(state, selected) : { left: 0, full: true, capacity: cfg.seatCapacity, used: cfg.seatCapacity };
+    var cards = future.map(function (slot) {
       var info = seatsLeft(state, slot.departAt);
-      var past = Date.parse(slot.departAt) < Date.parse(now) - 10 * 60 * 1000;
-      return "<option value=\"" + esc(slot.departAt) + "\"" + (slot.departAt === selected ? " selected" : "") + (past ? " disabled" : "") + ">" + esc(slotLabel(slot, info, now, lang)) + "</option>";
+      var rows = (state.signups || []).filter(function (s) { return sameSlot(s.departAt, slot.departAt); });
+      return slotCard(slot, info, rows, lang, { selected: sameSlot(slot.departAt, selected) });
     }).join("");
     var dest = draft.destination || "t1";
-    var kind = draft.labelKind === "room" ? "room" : "name";
-    var full = selected && seat.full ? "<p class=\"sh-full\" id=\"shFull\">" + esc(label("That run is full.", lang)) + "</p>" : "";
-    var park = draft.parkingVisitId ? "<p class=\"sh-note\" id=\"shParkNote\">" + esc(label("From a Park & Fly car. Add a last name or room. The plate is not stored here.", lang)) + "</p>" : "";
+    var maxParty = Math.max(0, Number(seat.left) || 0);
+    var party = Number(draft.partySize) || 1;
+    if (party < 1) party = 1;
+    if (maxParty && party > maxParty) party = maxParty;
+    var park = draft.parkingVisitId ? "<p class=\"sh-note\" id=\"shParkNote\">" + esc(label("From a Park & Fly car. Add a room number. The plate is not stored here.", lang)) + "</p>" : "";
     var none = future.length ? "" : "<p class=\"sh-full\" id=\"shNone\">" + esc(label("No more runs today.", lang)) + "</p>";
-    return "<form class=\"card\" id=\"shForm\" onsubmit=\"shBook(event)\"><h3>" + esc(label("Sign up a guest", lang)) + "</h3>" + park +
+    var hotelLine = "<p class=\"sh-note\" id=\"shHotel\">" + esc(label("Hotel", lang)) + ": <b>" + esc(hotelName(hotel, lang)) + "</b></p>";
+    return "<form class=\"card\" id=\"shForm\" onsubmit=\"shBook(event)\"><h3>" + esc(label("Sign up a guest", lang)) + "</h3>" + park + hotelLine +
       "<label class=\"sh-field\">" + esc(label("Destination", lang)) + "<select id=\"shDest\" onchange=\"shDraft('destination', this.value)\">" + DESTS.map(function (d) {
         return "<option value=\"" + d + "\"" + (d === dest ? " selected" : "") + ">" + esc(destName(d, lang)) + "</option>";
       }).join("") + "</select></label>" +
       (dest === "other" ? "<label class=\"sh-field\">" + esc(label("Where to", lang)) + "<input id=\"shOther\" maxlength=\"80\" value=\"" + esc(draft.destinationNote || "") + "\"></label>" : "<input id=\"shOther\" type=\"hidden\" value=\"\">") +
-      "<label class=\"sh-field\">" + esc(label("Departure", lang)) + "<select id=\"shSlot\" onchange=\"shDraft('departAt', this.value)\">" + options + "</select></label>" +
-      "<p class=\"sh-note\" id=\"shSeats\">" + esc(label("Shared seats", lang)) + ": " + esc(String(seat.left)) + " " + esc(label("seats left", lang)) + "</p>" + full + none +
-      "<div class=\"sh-kind\">" +
-      "<label><input type=\"radio\" name=\"shKind\" value=\"name\"" + (kind === "name" ? " checked" : "") + " onchange=\"shDraft('labelKind', 'name')\"> " + esc(label("Last name", lang)) + "</label>" +
-      "<label><input type=\"radio\" name=\"shKind\" value=\"room\"" + (kind === "room" ? " checked" : "") + " onchange=\"shDraft('labelKind', 'room')\"> " + esc(label("Room number", lang)) + "</label></div>" +
-      "<label class=\"sh-field\">" + esc(label(kind === "room" ? "Room number" : "Last name", lang)) + "<input id=\"shGuest\" maxlength=\"40\" autocomplete=\"off\" value=\"" + esc(draft.guestLabel || "") + "\"></label>" +
-      "<label class=\"sh-field\">" + esc(label("Party size", lang)) + "<input id=\"shParty\" type=\"number\" min=\"1\" max=\"14\" inputmode=\"numeric\" value=\"" + esc(draft.partySize || 1) + "\"></label>" +
+      "<div class=\"sh-slots\" id=\"shSlots\" role=\"radiogroup\" aria-label=\"" + esc(label("Departure", lang)) + "\">" + cards + "</div>" + none +
+      "<label class=\"sh-field\">" + esc(label("Room number", lang)) + "<input id=\"shRoom\" inputmode=\"numeric\" maxlength=\"4\" required autocomplete=\"off\" value=\"" + esc(draft.guestLabel || "") + "\"></label>" +
+      "<label class=\"sh-field\">" + esc(label("Number of guests", lang)) + "<input id=\"shParty\" type=\"number\" min=\"1\" max=\"" + (maxParty || 1) + "\" step=\"1\" inputmode=\"numeric\" required value=\"" + esc(maxParty ? party : "") + "\"" + (maxParty ? "" : " disabled") + "></label>" +
       "<label class=\"sh-field\">" + esc(label("Bags", lang)) + "<input id=\"shBags\" type=\"number\" min=\"0\" max=\"20\" inputmode=\"numeric\" value=\"" + esc(draft.bags == null ? 0 : draft.bags) + "\"></label>" +
       "<label class=\"sh-field\">" + esc(label("Flight time", lang)) + " (" + esc(label("Optional", lang)) + ")<input id=\"shFlight\" type=\"time\" value=\"" + esc(draft.flightTime || "") + "\"></label>" +
       "<label class=\"sh-field\">" + esc(label("Notes", lang)) + " (" + esc(label("Optional", lang)) + ")<input id=\"shNotes\" maxlength=\"200\" value=\"" + esc(draft.notes || "") + "\"></label>" +
-      "<button type=\"submit\" class=\"btn\" id=\"shSave\">" + esc(label("Add to run", lang)) + "</button></form>";
+      "<button type=\"submit\" class=\"btn\" id=\"shSave\"" + (maxParty ? "" : " disabled") + ">" + esc(label("Add to run", lang)) + "</button></form>";
   }
   function renderDriver(state, actor, now, lang) {
     var day = chicagoDate(now);
@@ -1037,6 +1073,7 @@
     fromChicagoLocal: fromChicagoLocal,
     slotsFor: slotsFor,
     seatsLeft: seatsLeft,
+    seatTone: seatTone,
     takenSeats: takenSeats,
     shouldAlert: shouldAlert,
     trackLink: trackLink,
@@ -1233,21 +1270,21 @@
   function showError(code) { ui.error = code || "save"; ui.notice = ""; render(); }
   function readDraft() {
     var prev = ui.draft || {};
-    var kind = "name";
-    var radios = document.getElementsByName("shKind");
-    for (var i = 0; i < radios.length; i++) if (radios[i].checked) kind = radios[i].value;
+    var picked = "";
+    var radios = document.getElementsByName("shSlotPick");
+    for (var i = 0; i < radios.length; i++) if (radios[i].checked) picked = radios[i].value;
     return {
       destination: val("shDest") || prev.destination || "t1",
       destinationNote: val("shOther"),
-      departAt: val("shSlot") || prev.departAt || "",
-      labelKind: kind,
-      guestLabel: val("shGuest"),
+      departAt: picked || prev.departAt || "",
+      labelKind: "room",
+      guestLabel: val("shRoom"),
       partySize: val("shParty") || prev.partySize || 1,
       bags: val("shBags") === "" ? 0 : val("shBags"),
       flightTime: val("shFlight"),
       notes: val("shNotes"),
       parkingVisitId: prev.parkingVisitId || "",
-      hotel: prev.hotel || ""
+      hotel: ""
     };
   }
   function fanout(signup) {
@@ -1301,7 +1338,7 @@
     ui.error = "";
     render();
     setTimeout(function () {
-      var id = key === "guestLabel" ? "shGuest" : key === "departAt" ? "shSlot" : key === "destination" ? "shDest" : "";
+      var id = key === "guestLabel" ? "shRoom" : key === "departAt" ? "shRoom" : key === "destination" ? "shDest" : "";
       var el = id && document.getElementById(id);
       if (el) el.focus();
     }, 0);
@@ -1316,7 +1353,8 @@
       destination: draft.destination,
       destinationNote: draft.destinationNote,
       departAt: draft.departAt,
-      labelKind: draft.labelKind,
+      labelKind: "room",
+      room: draft.guestLabel,
       guestLabel: draft.guestLabel,
       partySize: Number(draft.partySize),
       bags: draft.bags === "" ? 0 : Number(draft.bags),
@@ -1336,7 +1374,7 @@
         p_destination_note: input.destinationNote || null,
         p_depart: input.departAt,
         p_guest_label: input.guestLabel,
-        p_label_kind: input.labelKind,
+        p_label_kind: "room",
         p_party: input.partySize,
         p_bags: input.bags,
         p_notes: input.notes || null,
@@ -1501,6 +1539,28 @@
     ".sh-qr{width:min(220px,72vw);height:auto;display:block;margin:10px auto;background:#fff}",
     ".sh-full{background:#fde2e1;color:#c0262d;padding:8px;border-radius:8px;font-weight:700}",
     ".sh-guest{padding:8px 0;border-bottom:1px solid #eee}",
+    ".sh-slots{display:flex;flex-direction:column;gap:8px;margin:8px 0}",
+    ".sh-slot{display:block;position:relative;border:1px solid #e6e8ee;border-radius:14px;padding:10px 12px;background:#fff;text-align:left}",
+    ".sh-slot input{position:absolute;opacity:0;width:1px;height:1px}",
+    ".sh-slot-top{display:flex;align-items:center;justify-content:space-between;gap:8px}",
+    ".sh-slot-time{font-size:18px;font-weight:800}",
+    ".sh-slot-left{font-size:13px;font-weight:750;text-align:right;line-height:1.1}",
+    ".sh-slot-left b{display:block;font-size:32px;line-height:1}",
+    ".sh-bar{display:block;height:8px;border-radius:99px;background:#e6e8ee;overflow:hidden;margin-top:8px}",
+    ".sh-bar i{display:block;height:100%;width:0}",
+    ".sh-ok{border-color:#86efac}",
+    ".sh-ok .sh-slot-left{color:#166534}",
+    ".sh-ok .sh-bar i{background:#16a34a}",
+    ".sh-low{border-color:#fdba74}",
+    ".sh-low .sh-slot-left{color:#9a3412}",
+    ".sh-low .sh-bar i{background:#d97706}",
+    ".sh-full{border-color:#fecaca;background:#fff1f2}",
+    ".sh-full .sh-slot-left{color:#b91c1c}",
+    ".sh-full .sh-bar i{background:#dc2626}",
+    ".sh-slot.is-on{outline:2px solid #3b5bdb}",
+    ".sh-past{opacity:.72}",
+    ".sh-slot-pax{margin:8px 0 0;padding:0;list-style:none;font-size:14px;font-weight:650}",
+    ".sh-slot-pax li{padding:2px 0}",
     ".sh-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}",
     ".sh-actions .btn,.sh-actions .btn2{width:100%;min-height:44px}",
     ".sh-kind{display:flex;gap:12px;margin:8px 0}",
