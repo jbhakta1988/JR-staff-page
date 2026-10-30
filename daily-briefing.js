@@ -57,13 +57,16 @@
     try {
       var u = meUser();
       if (u && u.hotel) return u.hotel;
+      var role = "";
+      try { role = authRole(); } catch (e2) { role = u && u.role; }
+      if ((role === "Above Property" || role === "JR Corporate") && typeof S !== "undefined" && S.hotel) return S.hotel;
     } catch (e) {}
     return "";
   }
   function allowed() {
     var role = "";
     try { role = authRole(); } catch (e) { role = ""; }
-    return role === "GM" || role === "AGM";
+    return role === "GM" || role === "AGM" || role === "Above Property" || role === "JR Corporate";
   }
   function bag(hotel) {
     try { return (S.h && S.h[hotel]) || {}; } catch (e) { return {}; }
@@ -186,7 +189,7 @@
       var list = (prevTiles(role) || []).slice();
       var who = "";
       try { who = authRole() || role; } catch (e) { who = role; }
-      if (role === "GM" && (who === "GM" || who === "AGM")) {
+      if (role === "GM" && (who === "GM" || who === "AGM" || who === "Above Property" || who === "JR Corporate")) {
         list = list.filter(function (id) { return id !== "brief"; });
         if (list.indexOf("dbrief") < 0) list.unshift("dbrief");
       }

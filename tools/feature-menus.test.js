@@ -16,6 +16,10 @@ test("shuttle is shared by MSPAM and MSPMS and follows the switch", () => {
   assert.deepEqual(menus.filterIds(ids, "Front Desk", "MSPWE", on({})), ["home", "parking", "meetings", "winter", "gscores"]);
   assert.equal(menus.menuAllows("shut", "Front Desk", "MSPAM", on({})), true);
   assert.equal(menus.menuAllows("shut", "Shuttle Driver", "MSPMS", on({ "MSPMS|shuttle": false })), false);
+  assert.equal(menus.menuAllows("shut", "GM", "MSPAM", on({})), true);
+  assert.equal(menus.menuAllows("shut", "AGM", "MSPMS", on({})), true);
+  assert.equal(menus.menuAllows("shut", "Above Property", "MSPAM", on({})), true);
+  assert.equal(menus.menuAllows("shut", "GM", "MSPWE", on({})), false);
   assert.equal(menus.menuAllows("shut", "GM", "MSPWE", on({ "MSPWE|shuttle": true })), false);
 });
 
