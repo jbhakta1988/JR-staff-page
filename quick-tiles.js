@@ -9,6 +9,7 @@
 
   function norm(role) {
     if (role === "JR Corporate" || role === "corporate" || role === "above_property") return "Above Property";
+    if (role === "Night Audit" || role === "Night Auditor" || role === "night_audit") return "Front Desk";
     return role || "";
   }
   function featureAllows(featureOn, hotel, feature) {
@@ -21,9 +22,10 @@
     var parking = featureAllows(featureOn, hotel, "parking");
     if (role === "Front Desk") {
       return shuttle
-        ? ["shut", "parking", "notes", "meetings", "wo"]
-        : ["notes", "parking", "shut", "meetings", "wo"];
+        ? ["shut", "recs", "parking", "notes", "meetings", "wo"]
+        : ["recs", "notes", "parking", "shut", "meetings", "wo"];
     }
+    if (role === "Bartender") return shuttle ? ["shut", "recs"] : ["recs"];
     if (role === "Housekeeping") return ["rooms", "myrooms", "insp", "issue"];
     if (role === "Housekeeper") return ["myrooms", "rooms", "insp", "issue"];
     if (role === "Maintenance") return ["wo", "pm", "issue"];
@@ -90,6 +92,7 @@
     notes: ["Shift Notes", "Notas de turno"],
     parking: ["Park & Fly", "Estaciona y vuela"],
     shut: ["Shuttle", "Shuttle"],
+    recs: ["Local Tips", "Tips locales"],
     meetings: ["Meeting Rooms", "Salones"],
     wo: ["Work Order", "Orden de trabajo"],
     rooms: ["Room Status", "Estado de cuartos"],
@@ -190,7 +193,7 @@
   }
   function allowedNow() {
     var role = roleNow();
-    var view = role === "AGM" || role === "Above Property" || role === "GM" ? "GM" : (typeof S !== "undefined" ? S.role : role);
+    var view = role === "AGM" || role === "Above Property" || role === "GM" ? "GM" : role;
     var ids = [];
     try { ids = typeof tilesFor === "function" ? tilesFor(view) || [] : []; } catch (e) { ids = []; }
     return ids;
@@ -306,6 +309,14 @@
       return String(prevSettings.apply(this, arguments) || "") + settingHtml();
     };
   }
+  if (typeof TILES !== "undefined") {
+    var barTiles = TILES.Bartender || ["sched", "my", "recs", "shut"];
+    ["recs", "shut", "sched", "my"].forEach(function (id) {
+      if (barTiles.indexOf(id) < 0) barTiles.push(id);
+    });
+    TILES.Bartender = barTiles;
+  }
+  if (typeof NAV !== "undefined" && !NAV.Bartender) NAV.Bartender = ["home", "my", "sched"];
   if (typeof M !== "undefined") {
     M.dbrief = M.dbrief || ["☀️", "Daily Briefing"];
     M.hcmp = M.hcmp || ["📊", "Hotel Comparison"];
@@ -315,6 +326,8 @@
     I18N.es["Daily Briefing"] = "Resumen diario";
     I18N.es["Hotel Comparison"] = "Comparación de hoteles";
     I18N.es["Report Issue"] = "Reportar falla";
+    I18N.es["Local Tips"] = "Tips locales";
+    I18N.es.Bartender = "Cantinero";
     I18N.es["Quick tiles"] = "Accesos rápidos";
     I18N.es.Customize = "Personalizar";
     I18N.es["Park & Fly"] = "Estaciona y vuela";
