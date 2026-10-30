@@ -2143,7 +2143,7 @@ function render(){
   if(!dd.reqs){const y=ld(),nm=role=>((ST().find(s=>s.role==role)||{}).n)||role;dd.reqs=[{role:"House Person",text:"Lobby trash run",by:nm("Front Desk")+" (Front Desk)",who:nm("House Person"),st:"Open",day:y},{role:"House Person",text:"Linen run to 3rd floor",by:nm("Housekeeping")+" (HK Lead)",who:nm("House Person"),st:"Done",t0:"8:05 AM",t1:"8:20 AM",day:y},{role:"Laundry Attendant",text:"Rush towels for pool",by:nm("Housekeeping")+" (HK Lead)",who:nm("Laundry Attendant"),st:"Open",day:y}]}
   const tiles=tilesFor(S.role);
   if(gamifyOff()&&["avatar","avcredits"].includes(S.tab))S.tab="home";
-  M.pts[1]=gamifyOff()?"Leaderboard":"Points";
+  M.pts[1]=gamifyOff()?"Leaderboard":"Points & Rewards";
   if(!["home",...nav,...tiles].includes(S.tab)&&!(canSeeReports()&&(S.tab==="health"||S.tab==="score")))S.tab="home";
   INIT(dd);ST();["Daily","Weekly","Monthly"].forEach(t=>dd.touched[pk(t)]=1);
   $("hotel").hidden=authRole()!="Above Property";
@@ -3756,11 +3756,12 @@ function nm(l){return LANG==="es"?l[2]:l[1]}
 window.ptsAward=function(n,en,es,big){if(gamifyOff())return;const p=P(),before=lvl(p.xp);p.xp+=n;p.wk+=n;p.mo+=n;p.log.unshift([new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),en,es,n]);p.log=p.log.slice(0,15);const after=lvl(p.xp);SV(p);
   ptsToast("+"+n+" "+t("pts")+" · "+(LANG==="es"?es:en));if(big)confetti();
   if(after>before){p.xp+=LV.length*0+25*after;SV(p);setTimeout(()=>{confetti();window.avLevelUp&&avLevelUp();ptsToast("🎉 "+t("Level up!")+" "+t("Level")+" "+(after+1)+" · "+nm(LV[after]),3500)},900)}};
-function ptsToast(msg,ms){if(gamifyOff())return;let el=document.getElementById("ptsToast");if(!el){el=document.createElement("div");el.id="ptsToast";el.style.cssText="position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);pointer-events:none;background:#1f2a44;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;z-index:9999;box-shadow:0 4px 14px #0004;transition:opacity .3s;max-width:92vw;text-align:center";document.body.appendChild(el)}el.textContent=msg;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,ms||2200)}
+function ptsToast(msg,ms){if(gamifyOff())return;let el=document.getElementById("ptsToast");if(!el){el=document.createElement("div");el.id="ptsToast";el.style.cssText="position:fixed;left:50%;top:72px;transform:translateX(-50%);pointer-events:none;background:#1c1f26;color:#fff;padding:10px 16px;border-radius:999px;font-weight:650;z-index:9999;box-shadow:0 8px 24px rgba(16,24,40,.18);transition:opacity .3s;max-width:92vw;text-align:center";document.body.appendChild(el)}el.textContent=msg;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,ms||2200)}
 function confetti(){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;if(window.funBurst){window.funBurst();return}const c=document.createElement("canvas");c.style.cssText="position:fixed;inset:0;pointer-events:none;z-index:9998";c.width=innerWidth;c.height=innerHeight;document.body.appendChild(c);const x=c.getContext("2d"),cols=["#f94144","#f8961e","#f9c74f","#90be6d","#43aa8b","#577590"],ps=Array.from({length:140},()=>({x:c.width/2,y:c.height/3,vx:(Math.random()-.5)*12,vy:Math.random()*-12-3,s:4+Math.random()*5,c:cols[Math.floor(Math.random()*6)],r:Math.random()*6}));let f=0;(function a(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.35;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});if(++f<110)requestAnimationFrame(a);else c.remove()})()}
 // Credit points/stat to another associate (e.g. tagged on a guest compliment). Works for any hotel's demo store; no toast for the giver.
 window.ptsAwardTo=function(uid,hotel,n,en,es,stat){if(!uid||!hotel)return;const key="jrpts_"+hotel+"_"+uid,p=Pfor(key,hotel),before=lvl(p.xp);p.xp+=n;p.wk+=n;p.mo+=n;if(stat)for(const k in stat)p.st[k]=(p.st[k]||0)+stat[k];p.log.unshift([new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),en,es,n]);p.log=p.log.slice(0,15);const after=lvl(p.xp);if(after>before)p.xp+=25*after;try{localStorage.setItem(key,JSON.stringify(p))}catch(e){}};
 window.ptsToast=ptsToast;window.ptsLevel=()=>lvl(P().xp);window.ptsStats=()=>P().st;
+window.ptsTotal=function(){if(gamifyOff())return null;try{return P().xp}catch(e){return null}};
 window.ptsCard=function(){if(gamifyOff())return "";const p=P(),i=lvl(p.xp),nx=LV[i+1],pct=nx?Math.round((p.xp-LV[i][0])/(nx[0]-LV[i][0])*100):100;
   return `<div class=card onclick="go('pts')" style="cursor:pointer;background:linear-gradient(135deg,#fff7e0,#e8f0ff)"><div style="display:flex;justify-content:space-between;align-items:center"><b>⭐ ${t("My Points")}</b><span style="background:#1f2a44;color:#fff;border-radius:999px;padding:2px 10px;font-size:13px">${t("Level")} ${i+1} · ${escH(nm(LV[i]))}</span></div>
   <div style="font-size:28px;font-weight:700;margin:6px 0">${p.xp.toLocaleString()} <small style="font-size:14px;font-weight:400">XP</small></div>
@@ -3770,7 +3771,8 @@ function board(per){const me=(meUser()||{}).name||"";const myF=String(me).split(
   let rows=FIRST.slice(0,9).map((n,j)=>[n,((seed*(j+3)*(j+5))%97)+(per=="mo"?150:30)+j*7,(j*seed)%6]);if(!view)rows.push([t("You"),per=="mo"?p.mo:p.wk,lvl(p.xp),1]);rows.sort((a,b)=>b[1]-a[1]);
   const bdg=r=>BADGES.map((b,k)=>{const v=((r[1]+k*13+seed)%9);return v>=7?b[2]+TIER[v>=8?2:1]:v>=5?b[2]+TIER[0]:""}).filter(Boolean).slice(0,3).join(" ");
   return `<table class=t><tr><th>#</th><th>${t("Name")}</th><th>${t("Level")}</th>${view?`<th>${t("Badges")}</th>`:""}<th>${t("pts")}</th></tr>${rows.map((r,k)=>`<tr${r[3]?' style="background:#fff3cd;font-weight:600"':""}><td>${k<3?["🥇","🥈","🥉"][k]:k+1}</td><td><span style="display:flex;align-items:center;gap:6px">${window.avHTML?avHTML(r[3]?null:r[0],32):""}${escH(r[0])}</span></td><td>${r[2]+1}</td>${view?`<td>${bdg(r)||"–"}</td>`:""}<td>${r[1]}</td></tr>`).join("")}</table>`}
-M.pts=["⭐","Points"];
+M.pts=["⭐","Points & Rewards"];
+I18N.es["Points & Rewards"]="Puntos y premios";
 function ptsViewOnly(){S.ptab=S.ptab||"wk";
   const hs=authRole()==="Above Property"?Object.keys(HOTELS).map(k=>`<button type="button" class="${k==S.hotel?"on":""}" aria-pressed="${k==S.hotel}" style="${k==S.hotel?"background:#1f2a44;color:#fff;font-weight:700":""}" onclick="setHotel('${k}');go('pts')">${k}</button>`).join(""):"";
   return `<h2>🏁 ${t("Leaderboard")}</h2><div class=card><small>${escH(LANG==="es"?"Solo lectura. Muestra a los asociados del hotel elegido, no tus propios puntos.":"View only. Shows associates at the selected hotel, not your own points.")}</small><div style="display:flex;gap:6px;margin-top:8px" role="group" aria-label="${escH(t("Property"))}">${hs}</div></div>
@@ -3778,13 +3780,13 @@ function ptsViewOnly(){S.ptab=S.ptab||"wk";
   <div class=card><b>📈 ${t("How to earn")}</b><table class=t>${RULES.map(r=>`<tr><td>${escH(LANG==="es"?r[1]:r[0])}</td><td>${r[2]}</td></tr>`).join("")}</table></div>`}
 V.pts=function(){if(gamifyOff())return ptsViewOnly();const p=P();S.ptab=S.ptab||"wk";
   const badges=BADGES.map(b=>{const v=p.st[b[4]]||0;let tier=-1;b[3].forEach((th,k)=>{if(v>=th)tier=k});const nxt=b[3][tier+1];return `<div style="border:1px solid #ddd;border-radius:10px;padding:8px;text-align:center;opacity:${tier<0?.45:1}"><div style="font-size:24px">${b[2]}${tier>=0?TIER[tier]:""}</div><small><b>${escH(LANG==="es"?b[1]:b[0])}</b><br>${v}${nxt?" / "+nxt:""}</small></div>`}).join("");
-  return `<h2>⭐ ${t("Points")}</h2>${ptsCard()}
+  return `<div class="hhq-pts" id="hhqPts"><h2>${t("Points & Rewards")}</h2>${ptsCard()}
   <div class=card><b>🏁 ${t("Leaderboard")}</b><div style="display:flex;gap:6px;margin:8px 0">${[["wk","This week"],["mo","This month"]].map(x=>`<button class="${S.ptab==x[0]?"on":""}" onclick="S.ptab='${x[0]}';render()">${t(x[1])}</button>`).join("")}</div>${board(S.ptab)}<small>${t("My department")} · ${escH(S.hotel)}</small></div>
   <div class=card><b>🔥 ${t("Streaks")}</b><table class=t><tr><td>${t("On-time checklists")}</td><td>${p.st.ck}</td></tr><tr><td>${t("On-time clock-in")}</td><td>${p.st.ci}</td></tr><tr><td>${t("Clean punches")}</td><td>${p.st.pu}</td></tr><tr><td>${t("App days")}</td><td>${p.st.app}</td></tr></table></div>
   <div class=card><b>🏅 ${t("Badges")}</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px">${badges}</div><small>🥉 Bronze · 🥈 Silver · 🥇 Gold</small></div>
   <div class=card><b>🎁 ${t("Rewards")}</b><table class=t>${REWARDS.map((r,k)=>`<tr><td>${escH(LANG==="es"?r[1]:r[0])}</td><td>${r[2]}</td><td>${p.red.includes(k)?t("Requested"):`<button onclick="ptsRedeem(${k})">${t("Redeem")}</button>`}</td></tr>`).join("")}</table><small>${t("Needs GM approval")} · ${t("Delivered by Tremendous")} · ${t("You pick the brand: Amazon, Target, Walmart, restaurants, prepaid Visa and more")} · ${t("Sent to your email or phone on file")}</small></div>
   <div class=card><b>📈 ${t("How to earn")}</b><table class=t>${RULES.map(r=>`<tr><td>${escH(LANG==="es"?r[1]:r[0])}</td><td>${r[2]}</td></tr>`).join("")}</table></div>
-  ${p.log.length?`<div class=card><b>${t("Recent")}</b><table class=t>${p.log.map(l=>`<tr><td>${escH(l[0])}</td><td>${escH(LANG==="es"?l[2]:l[1])}</td><td>+${l[3]}</td></tr>`).join("")}</table></div>`:""}`};
+  ${p.log.length?`<div class=card><b>${t("Recent")}</b><table class=t>${p.log.map(l=>`<tr><td>${escH(l[0])}</td><td>${escH(LANG==="es"?l[2]:l[1])}</td><td>+${l[3]}</td></tr>`).join("")}</table></div>`:""}</div>`};
 window.ptsRedeem=function(k){const p=P();if(p.xp<REWARDS[k][2]){ptsToast(t("Not enough points"));return}p.red.push(k);SV(p);ptsToast("🎁 "+t("Requested")+" · "+t("Needs GM approval"));render()};
 Object.keys(TILES).forEach(r=>{if(!TILES[r].includes("pts"))TILES[r].push("pts")});ROLES.forEach(r=>{TILES[r]=TILES[r]||[];if(!TILES[r].includes("pts"))TILES[r].push("pts")});
 const _home=V.home;V.home=function(){return ptsCard()+_home()};
@@ -3861,12 +3863,15 @@ function pick(){if(!BANK||noQotd())return null;const s=st(),d=today(),pk=period(
   if(!id)return null;s.h[pk]={id,review,role:g,freq:isWk()?"weekly":"daily"};sv(s);return s.h[pk]}
 const L=()=>S.qlang||LANG;
 const tl=(en,es)=>L()==="es"?es:en;
+function qotdHideKey(){return "jrqotd_hide_"+S.hotel+"_"+((meUser()||{}).id||"x")+"_"+period(today())}
+window.qotdDismiss=function(){try{localStorage.setItem(qotdHideKey(),"1")}catch(e){}render()};
 window.qotdCard=function(){const a=pick();if(!a)return"";const q=BANK.find(x=>x[0]==a.id);if(!q)return"";const es=L()==="es",opts=es?q[7]:q[6],done=a.ans!=null,s=st();
-  return `<div class=card id=qotd style="background:linear-gradient(135deg,#eaf7ff,#f3ecff)"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>🧠 ${isWk()?tl("Question of the Week","Pregunta de la semana"):tl("Question of the Day","Pregunta del Día")}</b><span>${gamifyOff()?"":`<small>🔥 ${s.streak} ${isWk()?tl("week streak","semanas seguidas"):tl("day streak","días seguidos")}</small> `}<button class=btn2 style="padding:2px 8px;min-height:0" onclick="S.qlang=(L_()==='es'?'en':'es');render()" aria-label="EN/ES">${es?"EN":"ES"}</button></span></div>
+  if(done){try{if(localStorage.getItem(qotdHideKey()))return""}catch(e){}}
+  return `<div class=card id=qotd><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>🧠 ${isWk()?tl("Question of the Week","Pregunta de la semana"):tl("Question of the Day","Pregunta del Día")}</b><span>${gamifyOff()?"":`<small>🔥 ${s.streak} ${isWk()?tl("week streak","semanas seguidas"):tl("day streak","días seguidos")}</small> `}<button class=btn2 style="padding:2px 8px;min-height:0" onclick="S.qlang=(L_()==='es'?'en':'es');render()" aria-label="EN/ES">${es?"EN":"ES"}</button></span></div>
   ${a.review?`<small style="color:#6a1b9a">↻ ${tl("Review","Repaso")}</small> `:""}${isImp(q)?`<small style="color:#b00020">⚠️ ${tl("Important","Importante")}</small>`:""}<div style="font-weight:600;margin:8px 0">${escH(es?q[5]:q[4])}</div>
   <div style="display:grid;gap:6px">${opts.map((o,i)=>{let bg="#fff",an="";if(done){if(i==q[8]){bg="#c8f7c5";an="animation:qpop .5s"}else if(i==a.ans){bg="#ffd6d6";an="animation:qshake .4s"}}
     return `<button ${done?"disabled":""} onclick="qotdAnswer(${i})" style="text-align:left;padding:10px;border-radius:10px;border:1px solid #c9d3e3;background:${bg};${an};min-height:44px;color:#111">${String.fromCharCode(65+i)}. ${escH(o)}</button>`}).join("")}</div>
-  ${done?`<div style="margin-top:8px;animation:qfade .6s"><b>${a.ans==q[8]?"✅ "+tl("Correct!","¡Correcto!"):"💡 "+tl("Not quite","Casi")}</b> ${escH(es?q[10]:q[9])}<br><small>${/^http/.test(q[11])?`<a href="${escH(q[11])}" target=_blank rel=noopener>${tl("Source","Fuente")}</a>`:escH(q[11])} · ${isWk()?tl("Answer saved — new question Monday","Respuesta guardada; nueva pregunta el lunes"):tl("Answer saved — come back tomorrow","Respuesta guardada; vuelve mañana")}</small></div>`:""}</div>`};
+  ${done?`<div style="margin-top:8px;animation:qfade .6s"><b>${a.ans==q[8]?"✅ "+tl("Correct!","¡Correcto!"):"💡 "+tl("Not quite","Casi")}</b> ${escH(es?q[10]:q[9])}<br><small>${/^http/.test(q[11])?`<a href="${escH(q[11])}" target=_blank rel=noopener>${tl("Source","Fuente")}</a>`:escH(q[11])} · ${isWk()?tl("Answer saved — new question Monday","Respuesta guardada; nueva pregunta el lunes"):tl("Answer saved — come back tomorrow","Respuesta guardada; vuelve mañana")}</small><div style="margin-top:8px"><button type="button" class="btn2" onclick="qotdDismiss()">${tl("Dismiss","Ocultar")}</button></div></div>`:""}</div>`};
 window.L_=L;
 window.qotdAnswer=function(i){const s=st(),d=today(),pk=period(d),n=step(),wk=isWk(),a=s.h[pk];if(!a||a.ans!=null)return;const q=BANK.find(x=>x[0]==a.id);a.ans=i;const ok=i==q[8];
   // streak counts periods (days or weeks); a missed question comes back for review after 3 periods
@@ -5450,4 +5455,6 @@ const css=document.createElement("style");css.textContent=`
 <script src="quick-tiles.js"></script>
 <script src="daily-briefing.js"></script>
 <script src="shift-home.js"></script>
+<script src="expected-done.js"></script>
+<script src="avatars.js"></script>
 <script src="home-focus.js"></script></body></html>

@@ -739,6 +739,7 @@
       var shell = document.createElement("div");
       shell.id = "hhqFocus";
       var top = buildTop(hi, search);
+      if (window.HHQDone && HHQDone.homeHtml) top.insertAdjacentHTML("beforeend", HHQDone.homeHtml());
       if (window.HHQBrief && HHQBrief.inlineHtml) top.insertAdjacentHTML("beforeend", HHQBrief.inlineHtml());
       var pair = document.createElement("div");
       pair.className = "hhq-pair";
@@ -768,6 +769,12 @@
         if (el.classList && el.classList.contains("warn")) {
           var today = document.getElementById("hhqToday");
           if (today) today.insertBefore(el, today.children[1] || null);
+          return;
+        }
+        if (el.id === "qotd") {
+          var anchor = top.querySelector("#hhqUrgent") || top.querySelector("#hhqToday");
+          if (anchor && anchor.nextSibling) top.insertBefore(el, anchor.nextSibling);
+          else top.appendChild(el);
           return;
         }
         if (isQuiet(el)) { el.remove(); return; }
