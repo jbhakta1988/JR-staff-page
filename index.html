@@ -4892,7 +4892,8 @@ function cleansDay(h,w,i,occ){const c=(window.LCMD&&LCMD.cleansFor)?LCMD.cleansF
 function ovAll(){return jget(OVK,{})}
 function ov(h,w){return ovAll()[key(h,w)]||[null,null,null,null,null,null,null]}
 function occRooms(h,w){const o=ov(h,w);return [0,1,2,3,4,5,6].map(i=>o[i]!=null&&o[i]!==""?+o[i]:fcDay(h,w,i).rooms)}
-function calcHours(h,w){const occ=occRooms(h,w),out={};OPOS.forEach(p=>{out[p]=occ.map((n,i)=>{const s=std(h,iso(dayDate(w,i))),c=s.pos[p],cl=cleansDay(h,w,i,n);
+function calcHours(h,w){const occ=occRooms(h,w),out={};OPOS.forEach(p=>{out[p]=occ.map((n,i)=>{const s=std(h,iso(dayDate(w,i))),c=s.pos[p],cl=cleansDay(h,w,i,n),date=iso(dayDate(w,i));
+ if(window.HHQLaborStd&&HHQLaborStd.planHoursFor){const fromStd=HHQLaborStd.planHoursFor(h,p,date,{roomsSold:n,roomsSoldPrev:i?occ[i-1]:null,checkout:cl.co,stayover:cl.so,deep:0,suite:0});if(fromStd!=null&&isFinite(fromStd))return r4(fromStd)}
  const fx=Array.isArray(c.dow)?(+c.dow[i]||0):(+c.fixed||0);let v=fx+(p==="Housekeeper"?(cl.co*(+c.mprCO||0)+cl.so*(+c.mprSO||0))/60:p==="Laundry Attendant"?(cl.co+cl.so)*(+c.mpc||0)/60:(+c.per||0)*n);if(c.min!=null&&c.min!=="")v=Math.max(+c.min,v);if(c.max!=null&&c.max!==""&&+c.max>0)v=Math.min(+c.max,v);return r4(Math.max(0,v))})});return {hours:out,occ}}
 function calcSnap(h,w){return jget(CLK,{})[key(h,w)]||null}
 function moved(h,w){const sn=calcSnap(h,w);if(!sn)return [];const occ=occRooms(h,w);return occ.map((n,i)=>{const d=n-(sn.occ[i]||0);return Math.abs(d)>=Math.max(5,0.05*std(h).rooms)?d:0})}
@@ -5455,6 +5456,7 @@ const css=document.createElement("style");css.textContent=`
 <script src="quick-tiles.js"></script>
 <script src="daily-briefing.js"></script>
 <script src="shift-home.js"></script>
+<script src="labor-standards.js"></script>
 <script src="expected-done.js"></script>
 <script src="avatars.js"></script>
 <script src="home-focus.js"></script></body></html>

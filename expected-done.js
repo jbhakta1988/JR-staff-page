@@ -42,8 +42,9 @@
   }
   function cleanKind(room) {
     if (!room) return "checkout";
-    if (room.kind === "stayover" || room.kind === "checkout" || room.kind === "other") return room.kind;
-    if (room.ty === "other") return "other";
+    if (room.kind === "stayover" || room.kind === "checkout" || room.kind === "deep" || room.kind === "suite" || room.kind === "other") return room.kind;
+    if (room.suite || room.ty === "suite") return "suite";
+    if (room.deep || room.ty === "deep" || room.ty === "other") return "deep";
     var status = String(room.s || "");
     if (status === "OD" || (room.occ && status !== "VD")) return "stayover";
     return "checkout";
@@ -97,14 +98,13 @@
       var standards = spec.standards || {};
       var breakMin = finite(spec.breakMin);
       if (breakMin == null) breakMin = finite(standards.breakMin);
-      if (breakMin == null) return blank("standards");
       var rooms = spec.rooms || [];
       for (var i = 0; i < rooms.length; i++) {
         var rate = finite(standards[rooms[i].kind]);
         if (rate == null) return blank("standards");
         work += rate;
       }
-      work += breakMin;
+      if (breakMin != null) work += breakMin;
     } else {
       var hours = finite(spec.plannedHours);
       if (hours == null || hours <= 0) return blank("standards");
@@ -168,16 +168,10 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
   function standardsFor(hotel) {
-    var row = null;
-    try { row = window.LPX && LPX.std_ ? LPX.std_(hotel) : null; } catch (e) { row = null; }
-    if (!row) return null;
-    var hk = (row.pos && row.pos.Housekeeper) || {};
-    var ot = row.ot || {};
-    var checkout = finite(hk.mprCO);
-    if (checkout == null) checkout = finite(ot.co);
-    var stayover = finite(hk.mprSO);
-    if (stayover == null) stayover = finite(ot.so);
-    return { checkout: checkout, stayover: stayover, other: finite(ot.oth), breakMin: finite(ot.brk), example: !!row.ex };
+    try {
+      if (root.HHQLaborStd && HHQLaborStd.roomMinutes) return HHQLaborStd.roomMinutes(hotel, today());
+    } catch (e) {}
+    return null;
   }
   function shiftsFor(name, hotel, date) {
     var rows = [];
@@ -211,11 +205,15 @@
     return best;
   }
   function plannedHours(hotel, name, date) {
+    var sold = null;
     try {
-      var assoc = laborPlan.associate && laborPlan.associate[hotel] && laborPlan.associate[hotel][name];
-      var hours = assoc ? finite(assoc[dayIndex(date)]) : null;
-      if (hours != null && hours > 0) return hours;
+      var week = laborPlan.rooms && laborPlan.rooms[hotel];
+      var idx = dayIndex(date);
+      if (week && week.length === 7) sold = Number(week[(idx + 6) % 7]);
     } catch (e) {}
+    try {
+      if (root.HHQLaborStd && HHQLaborStd.laundryHours) return HHQLaborStd.laundryHours(hotel, date, sold);
+    } catch (e2) {}
     return null;
   }
   function nowMin() {
