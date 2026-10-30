@@ -8,7 +8,7 @@
 
   var GROUPS = [
     { id: "front_desk", en: "Front Desk", es: "Recepción", accent: "#1d4ed8", ids: ["greq", "gi", "notes", "comp", "lf", "recs", "notice", "parking", "shut", "brief", "find"] },
-    { id: "housekeeping", en: "Housekeeping", es: "Ama de llaves", accent: "#0f766e", ids: ["rooms", "myrooms", "insp", "esc", "rushq", "check", "ckhub", "lreq", "dc", "floors"] },
+    { id: "housekeeping", en: "Housekeeping", es: "Ama de llaves", accent: "#0f766e", ids: ["rooms", "myrooms", "insp", "ihg", "esc", "rushq", "check", "ckhub", "lreq", "dc", "floors"] },
     { id: "maintenance", en: "Maintenance", es: "Mantenimiento", accent: "#92400e", ids: ["wo", "pm", "equip", "pmsch", "walk", "inv", "order", "logs", "qimp", "winter"] },
     { id: "sales", en: "Sales & Events", es: "Ventas y eventos", accent: "#6d28d9", ids: ["slead", "sleads", "meetings"] },
     { id: "team", en: "Team", es: "Equipo", accent: "#166534", ids: ["team", "my", "sched", "line", "pts", "goals", "qotd", "fun", "celebr", "about", "avatar", "avcredits", "photos", "onb"] },
@@ -16,7 +16,7 @@
   ];
 
   var ICONS = {
-    home: "home", team: "users", rooms: "bed", insp: "clipboardCheck", wo: "wrench", pm: "calendarCheck",
+    home: "home", team: "users", rooms: "bed", insp: "clipboardCheck", ihg: "clipboardCheck", wo: "wrench", pm: "calendarCheck",
     equip: "hammer", pmsch: "calendar", notes: "notebook", check: "clipboardCheck", walk: "walk", inv: "package",
     order: "cart", labor: "clock", fc: "bars", gmc: "clipboardCheck", my: "check", myrooms: "bed",
     lf: "bag", esc: "flag", rules: "gear", line: "list", lreq: "inbox", shut: "bus",
