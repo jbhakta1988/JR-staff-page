@@ -18,6 +18,7 @@
       return {
         id: id,
         role: note.role || note.sh || "",
+        by: note.by || "",
         time: note.at || "",
         line: firstLine(note.t || note.text || ""),
         unread: !readMap[id]
@@ -102,7 +103,9 @@
       ? '<p class="sn-banner" id="snBanner">' + esc(view.unread + " " + L("unread shift notes", "notas de turno sin leer")) + "</p>"
       : "";
     var rows = view.rows.map(function (row) {
-      return '<li class="' + (row.unread ? "sn-new" : "") + '"><b>' + esc(row.role || L("Staff", "Personal")) + "</b> <small>" + esc(row.time) + "</small><span>" + esc(row.line) + "</span></li>";
+      var who = row.by || row.role || L("Staff", "Personal");
+      var face = (window.HHQAv && HHQAv.html) ? HHQAv.html(row.by || who, 28) : "";
+      return '<li class="' + (row.unread ? "sn-new" : "") + '"><span class="sn-by">' + face + "<b>" + esc(who) + "</b></span> <small>" + esc(row.time) + "</small><span>" + esc(row.line) + "</span></li>";
     }).join("");
     return '<section class="hhq-notes" id="hhqNotes"><div class="sn-hd"><h3>' + esc(L("Shift Notes", "Notas de turno")) + "</h3>" +
       (view.unread ? '<span class="qt-badge">' + view.unread + "</span>" : "") + "</div>" + banner +
@@ -112,6 +115,6 @@
   api.homeHtml = homeHtml;
 
   var css = document.createElement("style");
-  css.textContent = ".hhq-notes{background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:12px;margin:0 0 12px}.sn-hd{display:flex;align-items:center;gap:8px}.sn-hd h3{margin:0}.sn-banner{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:8px 10px;font-weight:750;color:#9a3412;margin:8px 0}.hhq-notes ul{list-style:none;margin:8px 0;padding:0}.hhq-notes li{padding:8px 0;border-bottom:1px solid #e6e8ee}.hhq-notes li span{display:block}.hhq-notes small{color:#5c6570;font-weight:650}.sn-new b{color:#9a3412}.sn-actions{display:flex;gap:8px}.sn-actions button{flex:1}.qt-badge{display:inline-flex;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#b42318;color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center}.more-ic{position:relative}.more-ic .qt-badge{position:absolute;top:-6px;right:-8px}";
+  css.textContent = ".hhq-notes{background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:12px;margin:0 0 12px}.sn-hd{display:flex;align-items:center;gap:8px}.sn-hd h3{margin:0}.sn-banner{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:8px 10px;font-weight:750;color:#9a3412;margin:8px 0}.hhq-notes ul{list-style:none;margin:8px 0;padding:0}.hhq-notes li{padding:8px 0;border-bottom:1px solid #e6e8ee}.hhq-notes li span{display:block}.sn-by{display:flex;align-items:center;gap:8px}.hhq-notes small{color:#5c6570;font-weight:650}.sn-new b{color:#9a3412}.sn-actions{display:flex;gap:8px}.sn-actions button{flex:1}.qt-badge{display:inline-flex;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#b42318;color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center}.more-ic{position:relative}.more-ic .qt-badge{position:absolute;top:-6px;right:-8px}";
   document.head.appendChild(css);
 })(typeof window !== "undefined" ? window : globalThis);

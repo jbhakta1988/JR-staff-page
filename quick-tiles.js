@@ -103,6 +103,8 @@
     check: ["Checklists", "Listas"],
     gmc: ["Checklists", "Listas"],
     dbrief: ["Daily Briefing", "Resumen diario"],
+    pts: ["Points & Rewards", "Puntos y premios"],
+    qotd: ["Question of the Day", "Pregunta del Día"],
     crep: ["Reports", "Reportes"],
     hcmp: ["Hotel Comparison", "Comparación de hoteles"],
     fc: ["Forecast", "Pronóstico"]
