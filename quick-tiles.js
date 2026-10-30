@@ -28,15 +28,16 @@
     if (role === "Housekeeper") return ["myrooms", "rooms", "insp", "issue"];
     if (role === "Maintenance") return ["wo", "pm", "issue"];
     if (role === "AGM" && shuttle) return ["dbrief", "shut", "notes", "parking", "meetings", "wo", "labor", "insp", "sleads", "check"];
+    if (role === "GM" && shuttle) return ["dbrief", "shut", "labor", "insp", "wo", "sleads", "check"];
     if (role === "AGM" || role === "GM") return ["dbrief", "labor", "insp", "wo", "sleads", "check"];
-    if (role === "Above Property") return ["crep", "hcmp", "sleads"];
+    if (role === "Above Property") return shuttle ? ["dbrief", "shut", "crep", "hcmp", "sleads"] : ["crep", "hcmp", "sleads"];
     if (role === "Shuttle Driver") return shuttle ? ["shut", "line", "my"] : ["line", "my", "check"];
     if (parking === false && shuttle === false) return ["my", "check", "sched"];
     return ["my", "line", "check"];
   }
   function virtualOk(role, id) {
     role = norm(role);
-    if (id === "dbrief") return role === "GM" || role === "AGM";
+    if (id === "dbrief") return role === "GM" || role === "AGM" || role === "Above Property";
     if (id === "hcmp") return role === "Above Property";
     if (id === "issue") return role === "Housekeeping" || role === "Housekeeper" || role === "Maintenance";
     return false;

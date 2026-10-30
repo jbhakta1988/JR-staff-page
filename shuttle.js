@@ -1511,6 +1511,10 @@
     root.tilesFor = function (role) {
       var list = (prevTiles(role) || []).slice();
       var hotel = (typeof S !== "undefined" && S.hotel) || "";
+      var who = normRole(role);
+      try { who = normRole(authRole() || role); } catch (e) {}
+      var manager = who === "GM" || who === "AGM" || who === "Above Property" || normRole(role) === "GM" || normRole(role) === "AGM";
+      if (featureOn(current(), hotel) && manager && list.indexOf("shut") < 0) list.push("shut");
       if (!featureOn(current(), hotel)) list = list.filter(function (id) { return id !== "shut"; });
       return list;
     };

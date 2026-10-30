@@ -98,7 +98,9 @@ test("shared seats, full runs, and the 60 minute driver alert", () => {
     hotel: "MSPWE", destination: "t1", departAt: later, labelKind: "name",
     guestLabel: "302", partySize: 1, bags: 0
   }, { role: "Front Desk", hotel: "MSPWE" }, NOW).error, "feature");
+  assert.equal(sh.canBook("GM"), true);
   assert.equal(sh.canBook("AGM"), true);
+  assert.equal(sh.canBook("Above Property"), true);
   assert.equal(sh.canBook("Shuttle Driver"), false);
   assert.equal(sh.canBook("Housekeeper"), false);
   assert.equal(sh.canConfigure("Front Desk"), false);
