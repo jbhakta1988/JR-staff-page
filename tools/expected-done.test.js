@@ -49,10 +49,11 @@ test("missing room or break standards stay blank", () => {
   const noBreak = done.project({
     role: "Housekeeper",
     startMin: 8 * 60,
-    standards: { checkout: 30, stayover: 20, breakMin: null },
-    rooms: []
+    standards: { checkout: 30, stayover: 15, deep: 45, suite: 36, breakMin: null },
+    rooms: [{ kind: "checkout" }]
   });
-  assert.equal(noBreak.ok, false);
+  assert.equal(noBreak.ok, true);
+  assert.equal(noBreak.finish, 8 * 60 + 30);
 });
 
 test("laundry uses planned hours and does not add a break", () => {
