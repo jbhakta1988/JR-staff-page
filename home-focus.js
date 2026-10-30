@@ -742,12 +742,14 @@
       shell.appendChild(top);
       var more = document.createElement("details");
       more.id = "hhqMore";
+      if (window.HHQMore && HHQMore.expanded && HHQMore.expanded()) more.open = true;
       var sum = document.createElement("summary");
       sum.textContent = L("More", "Más");
       var body = document.createElement("div");
       body.id = "hhqMoreBody";
       more.appendChild(sum);
       more.appendChild(body);
+      if (window.HHQMore && HHQMore.homeHtml) body.insertAdjacentHTML("beforeend", HHQMore.homeHtml());
       shell.appendChild(more);
       app.insertBefore(shell, app.firstChild);
       kids.forEach(function (el) {

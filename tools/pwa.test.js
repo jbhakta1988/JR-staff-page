@@ -46,7 +46,12 @@ test("apple touch icon is 180 and the page advertises iOS install metadata", () 
   assert.match(html, /name="apple-mobile-web-app-title" content="HotelHQ"/);
   assert.match(html, /name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
   assert.match(html, /name="mobile-web-app-capable" content="yes"/);
-  assert.match(html, /name="theme-color" content="#14365d"/);
+  assert.match(html, /name="color-scheme" content="light"/);
+  assert.match(html, /name="theme-color" content="#f4f5f7"/);
+  assert.match(html, /color-scheme:light/);
+  assert.doesNotMatch(html, /prefers-color-scheme:\s*dark/);
+  assert.doesNotMatch(html, /color-scheme:\s*dark/);
+  assert.doesNotMatch(html, /#101114/);
   assert.match(html, /rel="apple-touch-icon" href="apple-touch-icon.png"/);
   assert.match(html, /rel="manifest" href="manifest.webmanifest"/);
   assert.match(html, /viewport-fit=cover/);
