@@ -57,6 +57,8 @@
     "Notes": "Notas",
     "Add to run": "Agregar al viaje",
     "seats left": "asientos libres",
+    "seat taken by": "asiento tomado por",
+    "seats taken by": "asientos tomados por",
     "Full": "Lleno",
     "Past": "Pasó",
     "That run is full.": "Ese viaje está lleno.",
@@ -866,6 +868,38 @@
     if (seatTone(seat.left) === "full") return when + " · " + label("Full", lang);
     return when + " · " + seat.left + " " + label("seats left", lang);
   }
+  function seesEveryHotel(role) {
+    return normRole(role) === "Above Property";
+  }
+  function shortHotel(hotel) {
+    if (hotel === "MSPAM") return "Hampton";
+    if (hotel === "MSPMS") return "SpringHill";
+    return hotel || "";
+  }
+  function takenLine(seats, hotel, lang) {
+    var n = Number(seats) || 0;
+    var word = n === 1 ? label("seat taken by", lang) : label("seats taken by", lang);
+    return n + " " + word + " " + shortHotel(hotel);
+  }
+  function queueModel(signups, hotel, role, otherSeats) {
+    var rows = signups || [];
+    if (seesEveryHotel(role)) return { detail: rows.slice(), other: [] };
+    var detail = rows.filter(function (s) { return s && s.hotel === hotel; });
+    var map = {};
+    rows.forEach(function (s) {
+      if (!s || s.hotel === hotel || s.status === "no_show") return;
+      var key = String(s.departAt || "") + "|" + s.hotel;
+      if (!map[key]) map[key] = { departAt: s.departAt, hotel: s.hotel, seats: 0 };
+      map[key].seats += Number(s.partySize) || 0;
+    });
+    var other = Object.keys(map).map(function (k) { return map[k]; }).filter(function (row) { return row.seats > 0; });
+    if (!other.length && otherSeats && otherSeats.length) other = otherSeats.filter(function (row) { return row && row.seats > 0 && row.hotel !== hotel; });
+    return { detail: detail, other: other };
+  }
+  function trackHotels(state, role, hotel) {
+    if (seesEveryHotel(role)) return poolHotels(state);
+    return hotel ? [hotel] : [];
+  }
   function guestBits(row, lang) {
     var room = validRoom(row && row.guestLabel);
     var guests = Number(row && row.partySize) || 0;
@@ -894,6 +928,7 @@
     var big = tone === "full" ? label("Full", lang) : String(seat.left);
     var small = tone === "full" ? label("Full", lang) : label("seats left", lang);
     var people = (signups || []).map(function (row) {
+      if (row && row.aggregate) return "<li class=\"sh-agg\">" + esc(takenLine(row.seats, row.hotel, lang)) + "</li>";
       return "<li>" + esc(guestBits(row, lang)) + "</li>";
     }).join("");
     return "<label class=\"sh-slot sh-" + tone + (past ? " sh-past" : "") + (selected ? " is-on" : "") + "\">" +
@@ -942,25 +977,33 @@
   function renderDesk(state, actor, now, hotel, lang, ui) {
     var day = chicagoDate(now);
     var intro = "<p class=\"sh-note\">" + esc(label("One van for Hampton and SpringHill. Sign up rides that leave the hotel. Seats are shared.", lang)) + "</p>";
-    var form = canBook(actor.role) ? renderForm(state, now, hotel, lang, ui) : "";
+    var form = canBook(actor.role) ? renderForm(state, now, hotel, lang, ui, actor.role) : "";
     var today = (state.signups || []).filter(function (s) {
       return featureOn(state, s.hotel) && chicagoDate(s.departAt) === day;
     });
-    var groups = pickupGroups(today, poolSettings(state));
+    var model = queueModel(today, hotel, actor.role, state.otherSeats);
+    var groups = pickupGroups(model.detail, poolSettings(state));
+    var otherDay = {};
+    model.other.forEach(function (row) {
+      otherDay[row.hotel] = (otherDay[row.hotel] || 0) + row.seats;
+    });
+    var agg = Object.keys(otherDay).map(function (code) {
+      return "<p class=\"sh-agg\" id=\"shAgg-" + esc(code) + "\">" + esc(takenLine(otherDay[code], code, lang)) + "</p>";
+    }).join("");
     var list = "<section class=\"card\" id=\"shList\"><h3>" + esc(label("Today's sign-ups", lang)) + "</h3>" + (groups.length ? groups.map(function (g) {
       return "<h3>" + esc(hotelName(g.hotel, lang)) + "</h3>" + g.rows.map(function (row) {
         return "<div class=\"sh-guest\" id=\"shRow-" + esc(row.id) + "\">" + guestLine(row, lang) + "</div>";
       }).join("");
-    }).join("") : "<p>" + esc(label("No sign-ups yet.", lang)) + "</p>") + "</section>";
+    }).join("") : "<p>" + esc(label("No sign-ups yet.", lang)) + "</p>") + agg + "</section>";
     var ride = canConfigure(actor.role) ? renderRidership(state, day, lang) : "";
     var setup = canConfigure(actor.role) ? "<button type=\"button\" class=\"btn2\" id=\"shConfig\" onclick=\"shScreen('config')\">" + esc(label("Open settings", lang)) + "</button>" : "";
     var reset = state.origin === "example" ? "<button type=\"button\" class=\"btn2\" onclick=\"shReset()\">" + esc(label("Reset sample data", lang)) + "</button>" : "";
-    var codes = poolHotels(state).slice().sort(function (a, b) { return (a === hotel ? 0 : 1) - (b === hotel ? 0 : 1); }).map(function (h, i) {
+    var codes = trackHotels(state, actor.role, hotel).map(function (h, i) {
       return pickupCard(settingsFor(state, h) || defaultSettings(h), h, lang, i === 0 ? "" : h);
     }).join("");
     return intro + codes + form + list + ride + "<div class=\"sh-actions\">" + setup + reset + "</div>";
   }
-  function renderForm(state, now, hotel, lang, ui) {
+  function renderForm(state, now, hotel, lang, ui, role) {
     var draft = ui.draft || {};
     var cfg = poolSettings(state);
     var day = chicagoDate(now);
@@ -971,9 +1014,13 @@
     var selectedOpen = openSlots.some(function (s) { return sameSlot(s.departAt, selected); });
     if (!selectedOpen) selected = (openSlots[0] && openSlots[0].departAt) || "";
     var seat = selected ? seatsLeft(state, selected) : { left: 0, full: true, capacity: cfg.seatCapacity, used: cfg.seatCapacity };
+    var model = queueModel(state.signups || [], hotel, role, state.otherSeats);
     var cards = future.map(function (slot) {
       var info = seatsLeft(state, slot.departAt);
-      var rows = (state.signups || []).filter(function (s) { return sameSlot(s.departAt, slot.departAt); });
+      var rows = model.detail.filter(function (s) { return sameSlot(s.departAt, slot.departAt); });
+      model.other.filter(function (s) { return sameSlot(s.departAt, slot.departAt); }).forEach(function (row) {
+        rows.push({ aggregate: true, seats: row.seats, hotel: row.hotel });
+      });
       return slotCard(slot, info, rows, lang, { selected: sameSlot(slot.departAt, selected) });
     }).join("");
     var dest = draft.destination || "t1";
@@ -1001,14 +1048,19 @@
     var day = chicagoDate(now);
     var cfg = poolSettings(state);
     var home = featureOn(state, actor.hotel) ? actor.hotel : "MSPAM";
-    var codes = (cfg.pickupOrder || HOTELS).map(function (h) {
+    var codes = trackHotels(state, actor.role, home).map(function (h) {
       var row = settingsFor(state, h) || defaultSettings(h);
       return pickupCard(row, h, lang, h);
     }).join("");
     var runs = runsFor(state, day);
+    var model = queueModel(state.signups || [], home, actor.role, state.otherSeats);
     var body = runs.length ? runs.map(function (run) {
       var head = formatTime(run.slot.departAt, lang) + " · " + run.seat.used + "/" + run.seat.capacity;
-      var groups = run.groups.map(function (g) {
+      var own = model.detail.filter(function (s) { return sameSlot(s.departAt, run.slot.departAt); });
+      var agg = model.other.filter(function (s) { return sameSlot(s.departAt, run.slot.departAt); }).map(function (row) {
+        return "<p class=\"sh-agg\">" + esc(takenLine(row.seats, row.hotel, lang)) + "</p>";
+      }).join("");
+      var groups = pickupGroups(own, cfg).map(function (g) {
         return "<h3>" + esc(label("Pickup at", lang)) + " " + esc(hotelName(g.hotel, lang)) + "</h3>" + g.rows.map(function (row) {
           var buttons = "<div class=\"sh-actions\">" + ["boarded", "no_show", "done"].map(function (st) {
             var cls = row.status === st ? "btn" : "btn2";
@@ -1017,7 +1069,7 @@
           return "<div class=\"sh-guest\" id=\"shRow-" + esc(row.id) + "\">" + guestLine(row, lang) + buttons + "</div>";
         }).join("");
       }).join("");
-      return "<section class=\"card sh-run\"><h3>" + esc(head) + (run.seat.full ? " · " + esc(label("Full", lang)) : "") + "</h3>" + groups + "</section>";
+      return "<section class=\"card sh-run\"><h3>" + esc(head) + (run.seat.full ? " · " + esc(label("Full", lang)) : "") + "</h3>" + groups + agg + "</section>";
     }).join("") : "<div class=\"card\"><p>" + esc(label("No sign-ups yet.", lang)) + "</p></div>";
     return "<p class=\"sh-note\">" + esc(hotelName(home, lang)) + "</p>" + codes + body;
   }
@@ -1071,6 +1123,10 @@
     defaultFeatures: defaultFeatures,
     chicagoDate: chicagoDate,
     fromChicagoLocal: fromChicagoLocal,
+    seesEveryHotel: seesEveryHotel,
+    queueModel: queueModel,
+    trackHotels: trackHotels,
+    takenLine: takenLine,
     slotsFor: slotsFor,
     seatsLeft: seatsLeft,
     seatTone: seatTone,
@@ -1234,11 +1290,19 @@
       remoteState = "ready";
       var actor = actorNow();
       var day = chicagoDate(nowISO());
-      if (canBook(actor.role) || isDriver(actor.role)) {
+      if (canBook(actor.role) || isDriver(actor.role) || seesEveryHotel(actor.role)) {
         sb.rpc("shuttle_day_counts", { p_day: day }).then(function (r) {
           if (!r.error && mem) mem.dayCounts = r.data || [];
           render();
         }, function () { render(); });
+        if (!seesEveryHotel(actor.role)) {
+          sb.rpc("shuttle_other_seats", { p_day: day }).then(function (r) {
+            if (!r.error && mem) mem.otherSeats = (r.data || []).map(function (row) {
+              return { departAt: row.depart_at, hotel: row.hotel, seats: Number(row.seats) || 0 };
+            });
+            render();
+          }, function () {});
+        }
       }
       render();
     }, function () { remoteState = "demo"; mem = readStore() || buildDemo(nowISO()); render(); });

@@ -245,7 +245,7 @@
     ".more-tile[hidden]{display:none}",
     ".more-ic{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;flex:none;background:#f4f5f7;background:color-mix(in srgb,var(--more-accent,#334155) 12%,#fff);color:var(--more-accent,#334155)}",
     ".more-ic svg,.more-ic .i{width:22px;height:22px}",
-    ".more-lb{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-width:100%;max-height:2.6em;line-height:1.3;font-size:13px;font-weight:650;text-align:center}",
+    ".more-lb{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-width:100%;min-height:2.5em;line-height:1.25;font-size:13px;font-weight:650;text-align:center;white-space:normal;overflow-wrap:anywhere}",
     "#uxDeskMore{width:100%;margin:0 0 8px;display:flex;align-items:center;justify-content:center;gap:8px}",
     "#uxDeskMore[hidden]{display:none}",
     "@media(min-width:1024px){",
