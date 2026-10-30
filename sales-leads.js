@@ -345,6 +345,14 @@
       respondedBy: row.responded_by || ""
     };
   }
+  function waitingLeads(leads, hotel) {
+    return (leads || []).filter(function (row) {
+      if (!row || row.hotel !== hotel) return false;
+      if (row.status === "Won" || row.status === "Lost") return false;
+      if (row.status === "New") return true;
+      return !row.respondedAt;
+    });
+  }
   function rollup(leads, hotels) {
     var list = (hotels && hotels.length) ? hotels : HOTELS;
     return list.map(function (hotel) {
@@ -598,7 +606,8 @@
     listHtml: listHtml,
     rollupCardHtml: rollupCardHtml,
     homeCardHtml: homeCardHtml,
-    telHref: telHref
+    telHref: telHref,
+    waitingLeads: waitingLeads
   };
   root.SalesLeads = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -718,6 +727,7 @@
     mem = readStore() || buildDemo(nowISO());
     return mem;
   }
+  api.currentState = function () { return current(); };
   function commit(next) {
     mem = next;
     if (!remoteOn() && next.origin === "example") writeStore(next);

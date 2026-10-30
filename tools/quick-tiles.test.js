@@ -1,0 +1,65 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const tiles = require("../quick-tiles.js");
+
+function on(map) {
+  return function (hotel, feature) {
+    const key = hotel + "|" + feature;
+    if (Object.prototype.hasOwnProperty.call(map, key)) return !!map[key];
+    if (feature === "shuttle" && hotel === "MSPWE") return false;
+    if (feature === "parking" && hotel === "MSPWE") return false;
+    return true;
+  };
+}
+const features = on({});
+const desk = ["notes", "parking", "shut", "meetings", "wo", "greq", "rooms", "onb", "settings"];
+const hk = ["rooms", "myrooms", "insp", "check", "onb", "settings"];
+const mt = ["wo", "pm", "check", "onb", "settings"];
+const lead = ["labor", "insp", "wo", "sleads", "slead", "check", "notes", "parking", "shut", "meetings", "onb"];
+const corp = ["crep", "sleads", "slead", "fc", "labor", "onb"];
+
+test("front desk order follows the shuttle switch and drops tiles the hotel does not have", () => {
+  assert.deepEqual(tiles.pick("Front Desk", "MSPAM", null, desk, features), ["shut", "parking", "notes", "meetings", "wo"]);
+  assert.deepEqual(tiles.pick("Front Desk", "MSPMS", null, desk, features), ["shut", "parking", "notes", "meetings", "wo"]);
+  assert.deepEqual(tiles.pick("Front Desk", "MSPWE", null, desk, features), ["notes", "meetings", "wo"]);
+  assert.equal(tiles.pick("Front Desk", "MSPAM", null, desk, features).includes("onb"), false);
+});
+
+test("housekeeping, maintenance, leaders, and corporate keep their own defaults", () => {
+  assert.deepEqual(tiles.pick("Housekeeping", "MSPWE", null, hk, features), ["rooms", "myrooms", "insp", "issue"]);
+  assert.deepEqual(tiles.pick("Maintenance", "MSPAM", null, mt, features), ["wo", "pm", "issue"]);
+  assert.deepEqual(tiles.pick("GM", "MSPWE", null, lead, features).slice(0, 6), ["dbrief", "labor", "insp", "wo", "sleads", "check"]);
+  assert.equal(tiles.pick("GM", "MSPAM", null, lead, features).includes("onb"), false);
+  assert.deepEqual(tiles.pick("AGM", "MSPAM", null, lead, features).slice(0, 4), ["dbrief", "shut", "notes", "parking"]);
+  assert.deepEqual(tiles.pick("AGM", "MSPMS", null, lead, features).slice(0, 2), ["dbrief", "shut"]);
+  assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features).includes("shut"), false);
+  assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features)[0], "dbrief");
+  assert.deepEqual(tiles.pick("Above Property", "MSPWE", null, corp, features), ["crep", "hcmp", "sleads"]);
+  assert.deepEqual(tiles.pick("JR Corporate", "MSPAM", null, corp, features), ["crep", "hcmp", "sleads"]);
+});
+
+test("a saved list replaces defaults, stays inside access, and stops at 8", () => {
+  const saved = ["wo", "onb", "notes", "shut", "parking", "meetings", "greq", "rooms", "settings", "insp"];
+  assert.deepEqual(tiles.pick("Front Desk", "MSPWE", saved, desk, features), ["wo", "notes", "meetings", "greq", "rooms", "settings"]);
+  assert.equal(tiles.pick("Front Desk", "MSPAM", saved, desk, features).length <= 8, true);
+  assert.equal(tiles.pick("Front Desk", "MSPAM", [], desk, features).length, 0);
+  assert.equal(tiles.labelOf("dbrief", "es"), "Resumen diario");
+  assert.equal(tiles.labelOf("parking", "en"), "Park & Fly");
+  assert.equal(tiles.labelOf("issue", "es"), "Reportar falla");
+  const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
+  const sql = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261107_home_tiles.sql"), "utf8");
+  assert.match(html, /function setHomeTiles\(ids\)/);
+  assert.match(html, /home_tiles/);
+  assert.match(sql, /add column if not exists home_tiles text\[\]/);
+  assert.match(sql, /set search_path = ''/);
+  assert.match(sql, /where user_id = \(select auth\.uid\(\)\)/);
+  assert.doesNotMatch(sql, /drop table/i);
+  assert.doesNotMatch(sql, /delete from/i);
+  const more = fs.readFileSync(path.join(__dirname, "../more-menu.js"), "utf8");
+  assert.match(more, /photos", "onb"\]/);
+  const ux = fs.readFileSync(path.join(__dirname, "../ux.js"), "utf8");
+  assert.equal(ux.includes("Finish onboarding"), false);
+  assert.equal(ux.includes("go('onb')"), false);
+});

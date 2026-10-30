@@ -21,13 +21,16 @@ test("seeded settings, slots, and feature flag", () => {
   assert.equal(sh.chicagoDate(NOW), "2026-10-28");
   assert.equal(sh.defaultSettings("MSPAM").trackingCode, "2860");
   assert.equal(sh.defaultSettings("MSPMS").trackingCode, "2871");
-  assert.equal(sh.defaultSettings("MSPAM").seatCapacity, 14);
+  assert.equal(sh.defaultSettings("MSPAM").seatCapacity, 11);
   assert.equal(sh.defaultSettings("MSPAM").slotMinutes, 30);
+  assert.equal(sh.defaultSettings("MSPAM").openMinute, 0);
+  assert.equal(sh.defaultSettings("MSPAM").closeMinute, 1440);
+  assert.equal(sh.defaultSettings("MSPMS").seatCapacity, 11);
   assert.equal(sh.defaultSettings("MSPAM").trackUrl, "https://www.trackmyshuttle.com/");
   const slots = sh.slotsFor(sh.defaultSettings("MSPAM"), "2026-10-28");
-  assert.equal(slots.length, 37);
-  assert.equal(slots[0].local, "2026-10-28T05:00");
-  assert.equal(slots[slots.length - 1].local, "2026-10-28T23:00");
+  assert.equal(slots.length, 48);
+  assert.equal(slots[0].local, "2026-10-28T00:00");
+  assert.equal(slots[slots.length - 1].local, "2026-10-28T23:30");
   assert.equal(slots[1].minute - slots[0].minute, 30);
   const state = demo();
   assert.equal(sh.featureOn(state, "MSPWE"), false);
@@ -41,31 +44,48 @@ test("shared seats, full runs, and the 60 minute driver alert", () => {
   const soon = at(18, 0);
   const later = at(22, 0);
   assert.equal(sh.seatsLeft(state, soon).used, 5);
-  assert.equal(sh.seatsLeft(state, soon).left, 9);
+  assert.equal(sh.seatsLeft(state, soon).capacity, 11);
+  assert.equal(sh.seatsLeft(state, soon).left, 6);
+  assert.equal(sh.seatTone(6), "ok");
+  assert.equal(sh.seatTone(3), "low");
+  assert.equal(sh.seatTone(1), "low");
+  assert.equal(sh.seatTone(0), "full");
   assert.equal(sh.shouldAlert(soon, NOW), true);
   assert.equal(sh.shouldAlert(later, NOW), false);
   assert.equal(sh.shouldAlert(at(17, 0), NOW), false);
   const tooMany = sh.book(state, {
     hotel: "MSPAM", destination: "t1", departAt: soon, labelKind: "name",
-    guestLabel: "Adams", partySize: 10, bags: 0
+    guestLabel: "301", partySize: 10, bags: 0
   }, fd, NOW);
   assert.equal(tooMany.ok, false);
   assert.equal(tooMany.error, "seats");
+  const named = sh.book(state, {
+    hotel: "MSPAM", destination: "t1", departAt: soon, labelKind: "name",
+    guestLabel: "Adams", partySize: 1, bags: 0
+  }, fd, NOW);
+  assert.equal(named.error, "room");
   const added = sh.book(state, {
-    hotel: "MSPAM", destination: "t2", departAt: soon, labelKind: "name",
-    guestLabel: "Adams", partySize: 9, bags: 1, flightTime: "20:40"
+    hotel: "MSPAM", destination: "t2", departAt: soon, labelKind: "room",
+    guestLabel: "301", partySize: 6, bags: 1, flightTime: "20:40"
   }, fd, NOW);
   assert.equal(added.ok, true);
   assert.equal(added.alert, true);
   assert.equal(sh.seatsLeft(added.state, soon).full, true);
+  const fullHtml = desk(added.state, fd, "MSPAM", "en");
+  assert.match(fullHtml, /class="sh-slot sh-full/);
+  assert.match(fullHtml, /<b>Full<\/b>/);
+  assert.match(fullHtml, /disabled/);
+  const fullEs = desk(added.state, fd, "MSPAM", "es");
+  assert.match(fullEs, /<b>Lleno<\/b>/);
+  assert.match(fullEs, /asientos libres/);
   const overflow = sh.book(added.state, {
     hotel: "MSPMS", destination: "moa", departAt: soon, labelKind: "room",
-    guestLabel: "214", partySize: 1, bags: 0
+    guestLabel: "118", partySize: 1, bags: 0
   }, { role: "Front Desk", hotel: "MSPMS", view: "Front Desk" }, NOW);
   assert.equal(overflow.error, "full");
   const quiet = sh.book(state, {
     hotel: "MSPAM", destination: "t1", departAt: later, labelKind: "name",
-    guestLabel: "Adams", partySize: 1, bags: 0
+    guestLabel: "302", partySize: 1, bags: 0
   }, fd, NOW);
   assert.equal(quiet.ok, true);
   assert.equal(quiet.alert, false);
@@ -76,8 +96,9 @@ test("shared seats, full runs, and the 60 minute driver alert", () => {
   assert.equal(phone.error, "phone");
   assert.equal(sh.book(state, {
     hotel: "MSPWE", destination: "t1", departAt: later, labelKind: "name",
-    guestLabel: "Adams", partySize: 1, bags: 0
+    guestLabel: "302", partySize: 1, bags: 0
   }, { role: "Front Desk", hotel: "MSPWE" }, NOW).error, "feature");
+  assert.equal(sh.canBook("AGM"), true);
   assert.equal(sh.canBook("Shuttle Driver"), false);
   assert.equal(sh.canBook("Housekeeper"), false);
   assert.equal(sh.canConfigure("Front Desk"), false);
@@ -90,18 +111,27 @@ test("shared queue for both airport desks, status stamps, and ridership", () => 
   const state = demo();
   const groups = sh.pickupGroups(state.signups.filter(function (s) { return s.departAt === at(18, 0); }), sh.defaultSettings("MSPAM"));
   assert.deepEqual(groups.map(function (g) { return g.hotel; }), ["MSPAM", "MSPMS"]);
-  assert.equal(groups[0].rows[0].guestLabel, "Keller (EX)");
-  assert.equal(groups[1].rows[0].guestLabel, "Walsh (EX)");
+  assert.equal(groups[0].rows[0].guestLabel, "214");
+  assert.equal(groups[1].rows[0].guestLabel, "109");
   const fdHtml = desk(state, fd, "MSPAM", "en");
   assert.match(fdHtml, /id="shCode">2860</);
   assert.match(fdHtml, /Pickups: TrackMyShuttle/);
-  assert.match(fdHtml, /Keller \(EX\)/);
-  assert.match(fdHtml, /Walsh \(EX\)/);
-  assert.match(fdHtml, /Garcia \(EX\)/);
+  assert.match(fdHtml, /Room 214/);
+  assert.match(fdHtml, /Room 109/);
+  assert.match(fdHtml, /Hampton \(MSPAM\)/);
+  assert.match(fdHtml, /SpringHill \(MSPMS\)/);
+  assert.match(fdHtml, /class="sh-slot sh-ok/);
+  assert.match(fdHtml, /<b>6<\/b> <span>seats left<\/span>/);
+  assert.match(fdHtml, /id="shRoom"/);
+  assert.match(fdHtml, /Number of guests/);
+  assert.doesNotMatch(fdHtml, /Last name/);
+  assert.doesNotMatch(fdHtml, /Keller|Olson|Nguyen|Garcia|Walsh|Hayes/);
   assert.match(fdHtml, /id="shCode-MSPMS">2871</);
   assert.doesNotMatch(fdHtml, /type="tel"|phone/i);
-  assert.match(fdHtml, /9 seats left/);
   const es = desk(state, fd, "MSPAM", "es");
+  assert.match(es, /asientos libres/);
+  assert.match(es, /Número de huéspedes/);
+  assert.match(es, /Número de cuarto/);
   assert.match(es, /Recogidas: TrackMyShuttle/);
   assert.match(es, /Copiar código/);
   assert.match(es, /id="shCode">2860</);
@@ -128,8 +158,8 @@ test("shared queue for both airport desks, status stamps, and ridership", () => 
   const drv = desk(state, driver, "MSPMS");
   assert.match(drv, /2860/);
   assert.match(drv, /2871/);
-  assert.match(drv, /Keller \(EX\)/);
-  assert.match(drv, /Walsh \(EX\)/);
+  assert.match(drv, /Room 214/);
+  assert.match(drv, /Room 109/);
   assert.match(drv, /Pickup at/);
   const stamped = sh.setStatus(state, "ex5", "boarded", driver, NOW);
   assert.equal(stamped.ok, true);
@@ -146,15 +176,15 @@ test("shared queue for both airport desks, status stamps, and ridership", () => 
   assert.match(desk(state, gm, "MSPAM"), /Ridership today/);
   const gv = desk(state, { role: "GM", hotel: "MSPWE", view: "GM" }, "MSPWE");
   assert.match(gv, /No shuttle at this property/);
-  assert.doesNotMatch(gv, /2860|2871|Keller/);
+  assert.doesNotMatch(gv, /2860|2871|Room 214/);
   const hk = desk(state, { role: "Housekeeper", hotel: "MSPAM", view: "Housekeeper" }, "MSPAM");
   assert.match(hk, /No shuttle at this property/);
-  assert.doesNotMatch(hk, /Keller \(EX\)/);
+  assert.doesNotMatch(hk, /Room 214/);
   const note = sh.buildAlert(stamped.signup, "en");
   assert.deepEqual(note.hotels, ["MSPAM", "MSPMS"]);
   assert.deepEqual(note.roles, ["Shuttle Driver"]);
   assert.equal(note.kind, "shuttle_signup");
-  assert.doesNotMatch(note.body, /Keller|214|555/);
+  assert.doesNotMatch(note.body, /Keller|214|555|Room/);
 });
 
 test("guest code rides in the link, the share text, and the QR", () => {
@@ -212,6 +242,16 @@ test("migration is additive and keeps the shared driver queue narrow", () => {
   assert.doesNotMatch(js, /if \(hotel === "MSPAM"\) return "2860"/);
   assert.equal(sh.SEED_CODE.MSPAM, "2860");
   assert.equal(sh.SEED_CODE.MSPMS, "2871");
+  const seats = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261106_shuttle_shared_seats.sql"), "utf8");
+  assert.match(seats, /pg_advisory_xact_lock/);
+  assert.match(seats, /seat_capacity set default 11/);
+  assert.match(seats, /close_minute set default 1440/);
+  assert.match(seats, /s\.hotel = any \(private\.shuttle_pool\(\)\)/);
+  assert.match(seats, /guest_name, room_number/);
+  assert.match(seats, /v_label,\s*\n\s*null/);
+  assert.match(seats, /raise exception 'room'/);
+  assert.doesNotMatch(seats, /drop table/i);
+  assert.doesNotMatch(seats, /delete from/i);
 });
 
 test("spanish phrases exist for the shuttle screen", () => {

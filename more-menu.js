@@ -11,23 +11,23 @@
     { id: "housekeeping", en: "Housekeeping", es: "Ama de llaves", accent: "#0f766e", ids: ["rooms", "myrooms", "insp", "esc", "rushq", "check", "ckhub", "lreq", "dc", "floors"] },
     { id: "maintenance", en: "Maintenance", es: "Mantenimiento", accent: "#92400e", ids: ["wo", "pm", "equip", "pmsch", "walk", "inv", "order", "logs", "qimp", "winter"] },
     { id: "sales", en: "Sales & Events", es: "Ventas y eventos", accent: "#6d28d9", ids: ["slead", "sleads", "meetings"] },
-    { id: "team", en: "Team", es: "Equipo", accent: "#166534", ids: ["team", "my", "sched", "line", "onb", "pts", "goals", "qotd", "fun", "celebr", "about", "avatar", "avcredits", "photos"] },
+    { id: "team", en: "Team", es: "Equipo", accent: "#166534", ids: ["team", "my", "sched", "line", "pts", "goals", "qotd", "fun", "celebr", "about", "avatar", "avcredits", "photos", "onb"] },
     { id: "admin", en: "Admin & Reports", es: "Administración y reportes", accent: "#334155", ids: ["labor", "lplan", "lcmd", "onclock", "trreq", "fc", "health", "score", "gscores", "gmc", "rules", "crep", "audit", "alog", "settings"] }
   ];
 
   var ICONS = {
-    home: "home", team: "users", rooms: "bed", insp: "search", wo: "wrench", pm: "calendar",
-    equip: "wrench", pmsch: "calendar", notes: "file", check: "check", walk: "walk", inv: "package",
-    order: "cart", labor: "clock", fc: "trendUp", gmc: "clipboard", my: "user", myrooms: "bed",
-    lf: "bag", esc: "flag", rules: "gear", line: "clipboard", lreq: "inbox", shut: "bus",
-    sched: "calendar", health: "trendDown", score: "broom", pts: "star", photos: "camera",
+    home: "home", team: "users", rooms: "bed", insp: "clipboardCheck", wo: "wrench", pm: "calendarCheck",
+    equip: "hammer", pmsch: "calendar", notes: "notebook", check: "clipboardCheck", walk: "walk", inv: "package",
+    order: "cart", labor: "clock", fc: "bars", gmc: "clipboardCheck", my: "check", myrooms: "bed",
+    lf: "bag", esc: "flag", rules: "gear", line: "list", lreq: "inbox", shut: "bus",
+    sched: "calendar", health: "activity", score: "broom", pts: "star", photos: "camera",
     qotd: "bulb", goals: "target", about: "user", fun: "spark", celebr: "spark", avatar: "user",
-    avcredits: "file", comp: "mail", gi: "bell", recs: "pin", rushq: "zap", brief: "sun",
+    avcredits: "file", comp: "mail", gi: "alert", recs: "map", rushq: "zap", brief: "newspaper",
     lplan: "calendar", trreq: "grad", lcmd: "bars", onclock: "clock", onb: "grad", winter: "snow",
-    meetings: "calendar", alog: "list", parking: "pin", slead: "handshake", sleads: "list",
-    floors: "map", gscores: "trendUp", settings: "gear", ckhub: "clipboard", greq: "bell",
-    find: "search", logs: "clipboard", notice: "file", dc: "broom", crep: "bars", audit: "eye",
-    qimp: "inbox", help: "help"
+    meetings: "calendar", alog: "list", parking: "car", slead: "handshake", sleads: "handshake",
+    floors: "map", gscores: "bars", settings: "gear", ckhub: "clipboardCheck", greq: "bell",
+    find: "search", logs: "clipboard", notice: "pin", dc: "broom", crep: "bars", audit: "eye",
+    qimp: "inbox", help: "help", dbrief: "newspaper", hcmp: "building", issue: "alert"
   };
 
   var EXTRA = {
