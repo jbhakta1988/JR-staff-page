@@ -27,9 +27,10 @@
     if (role === "Housekeeping") return ["rooms", "myrooms", "insp", "issue"];
     if (role === "Housekeeper") return ["myrooms", "rooms", "insp", "issue"];
     if (role === "Maintenance") return ["wo", "pm", "issue"];
-    if (role === "AGM" && shuttle) return ["dbrief", "shut", "notes", "parking", "meetings", "wo", "labor", "insp", "sleads", "check"];
-    if (role === "GM" && shuttle) return ["dbrief", "shut", "labor", "insp", "wo", "sleads", "check"];
-    if (role === "AGM" || role === "GM") return ["dbrief", "labor", "insp", "wo", "sleads", "check"];
+    if (role === "AGM" && shuttle) return ["shut", "notes", "parking", "meetings", "wo", "labor", "insp", "sleads", "check"];
+    if (role === "GM" && shuttle) return ["shut", "labor", "insp", "wo", "sleads", "check"];
+    if (role === "AGM") return ["notes", "labor", "insp", "wo", "sleads", "check"];
+    if (role === "GM") return ["labor", "insp", "wo", "sleads", "check"];
     if (role === "Above Property") return shuttle ? ["dbrief", "shut", "crep", "hcmp", "sleads"] : ["crep", "hcmp", "sleads"];
     if (role === "Shuttle Driver") return shuttle ? ["shut", "line", "my"] : ["line", "my", "check"];
     if (parking === false && shuttle === false) return ["my", "check", "sched"];
@@ -37,7 +38,7 @@
   }
   function virtualOk(role, id) {
     role = norm(role);
-    if (id === "dbrief") return role === "GM" || role === "AGM" || role === "Above Property";
+    if (id === "dbrief") return role === "Above Property";
     if (id === "hcmp") return role === "Above Property";
     if (id === "issue") return role === "Housekeeping" || role === "Housekeeper" || role === "Maintenance";
     return false;
@@ -49,6 +50,7 @@
     });
     function ok(id) {
       if (!id || BLOCKED[id]) return false;
+      if (id === "dbrief" && (norm(role) === "GM" || norm(role) === "AGM")) return false;
       if (virtualOk(role, id)) return true;
       if (!allow[id]) return false;
       if (id === "shut" && !featureAllows(featureOn, hotel, "shuttle")) return false;
@@ -69,6 +71,7 @@
     var out = [];
     function add(id) {
       if (!id || seen[id] || BLOCKED[id]) return;
+      if (id === "dbrief" && (norm(role) === "GM" || norm(role) === "AGM")) return;
       if (!virtualOk(role, id)) {
         if ((allowed || []).indexOf(id) < 0) return;
         if (id === "shut" && !featureAllows(featureOn, hotel, "shuttle")) return;
@@ -145,7 +148,12 @@
     var click = id === "issue"
       ? "if(window.HQFold)HQFold.open('work_order','');else if(window.uxSheet)uxSheet('wo')"
       : "go('" + id + "')";
-    return '<button type="button" class="more-tile qt-tile" data-id="' + id + '" style="--more-accent:' + accent + '" onclick="' + click + '"><span class="more-ic" aria-hidden="true">' + iconOf(id) + '</span><span class="more-lb">' + esc(labelOf(id, lang)) + "</span></button>";
+    var badge = "";
+    if (id === "notes" && root.HHQNotes && HHQNotes.unreadCount) {
+      var n = HHQNotes.unreadCount();
+      if (n > 0) badge = '<span class="qt-badge" aria-label="' + n + '">' + n + "</span>";
+    }
+    return '<button type="button" class="more-tile qt-tile" data-id="' + id + '" style="--more-accent:' + accent + '" onclick="' + click + '"><span class="more-ic" aria-hidden="true">' + iconOf(id) + badge + '</span><span class="more-lb">' + esc(labelOf(id, lang)) + "</span></button>";
   }
 
   var api = {
@@ -325,15 +333,17 @@
     "#hhqActions .qt-tile{display:inline-flex}",
     "#hhqActions .more-tile{width:auto}",
     ".qt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}",
+    "#hhqActions .more-tile{width:100%;aspect-ratio:auto;min-height:108px;height:auto}",
+    "#hhqActions .more-lb{display:block;-webkit-line-clamp:unset;overflow:visible;min-height:0;white-space:normal;overflow-wrap:break-word}",
     "#hhqActions .qt-grid,.hhq-actions.qt-row .qt-grid{display:grid}",
     ".qt-set{margin-top:16px}",
     ".qt-choice{display:flex;align-items:center;gap:10px;min-height:48px;font-weight:700}",
     ".qt-choice input{width:22px;height:22px;min-height:22px}",
-    "@media(min-width:1024px){.qt-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}"
+    "@media(min-width:1024px){#hhqActions .qt-grid{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}}"
   ].join("");
   document.head.appendChild(css);
 
   var gridCss = document.createElement("style");
-  gridCss.textContent = "#hhqActions.qt-row{display:block}#hhqActions .qt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(min-width:1024px){#uxHero.hhq-home>.hhq-actions.qt-row{grid-template-columns:unset}#hhqActions .qt-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}";
+  gridCss.textContent = "#hhqActions.qt-row{display:block}#hhqActions .qt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#hhqActions .more-lb{overflow:visible}@media(min-width:1024px){#uxHero.hhq-home>.hhq-actions.qt-row{grid-template-columns:unset}#hhqActions .qt-grid{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}}";
   document.head.appendChild(gridCss);
 })(typeof window !== "undefined" ? window : globalThis);

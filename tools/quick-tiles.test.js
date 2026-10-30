@@ -30,15 +30,17 @@ test("front desk order follows the shuttle switch and drops tiles the hotel does
 test("housekeeping, maintenance, leaders, and corporate keep their own defaults", () => {
   assert.deepEqual(tiles.pick("Housekeeping", "MSPWE", null, hk, features), ["rooms", "myrooms", "insp", "issue"]);
   assert.deepEqual(tiles.pick("Maintenance", "MSPAM", null, mt, features), ["wo", "pm", "issue"]);
-  assert.deepEqual(tiles.pick("GM", "MSPWE", null, lead, features).slice(0, 6), ["dbrief", "labor", "insp", "wo", "sleads", "check"]);
+  assert.deepEqual(tiles.pick("GM", "MSPWE", null, lead, features).slice(0, 5), ["labor", "insp", "wo", "sleads", "check"]);
   assert.equal(tiles.pick("GM", "MSPWE", null, lead, features).includes("shut"), false);
-  assert.deepEqual(tiles.pick("GM", "MSPAM", null, lead, features).slice(0, 3), ["dbrief", "shut", "labor"]);
-  assert.deepEqual(tiles.pick("GM", "MSPMS", null, lead, features).slice(0, 2), ["dbrief", "shut"]);
+  assert.equal(tiles.pick("GM", "MSPWE", null, lead, features).includes("dbrief"), false);
+  assert.deepEqual(tiles.pick("GM", "MSPAM", null, lead, features).slice(0, 2), ["shut", "labor"]);
+  assert.deepEqual(tiles.pick("GM", "MSPMS", null, lead, features).slice(0, 1), ["shut"]);
   assert.equal(tiles.pick("GM", "MSPAM", null, lead, features).includes("onb"), false);
-  assert.deepEqual(tiles.pick("AGM", "MSPAM", null, lead, features).slice(0, 4), ["dbrief", "shut", "notes", "parking"]);
-  assert.deepEqual(tiles.pick("AGM", "MSPMS", null, lead, features).slice(0, 2), ["dbrief", "shut"]);
+  assert.deepEqual(tiles.pick("AGM", "MSPAM", null, lead, features).slice(0, 4), ["shut", "notes", "parking", "meetings"]);
+  assert.deepEqual(tiles.pick("AGM", "MSPMS", null, lead, features).slice(0, 2), ["shut", "notes"]);
   assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features).includes("shut"), false);
-  assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features)[0], "dbrief");
+  assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features).includes("dbrief"), false);
+  assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features)[0], "notes");
   assert.deepEqual(tiles.pick("Above Property", "MSPWE", null, corp.concat(["shut"]), features), ["crep", "hcmp", "sleads"]);
   assert.deepEqual(tiles.pick("JR Corporate", "MSPAM", null, corp.concat(["shut"]), features).slice(0, 2), ["dbrief", "shut"]);
   assert.equal(tiles.pick("Above Property", "MSPWE", null, corp.concat(["shut"]), features).includes("shut"), false);

@@ -189,7 +189,11 @@
       var list = (prevTiles(role) || []).slice();
       var who = "";
       try { who = authRole() || role; } catch (e) { who = role; }
-      if (role === "GM" && (who === "GM" || who === "AGM" || who === "Above Property" || who === "JR Corporate")) {
+      if (role === "GM" && (who === "GM" || who === "AGM")) {
+        list = list.filter(function (id) { return id !== "brief"; });
+        if (list.indexOf("dbrief") < 0) list.push("dbrief");
+      }
+      if (role === "GM" && (who === "Above Property" || who === "JR Corporate")) {
         list = list.filter(function (id) { return id !== "brief"; });
         if (list.indexOf("dbrief") < 0) list.unshift("dbrief");
       }
@@ -198,7 +202,44 @@
   }
   try { if (typeof NOCOLS !== "undefined" && NOCOLS.indexOf("dbrief") < 0) NOCOLS.push("dbrief"); } catch (e6) {}
 
+  function dayKey() { return new Date().toISOString().slice(0, 10); }
+  function foldKey() {
+    var uid = "";
+    try { uid = (meUser() && meUser().id) || (typeof S !== "undefined" && S.uid) || ""; } catch (e) {}
+    return "jrportal_brief_fold_" + uid + "_" + dayKey();
+  }
+  function collapsed() {
+    try { return localStorage.getItem(foldKey()) === "1"; } catch (e) { return false; }
+  }
+  root.HHQBriefToggle = function () {
+    try { localStorage.setItem(foldKey(), collapsed() ? "0" : "1"); } catch (e) {}
+    if (typeof render === "function") render();
+  };
+  function compact(block) {
+    if (block.value) return "<div class=\"db-mini\"><b>" + esc(block.value) + "</b><span>" + esc(L(block.en, block.es)) + "</span></div>";
+    if (block.rows) return "<div class=\"db-mini\"><b>" + esc(block.rows.map(function (row) { return row.value + " " + L(row.en, row.es); }).join(" · ")) + "</b><span>" + esc(L(block.en, block.es)) + "</span></div>";
+    if (block.id === "labor") return "<div class=\"db-mini\"><b>" + esc(block.actual) + "h</b><span>" + esc(L("Plan", "Plan")) + " " + esc(block.plan) + "h</span></div>";
+    if (block.id === "wo") return "<div class=\"db-mini\"><b>" + esc(block.open) + "</b><span>" + esc(L("open", "abiertas")) + (block.overdue && block.overdue !== "0" ? " · " + esc(block.overdue) + " " + esc(L("overdue", "atrasadas")) : "") + "</span></div>";
+    var first = (block.items || [])[0] || "";
+    return "<div class=\"db-mini\"><b>" + esc(String(first).slice(0, 72)) + "</b><span>" + esc(L(block.en, block.es)) + "</span></div>";
+  }
+  function inlineHtml() {
+    var role = "";
+    try { role = authRole(); } catch (e) { role = ""; }
+    if (role !== "GM" && role !== "AGM") return "";
+    var hotel = hotelOf();
+    if (!hotel) return "";
+    var blocks = sections(gather(hotel));
+    var title = L("Daily Briefing", "Resumen diario");
+    if (!blocks.length) return "";
+    if (collapsed()) {
+      return '<section class="hhq-brief" id="hhqBrief"><button type="button" class="hhq-brief-bar" onclick="HHQBriefToggle()"><b>' + esc(title) + '</b><span>' + esc(L("Show", "Mostrar")) + "</span></button></section>";
+    }
+    return '<section class="hhq-brief" id="hhqBrief"><div class="hhq-brief-hd"><h3>' + esc(title) + '</h3><button type="button" onclick="HHQBriefToggle()">' + esc(L("Collapse", "Ocultar")) + '</button><button type="button" onclick="go(\'dbrief\')">' + esc(L("Full briefing", "Resumen completo")) + '</button></div><div class="hhq-brief-grid">' + blocks.map(compact).join("") + "</div></section>";
+  }
+  root.HHQBrief.inlineHtml = inlineHtml;
+
   var css = document.createElement("style");
-  css.textContent = ".db-hotel{font-weight:750;color:#5c6570;margin:0 0 8px}.db-sec h3{margin:0 0 6px}.db-big{font-size:28px;font-weight:800;margin:0}.db-sec ul{margin:0;padding-left:18px}.db-sec li{margin:0 0 6px}@media(min-width:1024px){#dbRoot{display:grid;grid-template-columns:1fr 1fr;gap:12px}#dbRoot>h2,#dbRoot>.db-hotel{grid-column:1/-1}}";
+  css.textContent = ".db-hotel{font-weight:750;color:#5c6570;margin:0 0 8px}.db-sec h3{margin:0 0 6px}.db-big{font-size:28px;font-weight:800;margin:0}.db-sec ul{margin:0;padding-left:18px}.db-sec li{margin:0 0 6px}.hhq-brief{background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:12px;margin:0 0 12px}.hhq-brief-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hhq-brief-hd h3{margin:0;flex:1}.hhq-brief-hd button,.hhq-brief-bar{background:#f7f8fa;border:1px solid #e6e8ee;border-radius:10px;min-height:36px;font-weight:750;padding:0 12px}.hhq-brief-bar{display:flex;width:100%;align-items:center;justify-content:space-between}.hhq-brief-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:10px}.db-mini{background:#f7f8fa;border:1px solid #e6e8ee;border-radius:12px;padding:10px}.db-mini b{display:block;font-size:18px;line-height:1.2}.db-mini span{display:block;color:#5c6570;font-size:12px;font-weight:700}@media(min-width:1024px){#dbRoot{display:grid;grid-template-columns:1fr 1fr;gap:12px}#dbRoot>h2,#dbRoot>.db-hotel{grid-column:1/-1}}";
   document.head.appendChild(css);
 })(typeof window !== "undefined" ? window : globalThis);
