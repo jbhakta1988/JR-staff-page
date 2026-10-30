@@ -66,6 +66,11 @@ test("each tile is an inline svg with an English or Spanish label", () => {
   assert.match(en, /Sales &amp; Events/);
   assert.match(en, /Admin &amp; Reports/);
   assert.match(en, /Help &amp; tour/);
+  assert.match(en, /--more-accent:#0f766e/);
+  assert.match(en, /--more-accent:#92400e/);
+  assert.match(en, /--more-accent:#6d28d9/);
+  assert.match(en, /--more-accent:#334155/);
+  assert.match(en, /more-dot/);
   assert.equal(en.includes("🛏️"), false);
   assert.match(es, /Ama de llaves/);
   assert.match(es, />Cuartos</);
@@ -83,6 +88,14 @@ test("each tile is an inline svg with an English or Spanish label", () => {
   assert.match(css, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(css, /min-width:1400px\)/);
   assert.match(css, /grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+  assert.match(css, /width:44px;height:44px/);
+  assert.match(css, /color-mix\(in srgb,var\(--more-accent,#334155\) 12%,#fff\)/);
+  assert.match(css, /border-radius:16px/);
+  assert.match(css, /-webkit-line-clamp:2/);
+  assert.match(css, /translateY\(-3px\)/);
+  assert.match(css, /scale\(\.97\)/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.deepEqual(more.GROUPS.map((group) => group.accent), ["#1d4ed8", "#0f766e", "#92400e", "#6d28d9", "#166534", "#334155"]);
 });
 
 test("home stays collapsed until the saved per-user flag is on", () => {
@@ -119,6 +132,7 @@ test("the profile column is additive and only the signed-in person can change it
   assert.doesNotMatch(sql, /drop column/i);
   assert.doesNotMatch(sql, /delete from/i);
   const sw = read("sw.js");
-  assert.match(sw, /var CACHE_VERSION = "hotelhq-shell-v4"/);
+  assert.match(sw, /var CACHE_VERSION = "hotelhq-shell-v5"/);
+  assert.doesNotMatch(sw, /hotelhq-shell-v4/);
   assert.doesNotMatch(sw, /hotelhq-shell-v3/);
 });
