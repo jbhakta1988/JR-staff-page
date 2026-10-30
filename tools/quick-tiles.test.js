@@ -14,17 +14,21 @@ function on(map) {
   };
 }
 const features = on({});
-const desk = ["notes", "parking", "shut", "meetings", "wo", "greq", "rooms", "onb", "settings"];
+const desk = ["notes", "parking", "shut", "meetings", "wo", "greq", "rooms", "recs", "onb", "settings"];
 const hk = ["rooms", "myrooms", "insp", "check", "onb", "settings"];
 const mt = ["wo", "pm", "check", "onb", "settings"];
 const lead = ["labor", "insp", "wo", "sleads", "slead", "check", "notes", "parking", "shut", "meetings", "onb"];
 const corp = ["crep", "sleads", "slead", "fc", "labor", "onb"];
 
 test("front desk order follows the shuttle switch and drops tiles the hotel does not have", () => {
-  assert.deepEqual(tiles.pick("Front Desk", "MSPAM", null, desk, features), ["shut", "parking", "notes", "meetings", "wo"]);
-  assert.deepEqual(tiles.pick("Front Desk", "MSPMS", null, desk, features), ["shut", "parking", "notes", "meetings", "wo"]);
-  assert.deepEqual(tiles.pick("Front Desk", "MSPWE", null, desk, features), ["notes", "meetings", "wo"]);
+  assert.deepEqual(tiles.pick("Front Desk", "MSPAM", null, desk, features), ["shut", "recs", "parking", "notes", "meetings", "wo"]);
+  assert.deepEqual(tiles.pick("Front Desk", "MSPMS", null, desk, features), ["shut", "recs", "parking", "notes", "meetings", "wo"]);
+  assert.deepEqual(tiles.pick("Front Desk", "MSPWE", null, desk, features), ["recs", "notes", "meetings", "wo"]);
+  assert.deepEqual(tiles.pick("Night Audit", "MSPAM", null, desk, features).slice(0, 2), ["shut", "recs"]);
+  assert.equal(tiles.pick("Night Auditor", "MSPWE", null, desk, features)[0], "recs");
   assert.equal(tiles.pick("Front Desk", "MSPAM", null, desk, features).includes("onb"), false);
+  assert.equal(tiles.labelOf("recs", "en"), "Local Tips");
+  assert.equal(tiles.labelOf("recs", "es"), "Tips locales");
 });
 
 test("housekeeping, maintenance, leaders, and corporate keep their own defaults", () => {
@@ -41,6 +45,13 @@ test("housekeeping, maintenance, leaders, and corporate keep their own defaults"
   assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features).includes("shut"), false);
   assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features).includes("dbrief"), false);
   assert.equal(tiles.pick("AGM", "MSPWE", null, lead, features)[0], "notes");
+  assert.equal(tiles.pick("AGM", "MSPAM", null, lead.concat(["recs"]), features).includes("recs"), false);
+  assert.equal(tiles.pick("AGM", "MSPWE", null, lead.concat(["recs"]), features).includes("recs"), false);
+  assert.equal(tiles.choices("AGM", "MSPAM", lead.concat(["recs"]), features).includes("recs"), true);
+  const bar = ["shut", "recs", "my", "sched"];
+  assert.deepEqual(tiles.pick("Bartender", "MSPAM", null, bar, features), ["shut", "recs"]);
+  assert.deepEqual(tiles.pick("Bartender", "MSPMS", null, bar, features), ["shut", "recs"]);
+  assert.deepEqual(tiles.pick("Bartender", "MSPWE", null, bar, features), ["recs"]);
   assert.deepEqual(tiles.pick("Above Property", "MSPWE", null, corp.concat(["shut"]), features), ["crep", "hcmp", "sleads"]);
   assert.deepEqual(tiles.pick("JR Corporate", "MSPAM", null, corp.concat(["shut"]), features).slice(0, 2), ["dbrief", "shut"]);
   assert.equal(tiles.pick("Above Property", "MSPWE", null, corp.concat(["shut"]), features).includes("shut"), false);
@@ -49,6 +60,7 @@ test("housekeeping, maintenance, leaders, and corporate keep their own defaults"
 test("a saved list replaces defaults, stays inside access, and stops at 8", () => {
   const saved = ["wo", "onb", "notes", "shut", "parking", "meetings", "greq", "rooms", "settings", "insp"];
   assert.deepEqual(tiles.pick("Front Desk", "MSPWE", saved, desk, features), ["wo", "notes", "meetings", "greq", "rooms", "settings"]);
+  assert.deepEqual(tiles.pick("Front Desk", "MSPAM", ["notes", "recs"], desk, features), ["notes", "recs"]);
   assert.equal(tiles.pick("Front Desk", "MSPAM", saved, desk, features).length <= 8, true);
   assert.equal(tiles.pick("Front Desk", "MSPAM", [], desk, features).length, 0);
   assert.equal(tiles.labelOf("dbrief", "es"), "Resumen diario");
